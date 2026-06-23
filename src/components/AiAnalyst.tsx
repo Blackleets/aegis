@@ -99,6 +99,15 @@ interface ChatMessage {
   isError?: boolean;
 }
 
+interface FusionDossier {
+  bluf: string;
+  riskLevel: 'CRITICAL' | 'HIGH' | 'ELEVATED' | 'LOW';
+  confidence: 'HIGH' | 'MODERATE' | 'LOW';
+  hotspots: string[];
+  priorityActions: string[];
+  watchlist: string[];
+}
+
 interface AiAnalystProps {
   data: DashboardData;
 }
@@ -175,6 +184,28 @@ function renderMarkdown(text: string): string {
     .replace(/\n/g, '<br />');
 }
 
+function formatFusionDossier(dossier: FusionDossier): string {
+  const bullets = (items: string[]) => (items.length > 0 ? items.map((item) => `- ${item}`).join('\n') : '- None reported');
+  return `# AEGIS FUSION DOSSIER
+## BLUF
+${dossier.bluf}
+
+## RISK LEVEL
+**${dossier.riskLevel}**
+
+## ASSESSMENT CONFIDENCE
+**${dossier.confidence}**
+
+## HOTSPOTS
+${bullets(dossier.hotspots)}
+
+## PRIORITY ACTIONS
+${bullets(dossier.priorityActions)}
+
+## WATCHLIST
+${bullets(dossier.watchlist)}`;
+}
+
 /* ─────────────────────────────────────────────────────────────
    Component
    ───────────────────────────────────────────────────────────── */
@@ -193,7 +224,7 @@ export default function AiAnalyst({ data }: AiAnalystProps) {
 
   // Load saved key on mount
   useEffect(() => {
-    const saved = localStorage.getItem('osiris-gemini-key');
+    const saved = localStorage.getItem('aegis-gemini-key');
     if (saved) {
       setApiKeyInput(saved);
       setKeySaved(true);
@@ -214,7 +245,7 @@ export default function AiAnalyst({ data }: AiAnalystProps) {
 
   const getHeaders = useCallback((): Record<string, string> => {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    const savedKey = localStorage.getItem('osiris-gemini-key');
+    const savedKey = localStorage.getItem('aegis-gemini-key');
     if (savedKey) {
       headers['x-gemini-key'] = savedKey;
     }
@@ -325,6 +356,56 @@ export default function AiAnalyst({ data }: AiAnalystProps) {
     }
   }, [isLoading, data, getHeaders]);
 
+  const handleFusionDossier = useCallback(async () => {
+    if (isLoading) return;
+
+    const userMsg: ChatMessage = {
+      id: generateId(),
+      role: 'user',
+      content: '⚡ Generate AEGIS fusion dossier with hotspots, actions, and watchlist',
+      timestamp: new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, userMsg]);
+    setIsLoading(true);
+
+    try {
+      const context = buildContext(data);
+      const res = await fetch('/api/ai/fusion', {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ context }),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok) {
+        const errorBody = json as { error: string; code: string };
+        throw new Error(errorBody.error || `HTTP ${res.status}`);
+      }
+
+      const responseBody = json as { dossier: FusionDossier; generatedAt: string };
+      const analystMsg: ChatMessage = {
+        id: generateId(),
+        role: 'analyst',
+        content: formatFusionDossier(responseBody.dossier),
+        timestamp: responseBody.generatedAt,
+      };
+      setMessages((prev) => [...prev, analystMsg]);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Fusion dossier generation failed';
+      const errorMsg: ChatMessage = {
+        id: generateId(),
+        role: 'analyst',
+        content: `⚠ FUSION DOSSIER ERROR\n\n${message}`,
+        timestamp: new Date().toISOString(),
+        isError: true,
+      };
+      setMessages((prev) => [...prev, errorMsg]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [isLoading, data, getHeaders]);
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       if (e.key === 'Enter' && !e.shiftKey) {
@@ -338,14 +419,14 @@ export default function AiAnalyst({ data }: AiAnalystProps) {
   const saveApiKey = useCallback(() => {
     const key = apiKeyInput.trim();
     if (key) {
-      localStorage.setItem('osiris-gemini-key', key);
+      localStorage.setItem('aegis-gemini-key', key);
       setKeySaved(true);
       setTimeout(() => setShowSettings(false), 600);
     }
   }, [apiKeyInput]);
 
   const clearApiKey = useCallback(() => {
-    localStorage.removeItem('osiris-gemini-key');
+    localStorage.removeItem('aegis-gemini-key');
     setApiKeyInput('');
     setKeySaved(false);
   }, []);
@@ -440,7 +521,7 @@ export default function AiAnalyst({ data }: AiAnalystProps) {
                     <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-[var(--alert-green)] animate-osiris-pulse" />
                   </div>
                   <div className="flex flex-col">
-                    <span className="hud-text text-[11px] text-[var(--text-heading)]">OSIRIS ANALYST</span>
+                    <span className="hud-text text-[11px] text-[var(--text-heading)]">AEGIS ANALYST</span>
                     <span className="text-[7px] font-mono tracking-[0.2em] text-[var(--text-muted)]">
                       GEMINI 2.0 FLASH • ONLINE
                     </span>
@@ -539,7 +620,7 @@ export default function AiAnalyst({ data }: AiAnalystProps) {
                         )}
                       </div>
                       <p className="text-[8px] font-mono text-[var(--text-muted)] leading-relaxed">
-                        Your key is stored locally and sent only to the OSIRIS server. Get a free key at{' '}
+                        Your key is stored locally and sent only to the AEGIS server. Get a free key at{' '}
                         <a
                           href="https://aistudio.google.com/apikey"
                           target="_blank"
@@ -600,7 +681,7 @@ export default function AiAnalyst({ data }: AiAnalystProps) {
                       </span>
                       {[
                         'What are the top 3 threats right now?',
-                        'Are there seismic patterns correlating with conflicts?',
+                        'Build a cross-domain escalation hypothesis from today\'s signals',
                         'Assess cyber risks to critical infrastructure',
                       ].map((prompt) => (
                         <button
@@ -671,7 +752,7 @@ export default function AiAnalyst({ data }: AiAnalystProps) {
                               : 'var(--gold-primary)',
                           }}
                         >
-                          {msg.role === 'user' ? 'OPERATOR' : 'OSIRIS ANALYST'}
+                          {msg.role === 'user' ? 'OPERATOR' : 'AEGIS ANALYST'}
                         </span>
                         <span className="text-[7px] font-mono text-[var(--text-muted)] ml-auto">
                           {new Date(msg.timestamp).toLocaleTimeString([], {
@@ -741,6 +822,19 @@ export default function AiAnalyst({ data }: AiAnalystProps) {
                 {/* Quick action */}
                 <div className="flex gap-2 mb-2">
                   <button
+                    onClick={handleFusionDossier}
+                    disabled={isLoading}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[9px] font-mono tracking-[0.1em] uppercase transition-all disabled:opacity-40"
+                    style={{
+                      background: 'rgba(0, 229, 255, 0.08)',
+                      border: '1px solid rgba(0, 229, 255, 0.2)',
+                      color: 'var(--cyan-primary)',
+                    }}
+                  >
+                    <Sparkles className="w-3 h-3" />
+                    FUSION DOSSIER
+                  </button>
+                  <button
                     onClick={handleBriefing}
                     disabled={isLoading}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[9px] font-mono tracking-[0.1em] uppercase transition-all disabled:opacity-40"
@@ -753,7 +847,7 @@ export default function AiAnalyst({ data }: AiAnalystProps) {
                     <Sparkles className="w-3 h-3" />
                     GENERATE BRIEFING
                   </button>
-                  <div className="flex-1" />
+
                   <span className="flex items-center text-[7px] font-mono text-[var(--text-muted)] tracking-wider">
                     <ChevronDown className="w-2.5 h-2.5 mr-0.5" />
                     SHIFT+ENTER FOR NEWLINE
@@ -774,7 +868,7 @@ export default function AiAnalyst({ data }: AiAnalystProps) {
                       value={inputText}
                       onChange={(e) => setInputText(e.target.value)}
                       onKeyDown={handleKeyDown}
-                      placeholder="Query the intelligence analyst..."
+                      placeholder="Ask AEGIS for a fusion assessment..."
                       rows={1}
                       className="w-full bg-transparent px-3 py-2.5 text-[11px] font-mono text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none resize-none"
                       style={{ maxHeight: '120px', minHeight: '36px' }}
