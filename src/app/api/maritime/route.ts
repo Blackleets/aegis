@@ -1,6 +1,46 @@
 import { NextResponse } from 'next/server';
 import WebSocket from 'ws';
 
+type ShipCacheEntry = {
+  id: number;
+  mmsi: number;
+  timestamp: number;
+  lat?: number;
+  lng?: number;
+  speed?: number;
+  heading?: number;
+  type?: string;
+  name?: string;
+  destination?: string;
+  flag?: string;
+};
+
+type AisPositionReport = {
+  Latitude?: number;
+  Longitude?: number;
+  Sog?: number;
+  TrueHeading?: number;
+  Cog?: number;
+};
+
+type AisStaticData = {
+  Name?: string;
+  Destination?: string;
+  Type?: number;
+};
+
+type AisMessagePayload = {
+  MetaData?: {
+    MMSI?: number;
+    ShipName?: string;
+  };
+  MessageType?: 'PositionReport' | 'ShipStaticData' | string;
+  Message?: {
+    PositionReport?: AisPositionReport;
+    ShipStaticData?: AisStaticData;
+  };
+};
+
 /**
  * OSIRIS — Maritime Intelligence
  * Real-time AIS vessel tracking via aisstream.io + Static global ports.
@@ -84,7 +124,7 @@ const CHOKEPOINTS = [
 // For Next.js dev server or Node.js Docker container, this will persist.
 
 const globalForAis = globalThis as unknown as {
-  shipsCache: Map<number, any>;
+  shipsCache: Map<number, ShipCacheEntry>;
   isAisConnecting: boolean;
 };
 
@@ -105,7 +145,7 @@ function connectAisStream() {
 
   try {
     ws = new WebSocket("wss://stream.aisstream.io/v0/stream");
-  } catch (e) {
+  } catch {
     globalForAis.isAisConnecting = false;
     return;
   }
@@ -153,11 +193,11 @@ function connectAisStream() {
 
   ws.on("message", (data) => {
     try {
-      const parsed = JSON.parse(data.toString());
+      const parsed: AisMessagePayload = JSON.parse(data.toString());
       const mmsi = parsed.MetaData?.MMSI;
       if (!mmsi) return;
 
-      let existing = shipsCache.get(mmsi) || {
+      const existing = shipsCache.get(mmsi) || {
         id: mmsi, mmsi: mmsi, timestamp: Date.now()
       };
 
@@ -191,7 +231,7 @@ function connectAisStream() {
         const firstKey = shipsCache.keys().next().value;
         if (firstKey) shipsCache.delete(firstKey);
       }
-    } catch (e) {
+    } catch {
       // ignore parse errors
     }
   });
@@ -267,8 +307,8 @@ async function fetchVesselApiFallback() {
         name: ship.name, destination: ship.destination, flag: ship.flag
       });
     }
-  } catch (e) {
-    console.warn("VesselAPI Fallback Error:", e);
+  } catch (error) {
+    console.warn("VesselAPI Fallback Error:", error);
   }
 }
 
