@@ -13,7 +13,6 @@ import {
   type PolybolosEntity,
   type PolybolosClientConfig,
   type SDKStatus,
-  type LatticeConnectionStatus,
   Domain,
   EntityType,
   ThreatLevel,
@@ -23,7 +22,93 @@ import { LatticeAdapter } from './LatticeAdapter';
 
 // ── OSIRIS Feed → Entity Translators ───────────────────────────────
 
-function translateFlights(flights: any[], subtype: string): PolybolosEntity[] {
+interface FlightRecord {
+  icao24?: string;
+  callsign?: string;
+  lat: number;
+  lng: number;
+  alt?: number;
+  heading?: number;
+  speed_knots?: number;
+  model?: string;
+  registration?: string;
+}
+
+interface MaritimeRecord {
+  id?: string;
+  mmsi?: number | string;
+  name?: string;
+  lat: number;
+  lng: number;
+  heading?: number;
+  speed?: number;
+  type?: string;
+  destination?: string;
+  flag?: string;
+}
+
+interface EarthquakeRecord {
+  id?: string;
+  magnitude: number;
+  place?: string;
+  lat: number;
+  lng: number;
+  depth?: number;
+}
+
+interface SatelliteRecord {
+  noradId?: number | string;
+  name?: string;
+  lat: number;
+  lng: number;
+  alt?: number;
+  mission?: string;
+  color?: string;
+}
+
+interface FireRecord {
+  lat: number;
+  lng: number;
+  brightness?: number;
+}
+
+interface CctvRecord {
+  id?: string;
+  name?: string;
+  lat: number;
+  lng: number;
+  city?: string;
+  country?: string;
+  source?: string;
+  feed_url?: string;
+  stream_url?: string;
+}
+
+interface RadiationRecord {
+  name?: string;
+  lat: number;
+  lng: number;
+  status?: string;
+  reading?: number | string;
+  network?: string;
+  city?: string;
+  country?: string;
+}
+
+interface OsirisIngestPayload {
+  commercial_flights?: FlightRecord[];
+  private_flights?: FlightRecord[];
+  private_jets?: FlightRecord[];
+  military_flights?: FlightRecord[];
+  maritime_ships?: MaritimeRecord[];
+  satellites?: SatelliteRecord[];
+  earthquakes?: EarthquakeRecord[];
+  fires?: FireRecord[];
+  cameras?: CctvRecord[];
+  radiation?: RadiationRecord[];
+}
+
+function translateFlights(flights: FlightRecord[], subtype: string): PolybolosEntity[] {
   if (!flights?.length) return [];
   const colorMap: Record<string, string> = {
     commercial: '#00E5FF', private: '#00E676', jets: '#FF69B4', military: '#FF3D3D',
@@ -32,7 +117,7 @@ function translateFlights(flights: any[], subtype: string): PolybolosEntity[] {
     commercial: ThreatLevel.NONE, private: ThreatLevel.NONE,
     jets: ThreatLevel.LOW, military: ThreatLevel.ELEVATED,
   };
-  return flights.map((f: any) => ({
+  return flights.map((f) => ({
     id: `osiris-air-${f.icao24 || f.callsign || Math.random().toString(36).slice(2)}`,
     name: f.callsign?.trim() || 'UNKNOWN',
     domain: Domain.AIR,
@@ -47,9 +132,9 @@ function translateFlights(flights: any[], subtype: string): PolybolosEntity[] {
   }));
 }
 
-function translateMaritime(ships: any[]): PolybolosEntity[] {
+function translateMaritime(ships: MaritimeRecord[]): PolybolosEntity[] {
   if (!ships?.length) return [];
-  return ships.map((s: any) => ({
+  return ships.map((s) => ({
     id: `osiris-sea-${s.mmsi || s.id || Math.random().toString(36).slice(2)}`,
     name: s.name || `MMSI-${s.mmsi}`,
     domain: Domain.SEA,
@@ -67,9 +152,9 @@ function translateMaritime(ships: any[]): PolybolosEntity[] {
   }));
 }
 
-function translateEarthquakes(events: any[]): PolybolosEntity[] {
+function translateEarthquakes(events: EarthquakeRecord[]): PolybolosEntity[] {
   if (!events?.length) return [];
-  return events.map((eq: any) => ({
+  return events.map((eq) => ({
     id: `osiris-event-eq-${eq.id || Math.random().toString(36).slice(2)}`,
     name: `M${eq.magnitude} ${eq.place || 'Earthquake'}`,
     domain: Domain.LAND,
@@ -84,9 +169,9 @@ function translateEarthquakes(events: any[]): PolybolosEntity[] {
   }));
 }
 
-function translateSatellites(sats: any[]): PolybolosEntity[] {
+function translateSatellites(sats: SatelliteRecord[]): PolybolosEntity[] {
   if (!sats?.length) return [];
-  return sats.map((s: any) => ({
+  return sats.map((s) => ({
     id: `osiris-space-${s.noradId || Math.random().toString(36).slice(2)}`,
     name: s.name || 'UNKNOWN SAT',
     domain: Domain.SPACE,
@@ -101,9 +186,9 @@ function translateSatellites(sats: any[]): PolybolosEntity[] {
   }));
 }
 
-function translateFires(fires: any[]): PolybolosEntity[] {
+function translateFires(fires: FireRecord[]): PolybolosEntity[] {
   if (!fires?.length) return [];
-  return fires.map((f: any, i: number) => ({
+  return fires.map((f, i: number) => ({
     id: `osiris-event-fire-${i}`,
     name: 'Active Fire',
     domain: Domain.LAND,
@@ -118,9 +203,9 @@ function translateFires(fires: any[]): PolybolosEntity[] {
   }));
 }
 
-function translateCCTV(cameras: any[]): PolybolosEntity[] {
+function translateCCTV(cameras: CctvRecord[]): PolybolosEntity[] {
   if (!cameras?.length) return [];
-  return cameras.map((c: any) => ({
+  return cameras.map((c) => ({
     id: `osiris-sensor-cctv-${c.id || Math.random().toString(36).slice(2)}`,
     name: c.name || 'Camera',
     domain: Domain.LAND,
@@ -135,9 +220,9 @@ function translateCCTV(cameras: any[]): PolybolosEntity[] {
   }));
 }
 
-function translateRadiation(stations: any[]): PolybolosEntity[] {
+function translateRadiation(stations: RadiationRecord[]): PolybolosEntity[] {
   if (!stations?.length) return [];
-  return stations.map((r: any) => ({
+  return stations.map((r) => ({
     id: `osiris-sensor-rad-${r.name || Math.random().toString(36).slice(2)}`,
     name: r.name || 'Radiation Monitor',
     domain: Domain.LAND,
@@ -223,7 +308,7 @@ export class PolybolosClient {
    * Ingest raw OSIRIS data and translate it into Polybolos entities.
    * This is the primary method called by page.tsx to feed data into the SDK.
    */
-  ingestOsirisData(data: Record<string, any>): void {
+  ingestOsirisData(data: OsirisIngestPayload): void {
     const entities: PolybolosEntity[] = [];
 
     // Air domain
@@ -264,7 +349,7 @@ export class PolybolosClient {
   /** Get all entities, optionally filtered by domain */
   getEntities(domain?: Domain): PolybolosEntity[] {
     const all = Array.from(this.entityStore.values());
-    if (domain) return all.filter(e => e.domain === domain);
+    if (domain) return all.filter((entity) => entity.domain === domain);
     return all;
   }
 
@@ -272,7 +357,7 @@ export class PolybolosClient {
   getEntityCountByDomain(): Record<Domain, number> {
     const counts = {} as Record<Domain, number>;
     for (const d of Object.values(Domain)) counts[d] = 0;
-    for (const entity of this.entityStore.values()) {
+    for (const entity of Array.from(this.entityStore.values())) {
       counts[entity.domain] = (counts[entity.domain] || 0) + 1;
     }
     return counts;
@@ -283,7 +368,7 @@ export class PolybolosClient {
     const levels = [ThreatLevel.NONE, ThreatLevel.LOW, ThreatLevel.ELEVATED, ThreatLevel.HIGH, ThreatLevel.CRITICAL];
     const minIndex = levels.indexOf(minLevel);
     return Array.from(this.entityStore.values())
-      .filter(e => levels.indexOf(e.threat) >= minIndex);
+      .filter((entity) => levels.indexOf(entity.threat) >= minIndex);
   }
 
   /** Get current SDK status */
@@ -303,27 +388,27 @@ export class PolybolosClient {
     const entities = this.getEntities(domain);
     return {
       type: 'FeatureCollection',
-      features: entities.map(e => ({
+      features: entities.map((entity) => ({
         type: 'Feature' as const,
         geometry: {
           type: 'Point' as const,
-          coordinates: [e.position.lng, e.position.lat],
+          coordinates: [entity.position.lng, entity.position.lat],
         },
         properties: {
-          id: e.id,
-          name: e.name,
-          domain: e.domain,
-          entityType: e.entityType,
-          threat: e.threat,
-          color: e.display.color,
-          icon: e.display.icon,
-          heading: e.position.heading || 0,
-          alt: e.position.alt,
-          speed: e.position.speed,
-          glow: e.display.glow || false,
-          scale: e.display.scale || 1.0,
-          source: e.source.provider,
-          ...e.properties,
+          id: entity.id,
+          name: entity.name,
+          domain: entity.domain,
+          entityType: entity.entityType,
+          threat: entity.threat,
+          color: entity.display.color,
+          icon: entity.display.icon,
+          heading: entity.position.heading || 0,
+          alt: entity.position.alt,
+          speed: entity.position.speed,
+          glow: entity.display.glow || false,
+          scale: entity.display.scale || 1.0,
+          source: entity.source.provider,
+          ...entity.properties,
         },
       })),
     };
@@ -347,9 +432,7 @@ export class PolybolosClient {
     // Count OSIRIS feeds that have data
     const feeds = ['commercial_flights', 'private_flights', 'military_flights', 'maritime_ships',
       'satellites', 'earthquakes', 'fires', 'cameras', 'radiation'];
-    for (const feed of feeds) {
-      if (this.entityStore.size > 0) count++; // Simplified: if store has data, feeds are active
-    }
+    if (this.entityStore.size > 0) count = feeds.length; // Simplified: if store has data, feeds are active
     if (this.latticeAdapter && this.latticeAdapter.getEntityCount() > 0) count++;
     return Math.min(count, feeds.length);
   }
