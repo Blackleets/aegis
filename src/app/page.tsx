@@ -1023,7 +1023,17 @@ export default function Dashboard() {
         {showLayers && (
           <>
             <LayerPanel data={dataWithSdk} activeLayers={activeLayers} setActiveLayers={setActiveLayers} />
-            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.5 }} className="glass-panel px-3 py-2.5 pointer-events-auto">
+            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.5 }} className="glass-panel px-3 py-2.5 pointer-events-auto overflow-hidden border border-[var(--gold-primary)]/15 bg-[linear-gradient(180deg,rgba(10,17,24,0.95),rgba(6,11,18,0.86))]">
+              <div className="mb-2 flex items-center justify-between rounded-lg border border-[var(--border-secondary)]/40 bg-black/20 px-2.5 py-2">
+                <div>
+                  <div className="text-[8px] font-mono tracking-[0.26em] text-[var(--gold-primary)]/85">COMMAND POSTURE</div>
+                  <div className="mt-1 text-[10px] font-mono tracking-[0.16em] text-[var(--text-primary)]">{operationalModeLabel}</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-[8px] font-mono tracking-[0.16em] text-[var(--text-muted)]">ALERT LOAD</div>
+                  <div className="mt-1 text-[13px] font-bold tabular-nums" style={{ color: activeIntelAlerts > 0 ? '#FF9500' : 'var(--alert-green)' }}>{activeIntelAlerts}</div>
+                </div>
+              </div>
               <div className="grid grid-cols-5 gap-2 text-center">
                 <div><div className="hud-label">AIRCRAFT</div><div className="hud-value text-[10px] animate-data-pulse">{globalStats ? globalStats.flights.toLocaleString() : '0'}</div></div>
                 <div><div className="hud-label">SATS</div><div className="hud-value text-[10px]">{globalStats ? globalStats.sats.toLocaleString() : '0'}</div></div>
@@ -1185,6 +1195,20 @@ export default function Dashboard() {
                       {mobilePanel === 'layers' ? 'LAYERS & STATS' : mobilePanel === 'markets' ? 'MARKETS & INTEL' : mobilePanel === 'intel' ? 'INTEL FEED' : mobilePanel === 'recon' ? 'AEGIS RECON' : 'SEARCH'}
                     </span>
                     <button onClick={() => setMobilePanel(null)} className="text-[var(--text-muted)] p-1"><X className="w-4 h-4" /></button>
+                  </div>
+                  <div className="mb-2 grid grid-cols-3 gap-2">
+                    <div className="rounded-lg border border-[var(--border-secondary)]/35 bg-black/20 px-2 py-2">
+                      <div className="text-[6px] font-mono tracking-[0.22em] text-[var(--text-muted)]">MODE</div>
+                      <div className="mt-1 text-[9px] font-mono leading-tight text-[var(--text-primary)]">{operationalModeLabel}</div>
+                    </div>
+                    <div className="rounded-lg border border-[var(--border-secondary)]/35 bg-black/20 px-2 py-2 text-center">
+                      <div className="text-[6px] font-mono tracking-[0.22em] text-[var(--text-muted)]">ALERTS</div>
+                      <div className="mt-1 text-[11px] font-bold tabular-nums" style={{ color: activeIntelAlerts > 0 ? '#FF9500' : 'var(--alert-green)' }}>{activeIntelAlerts}</div>
+                    </div>
+                    <div className="rounded-lg border border-[var(--border-secondary)]/35 bg-black/20 px-2 py-2 text-center">
+                      <div className="text-[6px] font-mono tracking-[0.22em] text-[var(--text-muted)]">TRACKED</div>
+                      <div className="mt-1 text-[11px] font-bold tabular-nums text-[var(--gold-primary)]">{trackedEntityCount}</div>
+                    </div>
                   </div>
                   {mobilePanel === 'layers' && (
                     <>
