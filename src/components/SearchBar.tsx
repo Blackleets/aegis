@@ -4,9 +4,21 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Search, X, MapPin } from 'lucide-react';
 
 /* ═══════════════════════════════════════════════════════════════
-   OSIRIS — Search / Locate Bar
+   AEGIS — Search / Locate Bar
    Coordinate and place name search with geocoding
    ═══════════════════════════════════════════════════════════════ */
+
+interface SearchResult {
+  label: string;
+  lat: number;
+  lng: number;
+}
+
+interface NominatimResult {
+  display_name: string;
+  lat: string;
+  lon: string;
+}
 
 interface SearchBarProps {
   onLocate: (lat: number, lng: number) => void;
@@ -15,7 +27,7 @@ interface SearchBarProps {
 export default function SearchBar({ onLocate }: SearchBarProps) {
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState('');
-  const [results, setResults] = useState<{ label: string; lat: number; lng: number }[]>([]);
+  const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -47,8 +59,8 @@ export default function SearchBar({ onLocate }: SearchBarProps) {
         const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5`, {
           headers: { 'Accept-Language': 'en' },
         });
-        const data = await res.json();
-        setResults(data.map((r: any) => ({ label: r.display_name, lat: parseFloat(r.lat), lng: parseFloat(r.lon) })));
+        const data: NominatimResult[] = await res.json();
+        setResults(data.map((r) => ({ label: r.display_name, lat: parseFloat(r.lat), lng: parseFloat(r.lon) })));
       } catch { setResults([]); }
       setLoading(false);
     }, 350);

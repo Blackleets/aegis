@@ -1,7 +1,7 @@
 {
-  "name": "OSIRIS — Global Intelligence Platform",
-  "short_name": "OSIRIS",
-  "description": "Real-time global OSINT intelligence dashboard. Track 10K+ aircraft, 2K satellites, worldwide CCTV, earthquakes, wildfires, nuclear facilities, and more.",
+  "name": "AEGIS — AI-Enhanced Intelligence Platform",
+  "short_name": "AEGIS",
+  "description": "AI-enhanced open intelligence command center for live flight, satellite, CCTV and cyber reconnaissance.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#06060C",
@@ -16,7 +16,7 @@
       "purpose": "any"
     },
     {
-      "src": "/osiris-icon.png",
+      "src": "/android-chrome-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

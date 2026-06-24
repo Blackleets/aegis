@@ -3,21 +3,39 @@
 import { memo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Plane, Satellite, Activity, Globe, Radio, Eye,
-  Shield, Sun, AlertTriangle, Camera, Flame, Target,
-  CloudLightning, Radiation, Tv, Anchor, Ship, Newspaper,
+  Plane, Satellite, Activity, Radio, Eye,
+  Shield, Sun, AlertTriangle, Camera, Flame,
+  CloudLightning, Radiation, Tv, Ship,
   ChevronDown, ChevronUp, ToggleLeft, ToggleRight, Network,
 } from 'lucide-react';
 
-interface LayerPanelProps {
-  data: any;
-  activeLayers: any;
-  setActiveLayers: React.Dispatch<React.SetStateAction<any>>;
+type LayerDataMap = Record<string, unknown>;
+type ActiveLayers = Record<string, boolean>;
+
+interface LayerConfig {
+  key: string;
+  label: string;
+  icon: typeof Network;
+  color: string;
+  dataKey: string;
 }
 
-const LAYER_GROUPS = [
+interface LayerGroup {
+  label: string;
+  icon: typeof Network;
+  color: string;
+  layers: LayerConfig[];
+}
+
+interface LayerPanelProps {
+  data: LayerDataMap;
+  activeLayers: ActiveLayers;
+  setActiveLayers: React.Dispatch<React.SetStateAction<ActiveLayers>>;
+}
+
+const LAYER_GROUPS: LayerGroup[] = [
   {
-    label: 'OSIRIS SDK',
+    label: 'AEGIS SDK',
     icon: Network,
     color: '#1565C0',
     layers: [
@@ -84,7 +102,7 @@ const LAYER_GROUPS = [
 ];
 
 // Flat list for backward compat
-const ALL_LAYERS = LAYER_GROUPS.flatMap(g => g.layers);
+const ALL_LAYERS = LAYER_GROUPS.flatMap((g) => g.layers);
 
 function LayerPanel({ data, activeLayers, setActiveLayers }: LayerPanelProps) {
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(() => {
@@ -93,7 +111,7 @@ function LayerPanel({ data, activeLayers, setActiveLayers }: LayerPanelProps) {
     return initial;
   });
 
-  const toggle = (key: string) => setActiveLayers((prev: any) => ({ ...prev, [key]: !prev[key] }));
+  const toggle = (key: string) => setActiveLayers((prev) => ({ ...prev, [key]: !prev[key] }));
   const getCount = (dk: string): number | null => {
     if (!dk) return null;
     let total = 0;
@@ -106,7 +124,7 @@ function LayerPanel({ data, activeLayers, setActiveLayers }: LayerPanelProps) {
     }
     return found ? total : null;
   };
-  const totalEntities = ALL_LAYERS.reduce((s: number, l: any) => s + (getCount(l.dataKey) || 0), 0);
+  const totalEntities = ALL_LAYERS.reduce((sum, layer) => sum + (getCount(layer.dataKey) || 0), 0);
   const activeCount = Object.values(activeLayers).filter(Boolean).length;
 
   const toggleGroup = (groupLabel: string) => {
@@ -115,7 +133,7 @@ function LayerPanel({ data, activeLayers, setActiveLayers }: LayerPanelProps) {
 
   const toggleAllInGroup = (group: typeof LAYER_GROUPS[0]) => {
     const allActive = group.layers.every(l => activeLayers[l.key]);
-    setActiveLayers((prev: any) => {
+    setActiveLayers((prev) => {
       const next = { ...prev };
       group.layers.forEach(l => { next[l.key] = !allActive; });
       return next;

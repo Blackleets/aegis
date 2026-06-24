@@ -15,7 +15,7 @@ AEGIS turns the original global-intel dashboard into a sharper operator workspac
 - AI analyst mounted directly in the main dashboard
 - New Fusion Dossier workflow and API endpoint: `/api/ai/fusion`
 - Local Gemini key namespace changed to `aegis-gemini-key`
-- Updated share text, middleware metadata, and operator-facing labels
+- Updated share text, proxy metadata, and operator-facing labels
 - Build validated after the changes
 
 ## Core capabilities

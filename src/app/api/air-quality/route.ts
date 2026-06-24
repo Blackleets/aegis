@@ -1,11 +1,33 @@
 import { NextResponse } from 'next/server';
 
 /**
- * OSIRIS — Air Quality Monitoring API
+ * AEGIS — Air Quality Monitoring API
  * Fetches real-time global air quality data from OpenAQ
  * FREE — No API key required
  * Data: PM2.5, PM10, O3, NO2, SO2, CO measurements worldwide
  */
+
+interface OpenAQMeasurement {
+  parameter: string;
+  value: number;
+  unit: string;
+  lastUpdated: string;
+}
+
+interface OpenAQLocation {
+  location: string;
+  city?: string;
+  country: string;
+  coordinates?: {
+    latitude?: number;
+    longitude?: number;
+  };
+  measurements?: OpenAQMeasurement[];
+}
+
+interface OpenAQResponse {
+  results?: OpenAQLocation[];
+}
 
 export async function GET() {
   try {
@@ -24,13 +46,25 @@ export async function GET() {
       )
     );
 
-    const stations: any[] = [];
+    const stations: Array<{
+      id: string;
+      name: string;
+      city: string;
+      country: string;
+      lat: number;
+      lng: number;
+      pm25: number;
+      unit: string;
+      level: string;
+      color: string;
+      lastUpdated: string;
+    }> = [];
     for (const result of results) {
       if (result.status !== 'fulfilled') continue;
-      const data = result.value;
+      const data: OpenAQResponse = result.value;
       for (const loc of data.results || []) {
         if (!loc.coordinates?.latitude || !loc.coordinates?.longitude) continue;
-        const pm25 = loc.measurements?.find((m: any) => m.parameter === 'pm25');
+        const pm25 = loc.measurements?.find((m) => m.parameter === 'pm25');
         if (!pm25) continue;
         
         // AQI color coding based on PM2.5 (WHO/EPA scale)

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import type { NextRequest, NextFetchEvent } from 'next/server';
+import type { NextProxy } from 'next/server';
 
-export function middleware(request: NextRequest, event: NextFetchEvent) {
+export const proxy: NextProxy = (request, event) => {
   const url = request.nextUrl.pathname;
   
   const ip = request.headers.get('cf-connecting-ip') || request.headers.get('x-forwarded-for') || '127.0.0.1';
@@ -35,7 +35,7 @@ export function middleware(request: NextRequest, event: NextFetchEvent) {
   event.waitUntil(Promise.all([pageView, ipEvent]));
 
   return NextResponse.next();
-}
+};
 
 export const config = {
   matcher: [

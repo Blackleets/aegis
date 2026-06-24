@@ -5,12 +5,26 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Newspaper, ChevronDown, ChevronUp, ExternalLink, MapPin, Zap } from 'lucide-react';
 
 /* ═══════════════════════════════════════════════════════════════
-   OSIRIS — Intelligence Feed
+   AEGIS — Intelligence Feed
    SIGINT-style news aggregation with risk scoring
    ═══════════════════════════════════════════════════════════════ */
 
+interface IntelFeedItem {
+  id: string;
+  title: string;
+  description?: string;
+  link?: string;
+  published: string;
+  source: string;
+  risk_score: number;
+  coords: [number, number] | null;
+  machine_assessment?: string | null;
+}
+
 interface IntelFeedProps {
-  data: any;
+  data: {
+    news?: IntelFeedItem[];
+  };
   onLocate?: (lat: number, lng: number) => void;
 }
 
@@ -63,7 +77,7 @@ export default function IntelFeed({ data, onLocate }: IntelFeedProps) {
           <Newspaper className="w-3.5 h-3.5 text-[var(--gold-primary)]" />
           <span className="hud-text text-[12px] text-[var(--text-primary)]">SIGINT FEED</span>
           <span className="gotham-tag gotham-tag--info" style={{ fontSize: '8px', padding: '1px 5px' }}>{news.length}</span>
-          {news.some((n: any) => n.risk_score >= 8) && (
+          {news.some((n) => n.risk_score >= 8) && (
             <span className="gotham-tag gotham-tag--critical" style={{ fontSize: '7px', padding: '1px 4px' }}>ALERTS</span>
           )}
         </div>
@@ -90,7 +104,7 @@ export default function IntelFeed({ data, onLocate }: IntelFeedProps) {
                   </span>
                 </div>
               ) : (
-                news.slice(0, 25).map((item: any, i: number) => (
+                news.slice(0, 25).map((item, i) => (
                   <div
                     key={i}
                     role="button"

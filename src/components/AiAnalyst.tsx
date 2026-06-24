@@ -21,7 +21,7 @@ import {
 import type { IntelligenceContext } from '@/lib/ai-engine';
 
 /* ═══════════════════════════════════════════════════════════════
-   OSIRIS — AI Intelligence Analyst Panel
+   AEGIS — AI Intelligence Analyst Panel
    Premium glass-panel chat interface for real-time intelligence
    analysis powered by Gemini 2.0 Flash
    ═══════════════════════════════════════════════════════════════ */
@@ -216,20 +216,17 @@ export default function AiAnalyst({ data }: AiAnalystProps) {
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [apiKeyInput, setApiKeyInput] = useState('');
-  const [keySaved, setKeySaved] = useState(false);
+  const [apiKeyInput, setApiKeyInput] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    return localStorage.getItem('aegis-gemini-key') || '';
+  });
+  const [keySaved, setKeySaved] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return Boolean(localStorage.getItem('aegis-gemini-key'));
+  });
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-
-  // Load saved key on mount
-  useEffect(() => {
-    const saved = localStorage.getItem('aegis-gemini-key');
-    if (saved) {
-      setApiKeyInput(saved);
-      setKeySaved(true);
-    }
-  }, []);
 
   // Auto-scroll to bottom
   useEffect(() => {

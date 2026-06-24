@@ -5,6 +5,8 @@ import { motion } from 'framer-motion';
 
 interface Exchange { name: string; country: string; open: boolean; }
 interface CountryRisk { code: string; risk_score: number; risk_level: string; tags: string[]; }
+interface CyberThreatStats { active_cves?: number; }
+interface CyberThreatResponse { stats?: CyberThreatStats; }
 
 const RISK_TOOLTIPS: Record<string, string> = {
   CRITICAL: 'Active conflict, sanctions, or major instability detected',
@@ -16,7 +18,7 @@ const RISK_TOOLTIPS: Record<string, string> = {
 export default function GlobalStatusBar() {
   const [exchanges, setExchanges] = useState<Exchange[]>([]);
   const [risks, setRisks] = useState<CountryRisk[]>([]);
-  const [cyber, setCyber] = useState<any>(null);
+  const [cyber, setCyber] = useState<CyberThreatResponse | null>(null);
   const [openCount, setOpenCount] = useState(0);
   const [hoveredRisk, setHoveredRisk] = useState<CountryRisk | null>(null);
 
@@ -36,7 +38,7 @@ export default function GlobalStatusBar() {
         if (cyberRes.status === 'fulfilled' && cyberRes.value.ok) {
           setCyber(await cyberRes.value.json());
         }
-      } catch (e) { console.warn('[OSIRIS] Suppressed error:', e instanceof Error ? e.message : e); }
+      } catch (e) { console.warn('[AEGIS] Suppressed error:', e instanceof Error ? e.message : e); }
     };
     fetchData();
     const iv = setInterval(fetchData, 1800000); // 30 min (was 5 min)

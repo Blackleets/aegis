@@ -1,6 +1,5 @@
-const fs = require('fs');
-
 async function run() {
+    const { writeFileSync } = await import('node:fs');
     const res = await fetch('https://restcountries.com/v3.1/all');
     const data = await res.json();
     
@@ -15,7 +14,7 @@ async function run() {
         }
     }
 
-    fs.writeFileSync('region_map.json', JSON.stringify(map, null, 2));
+    writeFileSync('region_map.json', JSON.stringify(map, null, 2));
     console.log('Done mapping ' + Object.keys(map).length + ' regions.');
 }
 run();

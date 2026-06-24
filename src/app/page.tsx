@@ -17,7 +17,7 @@ import GlobalStatusBar from '@/components/GlobalStatusBar';
 import LiveAlerts from '@/components/LiveAlerts';
 import AiAnalyst from '@/components/AiAnalyst';
 
-const AegisMap = dynamic(() => import('@/components/OsirisMap'), { ssr: false });
+const AegisMap = dynamic(() => import('@/components/AegisMap'), { ssr: false });
 const LayerPanel = dynamic(() => import('@/components/LayerPanel'));
 const CameraViewer = dynamic(() => import('@/components/CameraViewer'));
 const OsintPanel = dynamic(() => import('@/components/OsintPanel'));
@@ -83,33 +83,170 @@ function getYouTubeWatchUrl(url: string): string {
   return url;
 }
 
+type Coordinate = { lat: number; lng: number };
+type FlyToLocation = Coordinate & { ts: number };
+type MapView = { zoom: number; latitude: number };
+type ActiveLayers = Record<string, boolean>;
+
+interface DashboardEntity extends Partial<Coordinate> {
+  [key: string]: unknown;
+}
+
+interface DashboardNews {
+  coords?: [number, number];
+  title?: string;
+  source?: string;
+  [key: string]: unknown;
+}
+
+interface DashboardData extends Record<string, unknown> {
+  commercial_flights?: DashboardEntity[];
+  private_flights?: DashboardEntity[];
+  private_jets?: DashboardEntity[];
+  military_flights?: DashboardEntity[];
+  maritime_ships?: DashboardEntity[];
+  maritime_ports?: DashboardEntity[];
+  maritime_chokepoints?: DashboardEntity[];
+  earthquakes?: (DashboardEntity & { magnitude?: number; place?: string })[];
+  gdelt?: (DashboardEntity & { name?: string })[];
+  news?: DashboardNews[];
+  satellites?: DashboardEntity[];
+  cameras?: DashboardEntity[];
+  weather_events?: DashboardEntity[];
+  infrastructure?: DashboardEntity[];
+  balloons?: DashboardEntity[];
+  radiation?: DashboardEntity[];
+  fires?: DashboardEntity[];
+  gps_jamming?: DashboardEntity[];
+  sdk_entities?: unknown[];
+}
+
+interface GlobalStats {
+  flights: number;
+  sats: number;
+  cctv: number;
+  weather: number;
+  nuclear: number;
+}
+
+interface RegionDossier {
+  location?: { display_name?: string };
+  country?: {
+    flag?: string;
+    name?: string;
+    capital?: string;
+    population?: number;
+    subregion?: string;
+    region?: string;
+    languages?: string[];
+    area?: number;
+  };
+  head_of_state?: { name?: string; position?: string };
+  wikipedia?: { thumbnail?: string; extract?: string };
+}
+
+interface SpaceWeather {
+  storm_color?: string;
+  kp_index?: number | string;
+  [key: string]: unknown;
+}
+
+interface ActiveCamera {
+  type?: string;
+  url?: string;
+  name?: string;
+  embed_allowed?: boolean;
+  [key: string]: unknown;
+}
+
+interface ScanTarget extends Coordinate {
+  id: string;
+  timestamp: number;
+  [key: string]: unknown;
+}
+
+interface OsintGeolocatePayload extends Coordinate {
+  [key: string]: unknown;
+}
+
+const DEFAULT_ACTIVE_LAYERS: ActiveLayers = {
+  flights: false,
+  private: false,
+  jets: false,
+  military: false,
+  maritime: true,
+  satellites: false,
+  balloons: false,
+  cctv: true,
+  live_news: true,
+  news_intel: true,
+  earthquakes: true,
+  fires: false,
+  weather: false,
+  radiation: false,
+  infrastructure: false,
+  global_incidents: true,
+  war_alerts: false,
+  gps_jamming: false,
+  day_night: true,
+  sdk_stream: true,
+};
+
+function getInitialUrlState() {
+  if (typeof window === 'undefined') {
+    return {
+      flyToLocation: null as FlyToLocation | null,
+      mapView: { zoom: 2.5, latitude: 20 } as MapView,
+      activeLayers: DEFAULT_ACTIVE_LAYERS,
+    };
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const lat = parseFloat(params.get('lat') || '');
+  const lon = parseFloat(params.get('lon') || '');
+  const zoom = parseFloat(params.get('zoom') || '');
+  const nextLayers: ActiveLayers = { ...DEFAULT_ACTIVE_LAYERS };
+  const layers = params.get('layers');
+
+  if (layers) {
+    const active = new Set(layers.split(','));
+    Object.keys(nextLayers).forEach((key) => {
+      nextLayers[key] = active.has(key);
+    });
+  }
+
+  return {
+    flyToLocation: !Number.isNaN(lat) && !Number.isNaN(lon) ? { lat, lng: lon, ts: Date.now() } : null,
+    mapView: { zoom: !Number.isNaN(zoom) ? zoom : 2.5, latitude: 20 },
+    activeLayers: nextLayers,
+  };
+}
+
 export default function Dashboard() {
-  const dataRef = useRef<any>({});
-  const [dataVersion, setDataVersion] = useState(0);
-  const data = dataRef.current;
+  const initialUrlState = useMemo(() => getInitialUrlState(), []);
+  const [data, setData] = useState<DashboardData>({});
 
   const [backendStatus, setBackendStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
-  const [mapView, setMapView] = useState({ zoom: 2.5, latitude: 20 });
-  const [flyToLocation, setFlyToLocation] = useState<{ lat: number; lng: number; ts: number } | null>(null);
-  const [globalStats, setGlobalStats] = useState<any>(null);
-  const mouseCoordsRef = useRef<{ lat: number; lng: number } | null>(null);
+  const [mapView, setMapView] = useState<MapView>(initialUrlState.mapView);
+  const [flyToLocation, setFlyToLocation] = useState<FlyToLocation | null>(initialUrlState.flyToLocation);
+  const [globalStats, setGlobalStats] = useState<GlobalStats | null>(null);
+  const mouseCoordsRef = useRef<Coordinate | null>(null);
   const coordsDisplayRef = useRef<HTMLDivElement>(null);
   const [locationLabel, setLocationLabel] = useState('');
-  const [regionDossier, setRegionDossier] = useState<any>(null);
+  const [regionDossier, setRegionDossier] = useState<RegionDossier | null>(null);
   const [dossierLoading, setDossierLoading] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
-  const [activeCamera, setActiveCamera] = useState<any>(null);
-  const [spaceWeather, setSpaceWeather] = useState<any>(null);
+  const [activeCamera, setActiveCamera] = useState<ActiveCamera | null>(null);
+  const [spaceWeather, setSpaceWeather] = useState<SpaceWeather | null>(null);
   const [showLayers, setShowLayers] = useState(true);
   const [showMarkets, setShowMarkets] = useState(true);
   const [showScmPanel, setShowScmPanel] = useState(true);
   const [showIntel, setShowIntel] = useState(true);
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const [mobilePanel, setMobilePanel] = useState<'layers'|'markets'|'intel'|'search'|'recon'|null>(null);
   const [mapProjection, setMapProjection] = useState<'globe'|'mercator'>('globe');
   const [mapStyle, setMapStyle] = useState<'dark'|'satellite'>('dark');
-  const [sweepData, setSweepData] = useState<any>(null);
-  const [scanTargets, setScanTargets] = useState<any[]>([]);
+  const [sweepData, setSweepData] = useState<unknown>(null);
+  const [scanTargets, setScanTargets] = useState<ScanTarget[]>([]);
 
   const isMobile = useIsMobile();
   const geocodeCache = useRef<Map<string, string>>(new Map());
@@ -117,28 +254,7 @@ export default function Dashboard() {
   const lastGeocodedPos = useRef<{ lat: number; lng: number } | null>(null);
 
   // ── DEFAULT: Most layers OFF — fast initial load ──
-  const [activeLayers, setActiveLayers] = useState({
-    flights: false,
-    private: false,
-    jets: false,
-    military: false,
-    maritime: true,
-    satellites: false,
-    balloons: false,
-    cctv: true,
-    live_news: true,
-    news_intel: true,
-    earthquakes: true,
-    fires: false,
-    weather: false,
-    radiation: false,
-    infrastructure: false,
-    global_incidents: true,
-    war_alerts: false,
-    gps_jamming: false,
-    day_night: true,
-    sdk_stream: true,
-  });
+  const [activeLayers, setActiveLayers] = useState<ActiveLayers>(initialUrlState.activeLayers);
   const [liveFeedUrl, setLiveFeedUrl] = useState<string | null>(null);
   const [liveFeedName, setLiveFeedName] = useState('');
   const [liveFeedEmbedAllowed, setLiveFeedEmbedAllowed] = useState(true);
@@ -147,28 +263,6 @@ export default function Dashboard() {
   useEffect(() => {
     const splashTimer = setTimeout(() => setShowSplash(false), 2500);
     return () => clearTimeout(splashTimer);
-  }, []);
-
-  // URL state: parse on mount
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const p = new URLSearchParams(window.location.search);
-    const lat = parseFloat(p.get('lat') || '');
-    const lon = parseFloat(p.get('lon') || '');
-    const zoom = parseFloat(p.get('zoom') || '');
-    if (!isNaN(lat) && !isNaN(lon)) {
-      setFlyToLocation({ lat, lng: lon, ts: Date.now() });
-      if (!isNaN(zoom)) setMapView(v => ({ ...v, zoom }));
-    }
-    const layers = p.get('layers');
-    if (layers) {
-      const active = layers.split(',');
-      setActiveLayers(prev => {
-        const next = { ...prev };
-        Object.keys(next).forEach(k => { (next as any)[k] = active.includes(k); });
-        return next;
-      });
-    }
   }, []);
 
   // URL state: update URL on view change (debounced)
@@ -192,7 +286,7 @@ export default function Dashboard() {
   useEffect(() => {
     fetch('/api/stats')
       .then(res => res.json())
-      .then(d => {
+      .then((d: { stats?: GlobalStats }) => {
         if (d.stats) setGlobalStats(d.stats);
       })
       .catch(console.error);
@@ -213,10 +307,8 @@ export default function Dashboard() {
       if (e.key === 'r') setFlyToLocation({ lat: 20, lng: 0, ts: Date.now() });
       if (e.key === 'g') setMapProjection(p => p === 'globe' ? 'mercator' : 'globe');
     };
-    const fsHandler = () => setIsFullscreen(!!document.fullscreenElement);
     window.addEventListener('keydown', handler);
-    document.addEventListener('fullscreenchange', fsHandler);
-    return () => { window.removeEventListener('keydown', handler); document.removeEventListener('fullscreenchange', fsHandler); };
+    return () => { window.removeEventListener('keydown', handler); };
   }, []);
 
   // Mouse coords + reverse geocode (Zero-Render)
@@ -249,16 +341,16 @@ export default function Dashboard() {
   }, []);
 
   // Region dossier (right-click)
-  const handleRightClick = useCallback(async (coords: { lat: number; lng: number }) => {
+  const handleRightClick = useCallback(async (coords: Coordinate) => {
     setDossierLoading(true); setRegionDossier(null);
     try {
       const res = await fetch(`/api/region-dossier?lat=${coords.lat}&lng=${coords.lng}`);
-      if (res.ok) setRegionDossier(await res.json());
+      if (res.ok) setRegionDossier(await res.json() as RegionDossier);
     } catch (e) { console.warn('[AEGIS] Suppressed error:', e instanceof Error ? e.message : e); } finally { setDossierLoading(false); }
   }, []);
 
   // Entity click handler (hoisted from JSX to comply with Rules of Hooks — Fixes #113)
-  const handleEntityClick = useCallback((entity: any) => {
+  const handleEntityClick = useCallback((entity: ActiveCamera) => {
     if (entity?.type === 'cctv') setActiveCamera(entity);
     if (entity?.type === 'live_news' && entity.url) {
       setLiveFeedUrl(entity.url);
@@ -268,15 +360,14 @@ export default function Dashboard() {
   }, []);
 
   // ── SHARED FETCH UTILITY (Fixes #107 — single definition, not 3 copies) ──
-  const fetchEndpoint = useCallback(async (url: string, transform?: (d: any) => any, options?: RequestInit) => {
+  const fetchEndpoint = useCallback(async (url: string, transform?: (d: unknown) => Partial<DashboardData>, options?: RequestInit) => {
     if (typeof document !== 'undefined' && document.hidden) return;
     try {
       const res = await fetch(url, options);
       if (res.ok) {
-        const json = await res.json();
-        const d = transform ? transform(json) : json;
-        dataRef.current = { ...dataRef.current, ...d };
-        setDataVersion(v => v + 1);
+        const json = await res.json() as unknown;
+        const nextData = transform ? transform(json) : (json as Partial<DashboardData>);
+        setData(prev => ({ ...prev, ...nextData }));
         setBackendStatus('connected');
       }
     } catch (e) {
@@ -287,9 +378,13 @@ export default function Dashboard() {
 
   // ── PROGRESSIVE DATA LOADING (request-optimized) ──
   useEffect(() => {
+    const loadCoreFeeds = async () => {
+      await fetchEndpoint('/api/earthquakes');
+      await fetchEndpoint('/api/news');
+    };
+
     // Priority 1: Core feeds (always needed for panels)
-    fetchEndpoint('/api/earthquakes');
-    fetchEndpoint('/api/news');
+    void loadCoreFeeds();
     const marketTimer = setTimeout(() => fetchEndpoint('/api/markets', d => ({ markets: d })), 800);
 
     // Priority 2: Space Weather (needed for MarketsPanel)
@@ -375,7 +470,7 @@ export default function Dashboard() {
       layerFetchedRef.current.add('gdelt');
     }
 
-  }, [activeLayers]);
+  }, [activeLayers, fetchEndpoint]);
 
   // ── LAYER-AWARE POLLING — only poll data for active layers ──
   useEffect(() => {
@@ -400,17 +495,24 @@ export default function Dashboard() {
 
   // Reactive layer fetch: handled by layerFetchedRef above (no duplicate)
 
-  // ── OSIRIS SDK — Intelligence Fusion Layer ──
+  // ── AEGIS SDK — Intelligence Fusion Layer ──
   // Produces node coordinates for the SDK network mesh visualization.
   // Does NOT duplicate existing layer visuals — SDK layer is LINES ONLY.
   // Cameras are excluded — they have their own dedicated layer.
-  useEffect(() => {
+  const sdkEntities = useMemo(() => {
     if (!activeLayers.sdk_stream) {
-      dataRef.current = { ...dataRef.current, sdk_entities: [] };
-      return;
+      return [] as Array<{
+        type: 'Feature';
+        geometry: { type: 'Point'; coordinates: [number, number] };
+        properties: { domain: string; name: string; source: string };
+      }>;
     }
 
-    const sdkEntities: any[] = [];
+    const computedSdkEntities: Array<{
+      type: 'Feature';
+      geometry: { type: 'Point'; coordinates: [number, number] };
+      properties: { domain: string; name: string; source: string };
+    }> = [];
 
     // Air domain (nodes only — no visual duplication)
     const allFlights = [
@@ -424,9 +526,9 @@ export default function Dashboard() {
     for (let i = 0; i < allFlights.length; i += flightStep) {
       const f = allFlights[i];
       if (!f.lat || !f.lng) continue;
-      sdkEntities.push({
+      computedSdkEntities.push({
         type: 'Feature', geometry: { type: 'Point', coordinates: [f.lng, f.lat] },
-        properties: { domain: 'AIR', name: f.callsign?.trim() || 'TRACK', source: 'ADS-B / OpenSky' },
+        properties: { domain: 'AIR', name: typeof f.callsign === 'string' ? f.callsign.trim() || 'TRACK' : 'TRACK', source: 'ADS-B / OpenSky' },
       });
     }
 
@@ -436,9 +538,9 @@ export default function Dashboard() {
     for (let i = 0; i < ships.length; i += shipStep) {
       const s = ships[i];
       if (!s.lat || !s.lng) continue;
-      sdkEntities.push({
+      computedSdkEntities.push({
         type: 'Feature', geometry: { type: 'Point', coordinates: [s.lng, s.lat] },
-        properties: { domain: 'SEA', name: s.name || `MMSI-${s.mmsi}`, source: 'AIS Stream' },
+        properties: { domain: 'SEA', name: typeof s.name === 'string' ? s.name : `MMSI-${String(s.mmsi ?? 'UNKNOWN')}`, source: 'AIS Stream' },
       });
     }
 
@@ -446,9 +548,9 @@ export default function Dashboard() {
     if (data.earthquakes?.length) {
       for (const eq of data.earthquakes) {
         if (!eq.lat || !eq.lng) continue;
-        sdkEntities.push({
+        computedSdkEntities.push({
           type: 'Feature', geometry: { type: 'Point', coordinates: [eq.lng, eq.lat] },
-          properties: { domain: 'LAND', name: `M${eq.magnitude} ${eq.place || ''}`, source: 'USGS' },
+          properties: { domain: 'LAND', name: `M${String(eq.magnitude ?? '?')} ${typeof eq.place === 'string' ? eq.place : ''}`.trim(), source: 'USGS' },
         });
       }
     }
@@ -457,9 +559,9 @@ export default function Dashboard() {
     if (data.gdelt?.length) {
       for (const g of data.gdelt) {
         if (!g.lat || !g.lng) continue;
-        sdkEntities.push({
+        computedSdkEntities.push({
           type: 'Feature', geometry: { type: 'Point', coordinates: [g.lng, g.lat] },
-          properties: { domain: 'INTEL', name: g.name || 'GDELT Event', source: 'GDELT Project' },
+          properties: { domain: 'INTEL', name: typeof g.name === 'string' ? g.name : 'GDELT Event', source: 'GDELT Project' },
         });
       }
     }
@@ -468,15 +570,30 @@ export default function Dashboard() {
     if (data.news?.length) {
       for (const n of data.news) {
         if (!n.coords || n.coords.length < 2) continue;
-        sdkEntities.push({
+        computedSdkEntities.push({
           type: 'Feature', geometry: { type: 'Point', coordinates: [n.coords[1], n.coords[0]] },
-          properties: { domain: 'INTEL', name: n.title || 'SIGINT', source: n.source || 'RSS Feed' },
+          properties: { domain: 'INTEL', name: typeof n.title === 'string' ? n.title : 'SIGINT', source: typeof n.source === 'string' ? n.source : 'RSS Feed' },
         });
       }
     }
 
-    dataRef.current = { ...dataRef.current, sdk_entities: sdkEntities };
-  }, [dataVersion, activeLayers.sdk_stream]);
+    return computedSdkEntities;
+  }, [
+    activeLayers.sdk_stream,
+    data.commercial_flights,
+    data.private_flights,
+    data.private_jets,
+    data.military_flights,
+    data.maritime_ships,
+    data.earthquakes,
+    data.gdelt,
+    data.news,
+  ]);
+
+  const dataWithSdk = useMemo<DashboardData>(() => ({
+    ...data,
+    sdk_entities: sdkEntities,
+  }), [data, sdkEntities]);
 
   const totalFlights = useMemo(() => (
     (data.commercial_flights?.length||0)+(data.private_flights?.length||0)+(data.private_jets?.length||0)+(data.military_flights?.length||0)
@@ -580,7 +697,7 @@ export default function Dashboard() {
               />
             </div>
 
-            {/* ── OSIRIS title — letter-by-letter stagger ── */}
+            {/* ── AEGIS title — letter-by-letter stagger ── */}
             <div className="flex items-center gap-[2px] mb-3 z-[2]">
               {'AEGIS'.split('').map((letter, i) => (
                 <motion.span
@@ -683,7 +800,7 @@ export default function Dashboard() {
       {/* ── MAP ── */}
       <ErrorBoundary name="Map">
         <AegisMap
-          data={data}
+          data={dataWithSdk}
           activeLayers={activeLayers}
           projection={mapProjection}
           mapStyle={mapStyle === 'satellite' ? 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' : 'dark'}
@@ -810,7 +927,7 @@ export default function Dashboard() {
       <div className="desktop-panel absolute left-5 top-20 bottom-24 w-72 flex flex-col gap-3 z-[200] pointer-events-none overflow-y-auto styled-scrollbar pr-1">
         {showLayers && (
           <>
-            <LayerPanel data={data} activeLayers={activeLayers} setActiveLayers={setActiveLayers} />
+            <LayerPanel data={dataWithSdk} activeLayers={activeLayers} setActiveLayers={setActiveLayers} />
             <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.5 }} className="glass-panel px-3 py-2.5 pointer-events-auto">
               <div className="grid grid-cols-5 gap-2 text-center">
                 <div><div className="hud-label">AIRCRAFT</div><div className="hud-value text-[10px] animate-data-pulse">{globalStats ? globalStats.flights.toLocaleString() : '0'}</div></div>
@@ -823,9 +940,9 @@ export default function Dashboard() {
             <ViewPresets onNavigate={(lat, lng, zoom) => { setFlyToLocation({ lat, lng, ts: Date.now() }); setMapView(v => ({ ...v, zoom })); }} />
           </>
         )}
-        {showScmPanel && <ScmPanel data={data} />}
-        {showMarkets && <MarketsPanel data={data} spaceWeather={spaceWeather} />}
-        {showIntel && <IntelFeed data={data} onLocate={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })} />}
+        {showScmPanel && <ScmPanel data={dataWithSdk} />}
+        {showMarkets && <MarketsPanel data={dataWithSdk} spaceWeather={spaceWeather} />}
+        {showIntel && <IntelFeed data={dataWithSdk} onLocate={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })} />}
       </div>
 
       {/* ── RIGHT HUD (desktop): Search + RECON + Live Alerts ── */}
@@ -834,17 +951,17 @@ export default function Dashboard() {
           <div className="flex-1"><SearchBar onLocate={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })} /></div>
           <div className="relative"><SharePanel mapView={mapView} activeLayers={activeLayers} mouseCoords={null} /></div>
         </div>
-        <OsintPanel onSweepVisualize={setSweepData} onScanGeolocate={(target, data) => {
+        <OsintPanel onSweepVisualize={setSweepData} onScanGeolocate={(target: string, payload: OsintGeolocatePayload) => {
           setScanTargets(prev => {
             const existing = prev.filter(t => t.id !== target);
-            return [{ id: target, timestamp: Date.now(), ...data }, ...existing].slice(0, 10);
+            return [{ id: target, timestamp: Date.now(), ...payload }, ...existing].slice(0, 10);
           });
-          setFlyToLocation({ lat: data.lat, lng: data.lng, ts: Date.now() });
+          setFlyToLocation({ lat: payload.lat, lng: payload.lng, ts: Date.now() });
         }} />
-        <LiveAlerts data={data} onLocate={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })} onWatchFeed={(url, name) => { setLiveFeedUrl(url); setLiveFeedName(name); }} />
+        <LiveAlerts data={dataWithSdk} onLocate={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })} onWatchFeed={(url, name) => { setLiveFeedUrl(url); setLiveFeedName(name); }} />
       </div>
 
-      <AiAnalyst data={data} />
+      <AiAnalyst data={dataWithSdk} />
 
       {/* ── LIVE FEED VIEWER OVERLAY ── */}
       <AnimatePresence>

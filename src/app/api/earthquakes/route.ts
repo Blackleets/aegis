@@ -2,10 +2,31 @@
 import { NextResponse } from 'next/server';
 
 /**
- * OSIRIS — Earthquake Data API
+ * AEGIS — Earthquake Data API
  * Fetches real-time seismic events from USGS (last 24h, M2.5+)
  * No API key required
  */
+
+interface UsgsFeature {
+  id: string;
+  geometry?: {
+    coordinates?: number[];
+  };
+  properties?: {
+    mag?: number;
+    place?: string;
+    time?: number;
+    url?: string;
+    tsunami?: number;
+    type?: string;
+    felt?: number | null;
+    alert?: string | null;
+  };
+}
+
+interface UsgsResponse {
+  features?: UsgsFeature[];
+}
 
 export async function GET() {
   try {
@@ -18,10 +39,10 @@ export async function GET() {
       return NextResponse.json({ earthquakes: [], error: 'USGS unavailable' });
     }
 
-    const data = await res.json();
+    const data: UsgsResponse = await res.json();
     const features = data.features || [];
 
-    const earthquakes = features.map((f: any) => {
+    const earthquakes = features.map((f) => {
       const coords = f.geometry?.coordinates || [0, 0, 0];
       const props = f.properties || {};
       return {

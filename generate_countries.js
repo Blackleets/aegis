@@ -1,6 +1,5 @@
-const fs = require('fs');
-
 async function run() {
+    const { writeFileSync } = await import('node:fs');
     const res = await fetch('https://restcountries.com/v3.1/all');
     const data = await res.json();
     
@@ -25,7 +24,7 @@ async function run() {
     COUNTRY_DATA['1'] = { name: 'United States / Canada', lat: 39.8283, lng: -98.5795 };
     
     const out = `const COUNTRY_DATA: Record<string, { name: string, lat: number, lng: number }> = ${JSON.stringify(COUNTRY_DATA, null, 2)};`;
-    fs.writeFileSync('country_data.ts', out);
+    writeFileSync('country_data.ts', out);
     console.log("Generated " + Object.keys(COUNTRY_DATA).length + " countries.");
 }
 run();
