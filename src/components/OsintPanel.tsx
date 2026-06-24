@@ -1,15 +1,16 @@
 'use client';
 
-import { useState, useCallback, useEffect, memo } from 'react';
+import { useState, useCallback, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Search, Radar, Globe, Shield, FileText, Radio,
+  Search, Radar, Globe, Shield, FileText,
   ChevronDown, ChevronUp, Loader2, AlertTriangle, Server,
-  Wifi, Lock, MapPin, Bug, Code, Layers, Network, Fingerprint,
+  Wifi, Lock, Bug, Code, Layers, Network, Fingerprint,
   CheckCircle, XCircle, Clock, ExternalLink, Crosshair,
-  Maximize2, Minimize2, Gavel, Bitcoin, Phone, Terminal, ShieldAlert
+  Maximize2, Minimize2, Phone, Terminal, ShieldAlert
 } from 'lucide-react';
-import { ipToNumber, numberToIp, calculateSubnetStart, classifyDevice, assessRisk, batchFetch, ShodanInternetDBResponse, SweepDevice } from '@/lib/osint-utils';
+import type { LucideIcon } from 'lucide-react';
+import { ipToNumber, numberToIp, calculateSubnetStart, classifyDevice, assessRisk, batchFetch, ShodanInternetDBResponse, SweepDevice, SweepResult } from '@/lib/osint-utils';
 
 const TABS = [
   { id: 'scanner', label: 'PORT SCAN', icon: Radar, placeholder: 'IP or hostname', color: '#00E5FF' },
@@ -32,22 +33,227 @@ const TABS = [
   { id: 'sweep', label: 'IP SWEEP', icon: Crosshair, placeholder: 'Enter IP address (e.g. 8.8.8.8)', color: '#FF3D3D' },
 ];
 
-interface OsintPanelProps { isOpen?: boolean; onClose?: () => void; isMobile?: boolean; onSweepVisualize?: (data: any) => void; onScanGeolocate?: (target: string, data: any) => void; }
+interface OsintPanelProps {
+  isOpen?: boolean;
+  onClose?: () => void;
+  isMobile?: boolean;
+  onSweepVisualize?: (data: SweepResult) => void;
+  onScanGeolocate?: (target: string, data: ScanGeolocatePayload) => void;
+}
+
+interface ScanGeolocatePayload extends Record<string, unknown> {
+  lat: number;
+  lng: number;
+  type: string;
+  region?: string;
+}
+
+interface HistoryEntry {
+  tab: string;
+  query: string;
+  time: string;
+}
+
+interface CveCacheEntryAffected {
+  vendor?: string;
+  product?: string;
+}
+
+interface CveCacheEntry {
+  loading?: boolean;
+  severity?: string;
+  cvss?: number | string;
+  description?: string;
+  cwe?: string;
+  affected?: CveCacheEntryAffected[];
+}
+
+interface SweepInitData {
+  target_ip: string;
+  center: SweepResult['center'];
+}
+
+interface PortScanEntry {
+  port?: number;
+  state?: string;
+  service?: string;
+  name?: string;
+  version?: string;
+}
+
+interface VulnEntry {
+  id?: string;
+  cve?: string;
+  name?: string;
+  is_exploit?: boolean;
+  severity?: string;
+  cvss?: number | string;
+  type?: string;
+  description?: string;
+}
+
+interface DnsMxEntry {
+  exchange?: string;
+}
+
+interface SanctionsEntry {
+  name?: string;
+}
+
+interface SanctionsHit {
+  matched_value?: string;
+  entries?: SanctionsEntry[];
+}
+
+interface SanctionsMatch {
+  source?: string;
+  hits?: SanctionsHit[];
+}
+
+interface BgpAsnSummary {
+  asn?: number;
+  name?: string;
+  country_code?: string;
+  description?: string;
+}
+
+interface BgpPrefixEntry {
+  prefix?: string;
+  asn: BgpAsnSummary;
+}
+
+interface BgpIpResult {
+  prefixes?: BgpPrefixEntry[];
+}
+
+interface BgpAsnResult extends BgpAsnSummary {
+  asn?: number;
+}
+
+interface GitHubRepo {
+  name?: string;
+  language?: string;
+}
+
+interface CertificateEntry {
+  issuer_name?: string;
+  issuer?: string;
+  common_name?: string;
+  name_value?: string;
+  not_before?: string;
+  not_after?: string;
+}
+
+interface GenericResult extends Record<string, unknown> {
+  ports?: Array<number | PortScanEntry>;
+  open_ports?: Array<number | PortScanEntry>;
+  results?: Array<number | PortScanEntry>;
+  host?: string;
+  target?: string;
+  scan_type?: string;
+  duration?: string;
+  scan_time?: string;
+  vulnerabilities?: VulnEntry[];
+  vulns?: string[] | VulnEntry[];
+  cves?: VulnEntry[];
+  risk_level?: string;
+  severity?: string;
+  domain?: string;
+  A?: string[] | string;
+  AAAA?: string[] | string;
+  MX?: Array<string | DnsMxEntry> | string;
+  NS?: string[] | string;
+  TXT?: string[] | string;
+  CNAME?: string[] | string;
+  SOA?: { nsname?: string; hostmaster?: string } | string;
+  sanctions_match?: SanctionsMatch;
+  domain_name?: string;
+  domainName?: string;
+  registrar?: string;
+  creation_date?: string;
+  createdDate?: string;
+  expiration_date?: string;
+  expiresDate?: string;
+  updated_date?: string;
+  updatedDate?: string;
+  status?: string[] | string;
+  name_servers?: string[];
+  nameServers?: string[];
+  ip?: string | BgpIpResult;
+  hostnames?: string[];
+  tags?: string[] | string;
+  query?: string;
+  type?: string;
+  asn?: BgpAsnResult;
+  prefixes?: { total_v4?: number; total_v6?: number };
+  peers?: { total?: number };
+  mac?: string;
+  vendor?: string;
+  valid?: boolean;
+  number?: string;
+  international?: string;
+  national?: string;
+  region?: string;
+  country_code?: string;
+  line_type?: string;
+  avatar_url?: string;
+  name?: string;
+  username?: string;
+  followers?: number;
+  company?: string;
+  location?: string;
+  email?: string;
+  twitter?: string;
+  blog?: string;
+  bio?: string;
+  recent_repos?: GitHubRepo[];
+  breached?: boolean;
+  data_exposed?: string[];
+  breaches?: string[];
+  certificates?: CertificateEntry[];
+  certs?: CertificateEntry[];
+  score?: number;
+  malicious?: boolean;
+  category?: string;
+  total_reports?: number;
+  reports?: number;
+  last_seen?: string;
+  last_analysis?: string;
+  protocol?: string;
+  tls_version?: string;
+  cipher?: string;
+  cipher_suite?: string;
+  issuer?: string;
+  subject?: string;
+  expires?: string;
+  not_after?: string;
+  sans?: string[] | string;
+  lat?: number;
+  lng?: number;
+  geo?: {
+    lat?: number;
+    lon?: number;
+  };
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : 'Unexpected error';
+}
 
 function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintPanelProps) {
   const [activeTab, setActiveTab] = useState('scanner');
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<any>(null);
+  const [results, setResults] = useState<GenericResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [scanType, setScanType] = useState('quick');
   const [expanded, setExpanded] = useState(true);
-  const [history, setHistory] = useState<{tab:string;query:string;time:string}[]>([]);
-  const [sweepResult, setSweepResult] = useState<any>(null);
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [sweepResult, setSweepResult] = useState<SweepResult | null>(null);
   const [sweepProgress, setSweepProgress] = useState<{ current: number; total: number } | null>(null);
   const [sweepCidr, setSweepCidr] = useState(24);
-  const [cveCache, setCveCache] = useState<Record<string, any>>({});
+  const [cveCache, setCveCache] = useState<Record<string, CveCacheEntry>>({});
   const [expandedDevice, setExpandedDevice] = useState<string | null>(null);
 
   // Fetch CVE details when a device is expanded in full-screen mode
@@ -89,7 +295,7 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
         const t0 = Date.now();
         const res = await fetch(`/api/osint/sweep?ip=${encodeURIComponent(query)}&cidr=${cidr}`);
         if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `Sweep failed (${res.status})`); }
-        const initData = await res.json();
+        const initData = await res.json() as SweepInitData;
 
         const ipParts = initData.target_ip.split('.').map(Number) as [number, number, number, number];
         const ipNum = ipToNumber(ipParts);
@@ -140,8 +346,8 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
         });
         setSweepProgress(null);
         setHistory(prev => [{ tab: activeTab, query, time: new Date().toLocaleTimeString() }, ...prev.slice(0, 9)]);
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err) {
+        setError(getErrorMessage(err));
         setSweepProgress(null);
       } finally {
         setLoading(false);
@@ -176,7 +382,7 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
         setLoading(false);
         return;
       }
-      const data = await res.json();
+      const data = await res.json() as GenericResult;
       if (res.ok) {
         setResults(data);
         setHistory(prev => [{ tab: activeTab, query, time: new Date().toLocaleTimeString() }, ...prev.slice(0, 9)]);
@@ -189,7 +395,7 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
         } else if (activeTab !== 'sweep' && activeTab !== 'vuln' && activeTab !== 'crypto' && activeTab !== 'mac' && activeTab !== 'bgp' && activeTab !== 'github' && activeTab !== 'leaks' && activeTab !== 'phone') {
           fetch(`/api/osint/ip?ip=${encodeURIComponent(query)}`)
             .then(r => r.json())
-            .then(locData => {
+            .then((locData: GenericResult) => {
               if (locData && locData.geo && locData.geo.lat && locData.geo.lon && onScanGeolocate) {
                 // ip-api returns lat/lon, we pass it up
                 onScanGeolocate(query, { lat: locData.geo.lat, lng: locData.geo.lon, ...locData, type: activeTab });
@@ -202,13 +408,13 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
       }
     } catch { setError('Network error'); }
     finally { setLoading(false); }
-  }, [query, activeTab, scanType, loading, sweepCidr]);
+  }, [query, activeTab, scanType, loading, sweepCidr, onScanGeolocate]);
 
   const currentTab = TABS.find(t => t.id === activeTab);
 
   // ── Shodan-style structured result renderers ──
 
-  const ResultRow = ({ label, value, color, mono = true }: { label: string; value: any; color?: string; mono?: boolean }) => {
+  const ResultRow = ({ label, value, color, mono = true }: { label: string; value: unknown; color?: string; mono?: boolean }) => {
     if (value === undefined || value === null || value === '') return null;
     return (
       <div className="flex items-start gap-3 py-1.5 border-b border-[var(--border-secondary)]/20 last:border-0">
@@ -229,7 +435,7 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
 
   // Surfaces an inline OFAC-SDN hit (used by the WHOIS and IP-intel routes
   // when their cross-check finds a sanctioned registrant / ASN owner).
-  const SanctionsBadge = ({ match }: { match: any }) => {
+  const SanctionsBadge = ({ match }: { match?: SanctionsMatch }) => {
     if (!match || !Array.isArray(match.hits) || match.hits.length === 0) return null;
     return (
       <div className="mb-2 px-2 py-2 rounded border border-red-500/40 bg-red-500/15">
@@ -239,17 +445,17 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
             SANCTIONED — {match.source || 'OFAC SDN'}
           </span>
         </div>
-        {match.hits.slice(0, 5).map((h: any, i: number) => (
+        {match.hits.slice(0, 5).map((h, i: number) => (
           <div key={i} className="text-[9px] font-mono text-red-200 break-all leading-tight">
             <span className="text-[var(--text-muted)]">↳ {h.matched_value}:</span>{' '}
-            {(h.entries || []).slice(0, 2).map((e: any) => e.name).join('; ')}
+            {(h.entries || []).slice(0, 2).map((entry) => entry.name).join('; ')}
           </div>
         ))}
       </div>
     );
   };
 
-  const SectionHeader = ({ title, icon: Icon, color }: { title: string; icon: any; color: string }) => (
+  const SectionHeader = ({ title, icon: Icon, color }: { title: string; icon: LucideIcon; color: string }) => (
     <div className="flex items-center gap-2 mt-3 mb-1.5 first:mt-0">
       <Icon className="w-3.5 h-3.5" style={{ color }} />
       <span className="text-[10px] font-mono font-bold tracking-widest" style={{ color }}>{title}</span>
@@ -284,9 +490,18 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
             <>
               <SectionHeader title={`OPEN PORTS (${ports.length})`} icon={Wifi} color="#00E676" />
               <div className="space-y-0.5">
-                {ports.map((p: any, i: number) => (
-                  <PortRow key={i} port={p.port || p} state={p.state || 'open'} service={p.service || p.name} version={p.version} />
-                ))}
+                {ports.map((p, i: number) => {
+                  const portEntry = typeof p === 'number' ? { port: p } : p;
+                  return (
+                    <PortRow
+                      key={i}
+                      port={portEntry.port ?? 0}
+                      state={portEntry.state || 'open'}
+                      service={portEntry.service || portEntry.name}
+                      version={portEntry.version}
+                    />
+                  );
+                })}
               </div>
             </>
           )}
@@ -297,9 +512,10 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
 
     // ── VULN SCAN ──
     if (activeTab === 'vuln') {
-      const vulns = r.vulnerabilities || r.vulns || r.cves || [];
-      const exploits = vulns.filter((v: any) => v.is_exploit);
-      const regularVulns = vulns.filter((v: any) => !v.is_exploit);
+      const rawVulns = r.vulnerabilities || r.cves || (Array.isArray(r.vulns) ? r.vulns : []);
+      const vulns = rawVulns.filter((item): item is VulnEntry => typeof item === 'object' && item !== null);
+      const exploits = vulns.filter((v) => v.is_exploit);
+      const regularVulns = vulns.filter((v) => !v.is_exploit);
       
       return (
         <div>
@@ -309,7 +525,7 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
           <ResultRow label="Risk Level" value={r.risk_level || r.severity} />
           {Array.isArray(regularVulns) && regularVulns.length > 0 && (
             <div className="mt-2 space-y-1">
-              {regularVulns.slice(0, 20).map((v: any, i: number) => (
+              {regularVulns.slice(0, 20).map((v, i: number) => (
                 <div key={i} className="p-2 rounded-lg border border-red-500/20 bg-red-500/5 flex flex-col">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-mono font-bold text-red-400">{v.id || v.cve || v.name}</span>
@@ -326,7 +542,7 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
             <div className="mt-4">
               <SectionHeader title={`POSSIBLE EXPLOITS (${exploits.length})`} icon={AlertTriangle} color="#FF9500" />
               <div className="mt-2 space-y-1">
-                {exploits.slice(0, 10).map((e: any, i: number) => (
+                {exploits.slice(0, 10).map((e, i: number) => (
                   <div key={i} className="p-2 rounded-lg border border-orange-500/30 bg-orange-500/10 flex flex-col">
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-mono font-bold text-orange-400">{e.id}</span>
@@ -357,7 +573,7 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
           <ResultRow label="Domain" value={r.domain || query} color="#448AFF" />
           {r.A && <ResultRow label="A Records" value={Array.isArray(r.A) ? r.A.join(', ') : r.A} />}
           {r.AAAA && <ResultRow label="AAAA" value={Array.isArray(r.AAAA) ? r.AAAA.join(', ') : r.AAAA} />}
-          {r.MX && <ResultRow label="MX" value={Array.isArray(r.MX) ? r.MX.map((m:any) => m.exchange || m).join(', ') : r.MX} />}
+          {r.MX && <ResultRow label="MX" value={Array.isArray(r.MX) ? r.MX.map((mx) => typeof mx === 'string' ? mx : mx.exchange || '').filter(Boolean).join(', ') : r.MX} />}
           {r.NS && <ResultRow label="NS" value={Array.isArray(r.NS) ? r.NS.join(', ') : r.NS} />}
           {r.TXT && <ResultRow label="TXT" value={Array.isArray(r.TXT) ? r.TXT.join(' | ') : r.TXT} />}
           {r.CNAME && <ResultRow label="CNAME" value={Array.isArray(r.CNAME) ? r.CNAME.join(', ') : r.CNAME} />}
@@ -416,9 +632,9 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
         <div>
           <SectionHeader title="BGP ROUTING INTELLIGENCE" icon={Globe} color="#00E5FF" />
           <ResultRow label="Query" value={r.query} color="#00E5FF" />
-          {r.type === 'ip' && r.ip && (
+          {r.type === 'ip' && r.ip && typeof r.ip !== 'string' && (
             <>
-              {r.ip.prefixes?.map((p: any, i: number) => (
+              {r.ip.prefixes?.map((p, i: number) => (
                 <div key={i} className="mt-2 p-2 border border-[#00E5FF]/20 bg-[#00E5FF]/5 rounded">
                   <ResultRow label="ASN" value={`AS${p.asn.asn} - ${p.asn.name}`} color="#00E5FF" />
                   <ResultRow label="Prefix" value={p.prefix} />
@@ -495,7 +711,7 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
           {r.recent_repos?.length > 0 && (
             <div className="mt-2 p-2 border border-[#87CEEB]/20 bg-[#87CEEB]/5 rounded">
               <span className="text-[9px] font-mono text-[#87CEEB] block mb-1">RECENT REPOS</span>
-              {r.recent_repos.map((repo: any, i: number) => (
+              {r.recent_repos.map((repo, i: number) => (
                 <div key={i} className="flex justify-between text-[9px] font-mono mb-0.5">
                   <span className="text-[#E8E6E0]">{repo.name}</span>
                   <span className="text-[var(--text-muted)]">{repo.language || 'Unknown'}</span>
@@ -551,7 +767,7 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
           <SectionHeader title="CERTIFICATE TRANSPARENCY" icon={Lock} color="#E040FB" />
           <ResultRow label="Domain" value={query} color="#E040FB" />
           <ResultRow label="Certificates" value={Array.isArray(certs) ? certs.length : 0} />
-          {Array.isArray(certs) && certs.slice(0, 15).map((c: any, i: number) => (
+          {Array.isArray(certs) && certs.slice(0, 15).map((c, i: number) => (
             <div key={i} className="mt-1.5 p-2 rounded border border-[var(--border-secondary)]/30 bg-[var(--bg-tertiary)]/30">
               <ResultRow label="Issuer" value={c.issuer_name || c.issuer} />
               <ResultRow label="Common Name" value={c.common_name || c.name_value} />
@@ -738,14 +954,14 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
             </div>
             {/* Breakdown Bar */}
             <div className="flex h-2 rounded-full overflow-hidden bg-[#1A1A18] mb-2">
-              {Object.entries(sweepResult.summary.device_breakdown).map(([type, count]: [string, any]) => {
-                const device = sweepResult.devices.find((d: any) => d.device_type === type);
+              {Object.entries(sweepResult.summary.device_breakdown).map(([type, count]) => {
+                const device = sweepResult.devices.find((d) => d.device_type === type);
                 return <div key={type} style={{ width: `${(count / sweepResult.summary.total_responsive) * 100}%`, backgroundColor: device?.device_color || '#666' }} title={`${type}: ${count}`} />;
               })}
             </div>
             <div className="flex flex-wrap gap-x-3 gap-y-1">
-              {Object.entries(sweepResult.summary.device_breakdown).map(([type, count]: [string, any]) => {
-                const device = sweepResult.devices.find((d: any) => d.device_type === type);
+              {Object.entries(sweepResult.summary.device_breakdown).map(([type, count]) => {
+                const device = sweepResult.devices.find((d) => d.device_type === type);
                 return (
                   <div key={type} className="flex items-center gap-1">
                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: device?.device_color || '#666' }} />
@@ -767,7 +983,7 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
           </div>
           {/* Device List */}
           <div className={isFullScreen ? "flex flex-col gap-3 p-4" : "divide-y divide-[#2A2A28]"}>
-            {sweepResult.devices.map((device: any) => {
+            {sweepResult.devices.map((device) => {
               const isExpanded = expandedDevice === device.ip;
               return (
               <div key={device.ip} className={isFullScreen
@@ -903,7 +1119,7 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
                                     {info.cwe && <div className="text-[10px] font-mono text-[#5C5A54] mt-2">Weakness: {info.cwe}</div>}
                                     {info.affected && info.affected.length > 0 && (
                                       <div className="mt-2 flex flex-wrap gap-1.5">
-                                        {info.affected.map((a: any, i: number) => (
+                                        {info.affected.map((a, i: number) => (
                                           <span key={i} className="text-[9px] font-mono px-1.5 py-0.5 bg-[#1A1A18] border border-[#2A2A28] rounded text-[#8A8880]">
                                             {a.vendor}/{a.product}
                                           </span>
