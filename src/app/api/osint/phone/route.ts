@@ -96,6 +96,8 @@ const NANP_COORDS: Record<string, { lat: number, lng: number }> = {
   '713': { lat: 29.7604, lng: -95.3698 }, // Houston
 };
 
+const getErrorMessage = (error: unknown) => error instanceof Error ? error.message : 'Unknown error';
+
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const number = searchParams.get('number');
@@ -168,11 +170,11 @@ export async function GET(req: Request) {
           lng: coords?.lng || null
       });
 
-  } catch (err: any) {
+  } catch (err: unknown) {
       return NextResponse.json({ 
           query: number,
           valid: false,
-          error: err.message,
+          error: getErrorMessage(err),
           number: query,
           international: query,
           national: query,

@@ -1,5 +1,22 @@
 import { NextResponse } from 'next/server';
 
+type SentinelFeature = {
+  id?: string;
+  bbox?: number[];
+  geometry?: { type?: string };
+  properties?: Record<string, unknown> & {
+    datetime?: string;
+    platform?: string;
+    orbitDirection?: string;
+    polarisation?: string;
+    productType?: string;
+  };
+  assets?: {
+    thumbnail?: { href?: string };
+    preview?: { href?: string };
+  };
+};
+
 // Sentinel-1 SAR Satellite — STAC Catalog via Element84 Earth Search + Copernicus fallback
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -18,7 +35,7 @@ export async function GET(req: Request) {
     const from = new Date(now.getTime() - days * 86400000);
     const datetime = `${from.toISOString().split('.')[0]}Z/${now.toISOString().split('.')[0]}Z`;
 
-    let scenes: any[] = [];
+    let scenes: ReturnType<typeof formatScene>[] = [];
     let source = '';
     let total = 0;
 
@@ -101,12 +118,12 @@ export async function GET(req: Request) {
     }, {
       headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600' },
     });
-  } catch (e) {
+  } catch {
     return NextResponse.json({ error: 'Sentinel lookup failed', scenes: [] }, { status: 500 });
   }
 }
 
-function formatScene(feature: any) {
+function formatScene(feature: SentinelFeature) {
   const props = feature.properties || {};
   return {
     id: feature.id,

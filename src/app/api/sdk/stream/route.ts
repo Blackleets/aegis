@@ -1,4 +1,7 @@
-import { NextResponse } from 'next/server';
+type SDKStoredEntity = {
+  id: string;
+  [key: string]: unknown;
+};
 
 /**
  * ╔══════════════════════════════════════════════════════════════════╗
@@ -12,7 +15,7 @@ import { NextResponse } from 'next/server';
 
 // In-memory entity store shared across the SDK endpoints
 const globalForSDK = globalThis as unknown as {
-  sdkEntityStore: Map<string, any>;
+  sdkEntityStore: Map<string, SDKStoredEntity>;
   sdkLastUpdate: number;
 };
 

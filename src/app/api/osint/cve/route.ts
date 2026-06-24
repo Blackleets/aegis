@@ -1,6 +1,68 @@
 import { NextResponse } from 'next/server';
 import { isRateLimited, getClientIp } from '@/lib/ssrf-guard';
 
+type CirclCveResponse = {
+  id?: string;
+  summary?: string;
+  cvss?: number | null;
+  cvss_vector?: string | null;
+  references?: string[];
+  Published?: string | null;
+  Modified?: string | null;
+  cwe?: string | null;
+};
+
+type CveDescription = {
+  lang?: string;
+  value?: string;
+};
+
+type CveMetricVersion = {
+  baseScore?: number | null;
+  vectorString?: string | null;
+  baseSeverity?: string | null;
+};
+
+type CveMetric = {
+  cvssV3_1?: CveMetricVersion;
+  cvssV3_0?: CveMetricVersion;
+  cvssV31?: CveMetricVersion;
+  cvssV2_0?: CveMetricVersion;
+  cvssV2?: CveMetricVersion;
+};
+
+type CveProblemDescription = {
+  cweId?: string;
+  description?: string;
+};
+
+type CveAffectedVersion = {
+  version?: string;
+};
+
+type CveAffectedProduct = {
+  vendor?: string;
+  product?: string;
+  versions?: CveAffectedVersion[];
+};
+
+type MitreCveResponse = {
+  cveMetadata?: {
+    cveId?: string;
+    datePublished?: string | null;
+    dateUpdated?: string | null;
+  };
+  containers?: {
+    cna?: {
+      descriptions?: CveDescription[];
+      metrics?: CveMetric[];
+      problemTypes?: Array<{ descriptions?: CveProblemDescription[] }>;
+      references?: Array<{ url?: string }>;
+      affected?: CveAffectedProduct[];
+    };
+  };
+};
+
 // CVE Intelligence — fetches vulnerability details from CIRCL CVE API (free, no key)
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -31,7 +93,7 @@ export async function GET(req: Request) {
           headers: { 'Accept': 'application/json' },
         });
         if (circlRes.ok) {
-          const data = await circlRes.json();
+          const data: CirclCveResponse = await circlRes.json();
           return NextResponse.json({
             id: data.id || cve.toUpperCase(),
             description: data.summary || 'No description available.',
@@ -55,11 +117,11 @@ export async function GET(req: Request) {
       });
     }
 
-    const data = await res.json();
+    const data: MitreCveResponse = await res.json();
 
     // Parse the CVE 5.0 JSON format from MITRE
     const cna = data.containers?.cna;
-    const description = cna?.descriptions?.find((d: any) => d.lang === 'en')?.value
+    const description = cna?.descriptions?.find((d) => d.lang === 'en')?.value
       || cna?.descriptions?.[0]?.value
       || 'No description available.';
 
@@ -95,13 +157,13 @@ export async function GET(req: Request) {
     }
 
     // Extract references
-    const references = (cna?.references || []).slice(0, 5).map((r: any) => r.url);
+    const references = (cna?.references || []).slice(0, 5).map((r) => r.url).filter(Boolean);
 
     // Extract affected products
-    const affected = (cna?.affected || []).slice(0, 5).map((a: any) => ({
+    const affected = (cna?.affected || []).slice(0, 5).map((a) => ({
       vendor: a.vendor || 'Unknown',
       product: a.product || 'Unknown',
-      versions: (a.versions || []).slice(0, 3).map((v: any) => v.version).filter(Boolean),
+      versions: (a.versions || []).slice(0, 3).map((v) => v.version).filter(Boolean),
     }));
 
     return NextResponse.json({
