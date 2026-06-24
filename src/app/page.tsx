@@ -129,6 +129,12 @@ interface GlobalStats {
   nuclear: number;
 }
 
+interface UsageMetrics {
+  onlineUsers: number;
+  totalUsers: number;
+  updatedAt?: string;
+}
+
 interface RegionDossier {
   location?: { display_name?: string };
   country?: {
@@ -230,6 +236,7 @@ export default function Dashboard() {
   const [mapView, setMapView] = useState<MapView>(initialUrlState.mapView);
   const [flyToLocation, setFlyToLocation] = useState<FlyToLocation | null>(initialUrlState.flyToLocation);
   const [globalStats, setGlobalStats] = useState<GlobalStats | null>(null);
+  const [usageMetrics, setUsageMetrics] = useState<UsageMetrics | null>(null);
   const mouseCoordsRef = useRef<Coordinate | null>(null);
   const coordsDisplayRef = useRef<HTMLDivElement>(null);
   const [locationLabel, setLocationLabel] = useState('');
@@ -290,6 +297,60 @@ export default function Dashboard() {
         if (d.stats) setGlobalStats(d.stats);
       })
       .catch(console.error);
+  }, []);
+
+  // Presence + cumulative usage counter
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const sessionKey = 'aegis-session-id';
+    let sessionId = window.sessionStorage.getItem(sessionKey);
+
+    if (!sessionId) {
+      sessionId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      window.sessionStorage.setItem(sessionKey, sessionId);
+    }
+
+    let cancelled = false;
+
+    const syncUsage = async () => {
+      try {
+        const res = await fetch('/api/usage', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          cache: 'no-store',
+          body: JSON.stringify({ sessionId }),
+        });
+
+        if (!res.ok) return;
+        const metrics = await res.json() as UsageMetrics;
+        if (!cancelled) setUsageMetrics(metrics);
+      } catch (e) {
+        console.warn('[AEGIS] Suppressed error:', e instanceof Error ? e.message : e);
+      }
+    };
+
+    void syncUsage();
+
+    const interval = window.setInterval(() => {
+      void syncUsage();
+    }, 30000);
+
+    const handleVisibility = () => {
+      if (!document.hidden) {
+        void syncUsage();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, []);
 
   // Keyboard shortcuts
@@ -940,16 +1001,16 @@ export default function Dashboard() {
       </motion.div>
 
       {/* ── TOP-RIGHT STATUS (desktop) — C2 DISPLAY ── */}
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 3 }} className="status-bar-desktop absolute top-3 right-3 md:top-4 md:right-5 z-[200] pointer-events-none flex items-center gap-1.5 md:gap-3 text-[9px] md:text-[10px] font-mono tracking-widest text-[var(--text-muted)]">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 3 }} className="status-bar-desktop absolute top-3 right-3 md:top-4 md:right-5 z-[200] pointer-events-none flex items-center gap-1.5 md:gap-3 text-[9px] md:text-[10px] font-mono tracking-[0.22em] text-[var(--text-muted)]">
 
         {/* Zulu Clock */}
-        <span className="hidden lg:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-sm border border-[var(--border-primary)] bg-black/30">
+        <span className="hidden lg:inline-flex items-center gap-1.5 rounded-full border border-[var(--border-primary)]/70 bg-[rgba(15,23,32,0.82)] px-2.5 py-1 shadow-[0_10px_30px_rgba(0,0,0,0.16)]">
           <ZuluClock />
         </span>
 
         <span className="hidden lg:inline text-[var(--border-primary)]">│</span>
 
-        <span className="flex items-center gap-1">SYS: <span className={backendStatus === 'connected' ? 'text-[var(--alert-green)]' : 'text-[var(--alert-red)]'}>{backendStatus.toUpperCase()}</span></span>
+        <span className="flex items-center gap-1">SYS <span className={backendStatus === 'connected' ? 'text-[var(--alert-green)]' : 'text-[var(--alert-red)]'}>{backendStatus.toUpperCase()}</span></span>
 
         {spaceWeather && <span className="hidden lg:inline">SOLAR: <span style={{ color: spaceWeather.storm_color, fontWeight: 700 }}>Kp{spaceWeather.kp_index}</span></span>}
 
@@ -960,10 +1021,22 @@ export default function Dashboard() {
           <span className="text-[var(--text-muted)]/60">FEEDS</span>
         </span>
 
+        {usageMetrics && (
+          <span className="hidden lg:inline-flex items-center gap-2 rounded-full border border-[var(--border-primary)]/70 bg-[rgba(15,23,32,0.82)] px-2.5 py-1 shadow-[0_10px_30px_rgba(0,0,0,0.16)]">
+            <Activity className="h-3 w-3 text-[var(--alert-green)]" />
+            <span className="text-[var(--text-secondary)]">LIVE</span>
+            <span className="font-bold text-[var(--text-primary)]">{usageMetrics.onlineUsers}</span>
+            <span className="text-[var(--border-primary)]">/</span>
+            <BarChart3 className="h-3 w-3 text-[var(--gold-primary)]" />
+            <span className="text-[var(--text-secondary)]">VISITS</span>
+            <span className="font-bold text-[var(--text-primary)]">{usageMetrics.totalUsers.toLocaleString()}</span>
+          </span>
+        )}
+
         <UptimeClock />
         
         <a href='https://ko-fi.com/M8D41ZYW4Z' target='_blank' className="pointer-events-auto hover:opacity-80 transition-opacity ml-1 flex items-center">
-          <span className="px-3 py-1 rounded-sm border border-[var(--gold-primary)]/40 bg-[var(--gold-primary)]/10 text-[var(--gold-primary)] text-[11px] font-bold tracking-[0.2em]">SUPPORT PROJECT</span>
+          <span className="rounded-full border border-[var(--border-primary)]/80 bg-[rgba(15,23,32,0.9)] px-3 py-1 text-[11px] font-semibold tracking-[0.16em] text-[var(--text-primary)]">SUPPORT PROJECT</span>
         </a>
       </motion.div>
 
@@ -971,29 +1044,29 @@ export default function Dashboard() {
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 3.15, duration: 0.5 }}
-        className="hidden xl:block absolute top-20 right-5 z-[200] w-[360px] pointer-events-none"
+        className="hidden xl:block absolute top-20 right-5 z-[200] w-[380px] pointer-events-none"
       >
-        <div className="glass-panel pointer-events-auto overflow-hidden border border-[var(--gold-primary)]/20 bg-[linear-gradient(135deg,rgba(10,17,24,0.94),rgba(6,11,18,0.82))] shadow-[0_18px_60px_rgba(0,0,0,0.35)]">
-          <div className="flex items-center justify-between border-b border-[var(--border-secondary)]/50 px-4 py-2.5">
+        <div className="glass-panel pointer-events-auto overflow-hidden border border-[var(--border-primary)]/80 bg-[linear-gradient(135deg,rgba(13,22,31,0.96),rgba(19,31,44,0.9))] shadow-[0_18px_60px_rgba(0,0,0,0.2)]">
+          <div className="flex items-center justify-between border-b border-[var(--border-primary)]/45 px-4 py-3">
             <div>
-              <div className="text-[9px] font-mono tracking-[0.32em] text-[var(--gold-primary)]/85">TACTICAL SNAPSHOT</div>
-              <div className="mt-1 text-[11px] font-mono tracking-[0.18em] text-[var(--text-primary)]">{operationalModeLabel}</div>
+              <div className="text-[9px] font-mono tracking-[0.32em] text-[var(--text-secondary)]">LIVE BRIEF</div>
+              <div className="mt-1 text-[11px] font-semibold tracking-[0.18em] text-[var(--text-primary)]">{operationalModeLabel}</div>
             </div>
-            <div className="flex items-center gap-2 rounded-full border border-[var(--border-primary)]/40 bg-black/20 px-2.5 py-1 text-[9px] font-mono text-[var(--text-secondary)]">
+            <div className="flex items-center gap-2 rounded-full border border-[var(--border-primary)]/50 bg-white/[0.03] px-2.5 py-1 text-[9px] font-mono text-[var(--text-secondary)]">
               <div className={`h-1.5 w-1.5 rounded-full ${backendStatus === 'connected' ? 'bg-[var(--alert-green)]' : backendStatus === 'error' ? 'bg-[var(--alert-red)]' : 'bg-[var(--gold-primary)]'} animate-osiris-pulse`} />
               <span>{backendStatus === 'connected' ? 'LIVE' : backendStatus === 'error' ? 'DEGRADED' : 'SYNCING'}</span>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-2 p-3">
+          <div className="grid grid-cols-2 gap-2.5 p-3.5">
             {[
               { label: 'TRACKED ENTITIES', value: trackedEntityCount.toLocaleString(), accent: 'var(--gold-primary)', icon: Database },
-              { label: 'HIGH-SIGNAL ALERTS', value: activeIntelAlerts.toString(), accent: activeIntelAlerts > 0 ? '#FF9500' : 'var(--alert-green)', icon: AlertTriangle },
-              { label: 'MARITIME PRESSURE', value: maritimePressure.toString(), accent: maritimePressure > 0 ? '#FF9500' : 'var(--cyan-primary)', icon: Activity },
-              { label: 'AIR TRACKS', value: totalFlights.toLocaleString(), accent: 'var(--cyan-primary)', icon: Radar },
+              { label: 'HIGH-SIGNAL ALERTS', value: activeIntelAlerts.toString(), accent: activeIntelAlerts > 0 ? '#F59E0B' : 'var(--alert-green)', icon: AlertTriangle },
+              { label: 'LIVE USERS', value: usageMetrics ? usageMetrics.onlineUsers.toString() : '0', accent: usageMetrics && usageMetrics.onlineUsers > 0 ? 'var(--alert-green)' : 'var(--text-secondary)', icon: Activity },
+              { label: 'TOTAL VISITS', value: usageMetrics ? usageMetrics.totalUsers.toLocaleString() : '0', accent: 'var(--cyan-primary)', icon: BarChart3 },
             ].map((item) => {
               const Icon = item.icon;
               return (
-                <div key={item.label} className="rounded-xl border border-white/6 bg-black/20 px-3 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+                <div key={item.label} className="rounded-2xl border border-white/8 bg-white/[0.035] px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
                   <div className="flex items-center justify-between">
                     <span className="text-[8px] font-mono tracking-[0.18em] text-[var(--text-muted)]">{item.label}</span>
                     <Icon className="h-3.5 w-3.5" style={{ color: item.accent }} />
@@ -1009,9 +1082,9 @@ export default function Dashboard() {
       {/* ── MOBILE: Compact top status ── */}
       {isMobile && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 2.5 }} className="absolute top-3 right-3 z-[200] pointer-events-auto flex items-center gap-2">
-          <a href='https://ko-fi.com/M8D41ZYW4Z' target='_blank' className="glass-panel px-2 py-1 flex items-center gap-1.5 text-[7px] font-mono tracking-widest hover:opacity-80 transition-opacity border-[var(--gold-primary)]/40 bg-[var(--gold-primary)]/10">
-            <div className="w-1 h-1 rounded-full bg-[var(--gold-primary)] animate-osiris-pulse" />
-            <span className="text-[var(--gold-primary)] font-bold">SUPPORT PROJECT</span>
+          <a href='https://ko-fi.com/M8D41ZYW4Z' target='_blank' className="glass-panel px-2.5 py-1.5 flex items-center gap-1.5 text-[7px] font-mono tracking-[0.22em] hover:opacity-80 transition-opacity border-[var(--border-primary)]/80 bg-[rgba(15,23,32,0.92)]">
+            <div className="w-1.5 h-1.5 rounded-full bg-[var(--gold-primary)] animate-osiris-pulse" />
+            <span className="text-[var(--text-primary)] font-bold">SUPPORT PROJECT</span>
           </a>
         </motion.div>
       )}
@@ -1023,15 +1096,15 @@ export default function Dashboard() {
         {showLayers && (
           <>
             <LayerPanel data={dataWithSdk} activeLayers={activeLayers} setActiveLayers={setActiveLayers} />
-            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.5 }} className="glass-panel px-3 py-2.5 pointer-events-auto overflow-hidden border border-[var(--gold-primary)]/15 bg-[linear-gradient(180deg,rgba(10,17,24,0.95),rgba(6,11,18,0.86))]">
-              <div className="mb-2 flex items-center justify-between rounded-lg border border-[var(--border-secondary)]/40 bg-black/20 px-2.5 py-2">
+            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.5 }} className="glass-panel px-3.5 py-3 pointer-events-auto overflow-hidden border border-[var(--border-primary)]/80 bg-[linear-gradient(180deg,rgba(14,24,34,0.96),rgba(18,29,42,0.9))]">
+              <div className="mb-2.5 flex items-center justify-between rounded-2xl border border-[var(--border-primary)]/45 bg-white/[0.035] px-3 py-2.5">
                 <div>
-                  <div className="text-[8px] font-mono tracking-[0.26em] text-[var(--gold-primary)]/85">COMMAND POSTURE</div>
-                  <div className="mt-1 text-[10px] font-mono tracking-[0.16em] text-[var(--text-primary)]">{operationalModeLabel}</div>
+                  <div className="text-[8px] font-mono tracking-[0.26em] text-[var(--text-secondary)]">OPERATIONS SUMMARY</div>
+                  <div className="mt-1 text-[10px] font-semibold tracking-[0.16em] text-[var(--text-primary)]">{operationalModeLabel}</div>
                 </div>
                 <div className="text-right">
-                  <div className="text-[8px] font-mono tracking-[0.16em] text-[var(--text-muted)]">ALERT LOAD</div>
-                  <div className="mt-1 text-[13px] font-bold tabular-nums" style={{ color: activeIntelAlerts > 0 ? '#FF9500' : 'var(--alert-green)' }}>{activeIntelAlerts}</div>
+                  <div className="text-[8px] font-mono tracking-[0.16em] text-[var(--text-muted)]">LIVE NOW</div>
+                  <div className="mt-1 text-[13px] font-bold tabular-nums" style={{ color: usageMetrics && usageMetrics.onlineUsers > 0 ? 'var(--alert-green)' : 'var(--text-secondary)' }}>{usageMetrics ? usageMetrics.onlineUsers : 0}</div>
                 </div>
               </div>
               <div className="grid grid-cols-5 gap-2 text-center">

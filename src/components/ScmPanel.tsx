@@ -98,7 +98,15 @@ export default function ScmPanel({ data }: ScmPanelProps) {
                 ) : (
                   <div className="space-y-1">
                     {criticalSuppliers.map((s: SupplierItem, i: number) => {
-                      const threats = s.active_threats ? JSON.parse(s.active_threats) : [];
+                      const threats = (() => {
+                        if (!s.active_threats) return [];
+                        try {
+                          const parsed = JSON.parse(s.active_threats);
+                          return Array.isArray(parsed) ? parsed : [];
+                        } catch {
+                          return [];
+                        }
+                      })();
                       return (
                         <div key={i} className="px-2 py-1.5 rounded border border-[#FF1744]/40 bg-[#FF1744]/10">
                           <div className="flex justify-between items-start mb-1">

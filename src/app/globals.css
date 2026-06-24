@@ -8,54 +8,54 @@
 
 :root {
   /* ── Core Palette ── */
-  --bg-void: #04040A;
-  --bg-primary: #06060C;
-  --bg-secondary: #0C0E1A;
-  --bg-tertiary: #121628;
-  --bg-panel: rgba(8, 10, 20, 0.88);
-  --bg-panel-solid: #0C0E1A;
+  --bg-void: #081018;
+  --bg-primary: #0D1721;
+  --bg-secondary: #13202C;
+  --bg-tertiary: #1A2A38;
+  --bg-panel: rgba(15, 23, 32, 0.84);
+  --bg-panel-solid: #13202C;
 
   /* ── Gold Accent (Eye of Horus) ── */
-  --gold-primary: #D4AF37;
-  --gold-light: #F0D060;
-  --gold-dim: #8B7325;
-  --gold-glow: rgba(212, 175, 55, 0.3);
+  --gold-primary: #7EA9C9;
+  --gold-light: #C3D8E8;
+  --gold-dim: #486781;
+  --gold-glow: rgba(126, 169, 201, 0.24);
 
   /* ── Cyan Intel Stream ── */
-  --cyan-primary: #00E5FF;
-  --cyan-dim: #006B7A;
-  --cyan-glow: rgba(0, 229, 255, 0.15);
+  --cyan-primary: #67D0D9;
+  --cyan-dim: #2E6E75;
+  --cyan-glow: rgba(103, 208, 217, 0.14);
 
   /* ── Alert Colors ── */
   --alert-red: #FF3D3D;
-  --alert-orange: #FF9500;
+  --alert-orange: #F59E0B;
   --alert-green: #00E676;
   --alert-blue: #448AFF;
 
   /* ── Accent Colors (layer-specific) ── */
-  --accent-weather: #E040FB;
-  --accent-nuclear: #76FF03;
+  --accent-weather: #B07CF2;
+  --accent-nuclear: #6FD28A;
 
   /* ── Borders ── */
-  --border-primary: rgba(212, 175, 55, 0.15);
-  --border-secondary: rgba(212, 175, 55, 0.08);
-  --border-active: rgba(212, 175, 55, 0.4);
-  --border-cyan: rgba(0, 229, 255, 0.2);
+  --border-primary: rgba(126, 169, 201, 0.18);
+  --border-secondary: rgba(126, 169, 201, 0.08);
+  --border-active: rgba(126, 169, 201, 0.38);
+  --border-cyan: rgba(103, 208, 217, 0.18);
 
   /* ── Text ── */
-  --text-primary: #E8E6E0;
-  --text-secondary: #9B978E;
-  --text-muted: #5C5A54;
-  --text-heading: #F5F0E0;
-  --text-gold: #D4AF37;
-  --text-cyan: #00E5FF;
+  --text-primary: #F2F5F7;
+  --text-secondary: #AEC1D0;
+  --text-muted: #6D8090;
+  --text-heading: #FAFCFD;
+  --text-gold: #7EA9C9;
+  --text-cyan: #67D0D9;
 
   /* ── Scrollbar ── */
-  --scrollbar-thumb: rgba(212, 175, 55, 0.2);
-  --scrollbar-thumb-hover: rgba(212, 175, 55, 0.4);
+  --scrollbar-thumb: rgba(126, 169, 201, 0.24);
+  --scrollbar-thumb-hover: rgba(126, 169, 201, 0.42);
 
   /* ── Hover ── */
-  --hover-accent: rgba(212, 175, 55, 0.08);
+  --hover-accent: rgba(126, 169, 201, 0.08);
 
   /* ── Fonts ── */
   --font-hud: 'JetBrains Mono', 'Courier New', monospace;
@@ -100,27 +100,27 @@ html, body {
    ═══════════════════════════════════════════════════════════════ */
 .glass-panel {
   background: var(--bg-panel);
-  backdrop-filter: blur(24px) saturate(1.3);
-  -webkit-backdrop-filter: blur(24px) saturate(1.3);
+  backdrop-filter: blur(22px) saturate(1.08);
+  -webkit-backdrop-filter: blur(22px) saturate(1.08);
   border: 1px solid var(--border-primary);
-  border-radius: 14px;
+  border-radius: 18px;
   box-shadow:
-    0 4px 30px rgba(0, 0, 0, 0.5),
-    0 1px 0 rgba(212, 175, 55, 0.06) inset,
-    0 -1px 0 rgba(0, 0, 0, 0.3) inset;
+    0 12px 34px rgba(0, 0, 0, 0.24),
+    0 1px 0 rgba(255, 255, 255, 0.05) inset,
+    0 -1px 0 rgba(0, 0, 0, 0.14) inset;
   transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 .glass-panel:hover {
-  border-color: rgba(212, 175, 55, 0.22);
+  border-color: rgba(126, 169, 201, 0.28);
 }
 
 .glass-panel-sm {
   background: var(--bg-panel);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   border: 1px solid var(--border-secondary);
-  border-radius: 10px;
+  border-radius: 14px;
 }
 
 /* ── Osiris Gold Glow ── */
@@ -250,12 +250,12 @@ html, body {
 
 /* ── CRT Scanlines ── */
 .crt-scanlines {
-  background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(255,255,255,0.02) 3px, rgba(255,255,255,0.02) 4px);
+  background: repeating-linear-gradient(0deg, transparent, transparent 4px, rgba(255,255,255,0.008) 4px, rgba(255,255,255,0.008) 5px);
 }
 
 /* ── Vignette ── */
 .vignette {
-  background: radial-gradient(ellipse at center, transparent 40%, rgba(4,4,10,0.6) 80%, rgba(4,4,10,0.95) 100%);
+  background: radial-gradient(ellipse at center, transparent 42%, rgba(8,16,24,0.32) 78%, rgba(8,16,24,0.68) 100%);
 }
 
 /* ═══════════════════════════════════════════════════════════════
