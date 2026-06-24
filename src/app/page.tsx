@@ -599,10 +599,66 @@ export default function Dashboard() {
     (data.commercial_flights?.length||0)+(data.private_flights?.length||0)+(data.private_jets?.length||0)+(data.military_flights?.length||0)
   ), [data.commercial_flights, data.private_flights, data.private_jets, data.military_flights]);
 
+  const trackedEntityCount = useMemo(() => {
+    return [
+      data.commercial_flights,
+      data.private_flights,
+      data.private_jets,
+      data.military_flights,
+      data.maritime_ships,
+      data.satellites,
+      data.cameras,
+      data.weather_events,
+      data.infrastructure,
+      data.balloons,
+      data.radiation,
+      data.fires,
+      data.gps_jamming,
+      data.gdelt,
+      data.news,
+      data.earthquakes,
+    ].reduce((sum, items) => sum + (Array.isArray(items) ? items.length : 0), 0);
+  }, [
+    data.commercial_flights,
+    data.private_flights,
+    data.private_jets,
+    data.military_flights,
+    data.maritime_ships,
+    data.satellites,
+    data.cameras,
+    data.weather_events,
+    data.infrastructure,
+    data.balloons,
+    data.radiation,
+    data.fires,
+    data.gps_jamming,
+    data.gdelt,
+    data.news,
+    data.earthquakes,
+  ]);
+
+  const activeIntelAlerts = useMemo(() => {
+    const highRiskNews = (data.news || []).filter((item) => typeof item.risk_score === 'number' && item.risk_score >= 6).length;
+    const significantQuakes = (data.earthquakes || []).filter((item) => typeof item.magnitude === 'number' && item.magnitude >= 4.5).length;
+    return highRiskNews + significantQuakes;
+  }, [data.news, data.earthquakes]);
+
+  const maritimePressure = useMemo(() => {
+    const congestedPorts = (data.maritime_ports || []).filter((port) => port.congestion === 'SEVERE' || port.congestion === 'CONGESTED').length;
+    const riskyChokepoints = (data.maritime_chokepoints || []).filter((point) => point.risk === 'CRITICAL' || point.risk === 'HIGH').length;
+    return congestedPorts + riskyChokepoints;
+  }, [data.maritime_ports, data.maritime_chokepoints]);
+
+  const operationalModeLabel = backendStatus === 'connected'
+    ? activeIntelAlerts > 0 || maritimePressure > 0
+      ? 'HEIGHTENED WATCH'
+      : 'STEADY TRACKING'
+    : backendStatus === 'error'
+      ? 'DEGRADED FEED STATE'
+      : 'LINKING DATA MESH';
 
   return (
     <main className="fixed inset-0 w-full h-full bg-[var(--bg-void)] overflow-hidden">
-
       {/* ── SPLASH ── */}
       <AnimatePresence>
         {showSplash && (
@@ -613,7 +669,7 @@ export default function Dashboard() {
             className="absolute inset-0 z-[999] flex flex-col items-center justify-center overflow-hidden"
             style={{ background: 'radial-gradient(ellipse at center, #0a0a14 0%, var(--bg-void) 70%)' }}
           >
-            {/* ── Scanline CRT overlay ── */}
+
             <div className="absolute inset-0 pointer-events-none z-[1]" style={{
               backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(212,175,55,0.015) 2px, rgba(212,175,55,0.015) 4px)',
               animation: 'splashScanDrift 8s linear infinite',
@@ -909,6 +965,45 @@ export default function Dashboard() {
         <a href='https://ko-fi.com/M8D41ZYW4Z' target='_blank' className="pointer-events-auto hover:opacity-80 transition-opacity ml-1 flex items-center">
           <span className="px-3 py-1 rounded-sm border border-[var(--gold-primary)]/40 bg-[var(--gold-primary)]/10 text-[var(--gold-primary)] text-[11px] font-bold tracking-[0.2em]">SUPPORT PROJECT</span>
         </a>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 3.15, duration: 0.5 }}
+        className="hidden xl:block absolute top-20 right-5 z-[200] w-[360px] pointer-events-none"
+      >
+        <div className="glass-panel pointer-events-auto overflow-hidden border border-[var(--gold-primary)]/20 bg-[linear-gradient(135deg,rgba(10,17,24,0.94),rgba(6,11,18,0.82))] shadow-[0_18px_60px_rgba(0,0,0,0.35)]">
+          <div className="flex items-center justify-between border-b border-[var(--border-secondary)]/50 px-4 py-2.5">
+            <div>
+              <div className="text-[9px] font-mono tracking-[0.32em] text-[var(--gold-primary)]/85">TACTICAL SNAPSHOT</div>
+              <div className="mt-1 text-[11px] font-mono tracking-[0.18em] text-[var(--text-primary)]">{operationalModeLabel}</div>
+            </div>
+            <div className="flex items-center gap-2 rounded-full border border-[var(--border-primary)]/40 bg-black/20 px-2.5 py-1 text-[9px] font-mono text-[var(--text-secondary)]">
+              <div className={`h-1.5 w-1.5 rounded-full ${backendStatus === 'connected' ? 'bg-[var(--alert-green)]' : backendStatus === 'error' ? 'bg-[var(--alert-red)]' : 'bg-[var(--gold-primary)]'} animate-osiris-pulse`} />
+              <span>{backendStatus === 'connected' ? 'LIVE' : backendStatus === 'error' ? 'DEGRADED' : 'SYNCING'}</span>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2 p-3">
+            {[
+              { label: 'TRACKED ENTITIES', value: trackedEntityCount.toLocaleString(), accent: 'var(--gold-primary)', icon: Database },
+              { label: 'HIGH-SIGNAL ALERTS', value: activeIntelAlerts.toString(), accent: activeIntelAlerts > 0 ? '#FF9500' : 'var(--alert-green)', icon: AlertTriangle },
+              { label: 'MARITIME PRESSURE', value: maritimePressure.toString(), accent: maritimePressure > 0 ? '#FF9500' : 'var(--cyan-primary)', icon: Activity },
+              { label: 'AIR TRACKS', value: totalFlights.toLocaleString(), accent: 'var(--cyan-primary)', icon: Radar },
+            ].map((item) => {
+              const Icon = item.icon;
+              return (
+                <div key={item.label} className="rounded-xl border border-white/6 bg-black/20 px-3 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[8px] font-mono tracking-[0.18em] text-[var(--text-muted)]">{item.label}</span>
+                    <Icon className="h-3.5 w-3.5" style={{ color: item.accent }} />
+                  </div>
+                  <div className="mt-2 text-[18px] font-bold tabular-nums" style={{ color: item.accent }}>{item.value}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </motion.div>
 
       {/* ── MOBILE: Compact top status ── */}
