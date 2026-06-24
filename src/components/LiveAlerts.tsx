@@ -3,12 +3,60 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  ChevronDown, ChevronUp, MapPin, ExternalLink, AlertTriangle,
+  ChevronDown, ChevronUp, MapPin, AlertTriangle,
   Newspaper, Clock, Radio, Maximize2, Minimize2
 } from 'lucide-react';
 
+interface NewsItem {
+  title?: string;
+  description?: string;
+  source?: string;
+  coords?: [number, number];
+  published?: string;
+  risk_score?: number;
+  link?: string;
+}
+
+interface EarthquakeItem {
+  magnitude: number;
+  place: string;
+  lat: number;
+  lng: number;
+  time?: string;
+}
+
+interface FeedItem {
+  name: string;
+  city: string;
+  country: string;
+  lat: number;
+  lng: number;
+  url: string;
+  category: string;
+  region: string;
+}
+
+interface AlertItem {
+  type: 'news' | 'quake' | 'feed';
+  title: string;
+  description?: string;
+  source: string;
+  lat?: number;
+  lng?: number;
+  time?: string;
+  severity: string;
+  url?: string;
+  feedUrl?: string;
+  category?: string;
+}
+
+interface LiveAlertsData {
+  news?: NewsItem[];
+  earthquakes?: EarthquakeItem[];
+}
+
 interface LiveAlertsProps {
-  data: any;
+  data: LiveAlertsData;
   onLocate: (lat: number, lng: number) => void;
   onWatchFeed?: (url: string, name: string) => void;
 }
@@ -27,7 +75,7 @@ export default function LiveAlerts({ data, onLocate, onWatchFeed }: LiveAlertsPr
   const [filter, setFilter] = useState<'all' | 'news' | 'quakes' | 'feeds'>('all');
 
   // Built-in live feeds — verified video IDs (synced with /api/live-news)
-  const BUILTIN_FEEDS = [
+  const BUILTIN_FEEDS: FeedItem[] = [
     // ── North America ──
     { name: 'NBC News NOW', city: 'New York', country: 'US', lat: 40.759, lng: -73.980, url: 'https://www.youtube.com/embed/live_stream?channel=UCeY0bbntWzzVIaj2z3QigXg&autoplay=1&mute=1', category: 'mainstream', region: 'americas' },
     { name: 'CBS News 24/7', city: 'New York', country: 'US', lat: 40.764, lng: -73.973, url: 'https://www.youtube.com/embed/live_stream?channel=UC8p1vwvWtl6T73JiExfWs1g&autoplay=1&mute=1', category: 'mainstream', region: 'americas' },
@@ -60,11 +108,11 @@ export default function LiveAlerts({ data, onLocate, onWatchFeed }: LiveAlertsPr
   ];
 
   // Build unified alert feed
-  const alerts: any[] = [];
+  const alerts: AlertItem[] = [];
 
   // OSINT Telegram News Feed (from /api/news)
   if (data.news) {
-    data.news.forEach((a: any) => {
+    data.news.forEach((a: NewsItem) => {
       alerts.push({
         type: 'news', title: a.title, description: a.description, source: a.source,
         lat: a.coords?.[0], lng: a.coords?.[1], time: a.published,
@@ -76,7 +124,7 @@ export default function LiveAlerts({ data, onLocate, onWatchFeed }: LiveAlertsPr
 
   // Earthquakes
   if (data.earthquakes) {
-    data.earthquakes.slice(0, 5).forEach((eq: any) => {
+    data.earthquakes.slice(0, 5).forEach((eq: EarthquakeItem) => {
       alerts.push({
         type: 'quake', title: `M${eq.magnitude} - ${eq.place}`, source: 'USGS',
         lat: eq.lat, lng: eq.lng, time: eq.time,

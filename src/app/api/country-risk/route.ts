@@ -25,7 +25,6 @@ const RISK_FACTORS: Record<string, { base: number; tags: string[] }> = {
   ET: { base: 62, tags: ['ethnic_tensions', 'regional_conflicts'] },
 };
 
-// Major stock exchange status
 const EXCHANGES = [
   { name: 'NYSE', tz: 'America/New_York', open: 9.5, close: 16, country: 'US' },
   { name: 'NASDAQ', tz: 'America/New_York', open: 9.5, close: 16, country: 'US' },
@@ -39,56 +38,74 @@ const EXCHANGES = [
   { name: 'ASX', tz: 'Australia/Sydney', open: 10, close: 16, country: 'AU' },
   { name: 'KRX', tz: 'Asia/Seoul', open: 9, close: 15.5, country: 'KR' },
   { name: 'MOEX', tz: 'Europe/Moscow', open: 10, close: 18.5, country: 'RU' },
-];
+] as const;
 
-function isExchangeOpen(ex: typeof EXCHANGES[0]): boolean {
+type EarthquakeFeed = {
+  features?: Array<{
+    properties?: {
+      place?: string;
+      mag?: number;
+    };
+  }>;
+};
+
+function isExchangeOpen(ex: (typeof EXCHANGES)[number]): boolean {
   try {
     const now = new Date();
     const formatter = new Intl.DateTimeFormat('en-US', {
-      timeZone: ex.tz, hour: 'numeric', minute: 'numeric', hour12: false, weekday: 'short',
+      timeZone: ex.tz,
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: false,
+      weekday: 'short',
     });
     const parts = formatter.formatToParts(now);
     const weekday = parts.find(p => p.type === 'weekday')?.value || '';
     if (['Sat', 'Sun'].includes(weekday)) return false;
-    const hour = parseInt(parts.find(p => p.type === 'hour')?.value || '0');
-    const minute = parseInt(parts.find(p => p.type === 'minute')?.value || '0');
+    const hour = parseInt(parts.find(p => p.type === 'hour')?.value || '0', 10);
+    const minute = parseInt(parts.find(p => p.type === 'minute')?.value || '0', 10);
     const decimal = hour + minute / 60;
     return decimal >= ex.open && decimal < ex.close;
-  } catch { return false; }
+  } catch {
+    return false;
+  }
 }
 
 export async function GET() {
   try {
     const exchangeStatus = EXCHANGES.map(ex => ({
-      name: ex.name, country: ex.country, open: isExchangeOpen(ex),
+      name: ex.name,
+      country: ex.country,
+      open: isExchangeOpen(ex),
     }));
 
-    // Enrich risk with live earthquake proximity
-    let quakeRisks: Record<string, number> = {};
+    const quakeRisks: Record<string, number> = {};
     try {
-      const res = await fetch('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_day.geojson', {  });
+      const res = await fetch('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_day.geojson');
       if (res.ok) {
-        const data = await res.json();
-        // Count significant quakes per rough region
-        for (const f of data.features || []) {
-          const place = f.properties?.place || '';
-          const mag = f.properties?.mag || 0;
-          // Extract country-ish context from place name
-          for (const [code, _] of Object.entries(RISK_FACTORS)) {
+        const data = (await res.json()) as EarthquakeFeed;
+        for (const feature of data.features || []) {
+          const place = feature.properties?.place || '';
+          const mag = feature.properties?.mag || 0;
+          for (const [code] of Object.entries(RISK_FACTORS)) {
             if (place.toLowerCase().includes(code.toLowerCase())) {
               quakeRisks[code] = (quakeRisks[code] || 0) + mag;
             }
           }
         }
       }
-    } catch (e) { console.warn('[OSIRIS] Suppressed error:', e instanceof Error ? e.message : e); }
+    } catch (error) {
+      console.warn('[OSIRIS] Suppressed error:', error instanceof Error ? error.message : error);
+    }
 
-    const countries = Object.entries(RISK_FACTORS).map(([code, data]) => ({
-      code,
-      risk_score: Math.min(100, data.base + (quakeRisks[code] || 0)),
-      risk_level: data.base >= 80 ? 'CRITICAL' : data.base >= 60 ? 'HIGH' : data.base >= 40 ? 'ELEVATED' : 'LOW',
-      tags: data.tags,
-    })).sort((a, b) => b.risk_score - a.risk_score);
+    const countries = Object.entries(RISK_FACTORS)
+      .map(([code, data]) => ({
+        code,
+        risk_score: Math.min(100, data.base + (quakeRisks[code] || 0)),
+        risk_level: data.base >= 80 ? 'CRITICAL' : data.base >= 60 ? 'HIGH' : data.base >= 40 ? 'ELEVATED' : 'LOW',
+        tags: data.tags,
+      }))
+      .sort((a, b) => b.risk_score - a.risk_score);
 
     return NextResponse.json({
       countries,
@@ -97,7 +114,7 @@ export async function GET() {
       total_exchanges: exchangeStatus.length,
       timestamp: new Date().toISOString(),
     });
-  } catch (err) {
+  } catch {
     return NextResponse.json({ countries: [], exchanges: [], error: 'Failed' }, { status: 500 });
   }
 }

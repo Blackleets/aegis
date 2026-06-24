@@ -2,24 +2,49 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Target, ChevronDown, ChevronUp, AlertTriangle, Ship, Anchor, AlertCircle, Maximize2, Minimize2 } from 'lucide-react';
+import { Target, ChevronDown, ChevronUp, AlertTriangle, Anchor, AlertCircle } from 'lucide-react';
+
+interface SupplierItem {
+  name: string;
+  city: string;
+  risk_level: string;
+  active_threats?: string;
+}
+
+interface MaritimePortItem {
+  name: string;
+  congestion: string;
+  dwell_time?: string;
+  volume?: string;
+}
+
+interface ChokepointItem {
+  name: string;
+  risk: string;
+  traffic?: string;
+}
+
+interface ScmPanelData {
+  scm_suppliers?: SupplierItem[];
+  maritime_ports?: MaritimePortItem[];
+  maritime_chokepoints?: ChokepointItem[];
+  markets?: { scm_alerts?: string[] };
+}
 
 interface ScmPanelProps {
-  data: any;
+  data: ScmPanelData;
 }
 
 export default function ScmPanel({ data }: ScmPanelProps) {
   const [expanded, setExpanded] = useState(true);
-  const [maximized, setMaximized] = useState(false);
-
   const suppliers = data.scm_suppliers || [];
-  const criticalSuppliers = suppliers.filter((s: any) => s.risk_level === 'CRITICAL' || s.risk_level === 'HIGH');
+  const criticalSuppliers = suppliers.filter((s: SupplierItem) => s.risk_level === 'CRITICAL' || s.risk_level === 'HIGH');
 
   const ports = data.maritime_ports || [];
-  const congestedPorts = ports.filter((p: any) => p.congestion === 'SEVERE' || p.congestion === 'CONGESTED');
+  const congestedPorts = ports.filter((p: MaritimePortItem) => p.congestion === 'SEVERE' || p.congestion === 'CONGESTED');
 
   const chokepoints = data.maritime_chokepoints || [];
-  const riskyChokes = chokepoints.filter((c: any) => c.risk === 'CRITICAL' || c.risk === 'HIGH');
+  const riskyChokes = chokepoints.filter((c: ChokepointItem) => c.risk === 'CRITICAL' || c.risk === 'HIGH');
 
   const marketAlerts = data.markets?.scm_alerts || [];
 
@@ -72,7 +97,7 @@ export default function ScmPanel({ data }: ScmPanelProps) {
                   <div className="text-[9px] font-mono text-[#00E676] px-2">✓ All monitored Tier 1/2 nodes operational.</div>
                 ) : (
                   <div className="space-y-1">
-                    {criticalSuppliers.map((s: any, i: number) => {
+                    {criticalSuppliers.map((s: SupplierItem, i: number) => {
                       const threats = s.active_threats ? JSON.parse(s.active_threats) : [];
                       return (
                         <div key={i} className="px-2 py-1.5 rounded border border-[#FF1744]/40 bg-[#FF1744]/10">
@@ -98,7 +123,7 @@ export default function ScmPanel({ data }: ScmPanelProps) {
                   <div className="text-[9px] font-mono text-[#00E676] px-2">✓ Global maritime flow optimal.</div>
                 ) : (
                   <div className="space-y-1">
-                    {riskyChokes.map((c: any, i: number) => (
+                    {riskyChokes.map((c: ChokepointItem, i: number) => (
                       <div key={`c-${i}`} className="px-2 py-1.5 rounded hover:bg-white/5 transition-colors border-l-2" style={{ borderLeftColor: c.risk === 'CRITICAL' ? '#FF1744' : '#FF9500' }}>
                         <div className="flex justify-between items-center mb-0.5">
                           <span className="text-[10px] font-mono text-[#FF9500] font-bold">{c.name}</span>
@@ -107,7 +132,7 @@ export default function ScmPanel({ data }: ScmPanelProps) {
                         <div className="text-[8px] font-mono text-[#aaa]">{c.traffic}</div>
                       </div>
                     ))}
-                    {congestedPorts.map((p: any, i: number) => (
+                    {congestedPorts.map((p: MaritimePortItem, i: number) => (
                       <div key={`p-${i}`} className="px-2 py-1.5 rounded hover:bg-white/5 transition-colors border-l-2" style={{ borderLeftColor: p.congestion === 'SEVERE' ? '#FF1744' : '#FF9500' }}>
                         <div className="flex justify-between items-center mb-0.5">
                           <span className="text-[10px] font-mono text-[#00BCD4]">{p.name}</span>

@@ -4,10 +4,32 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   TrendingUp, TrendingDown, ChevronDown, ChevronUp, BarChart3,
-  Zap, Shield, Droplets, Gem, Bitcoin, LineChart, Maximize2, Minimize2
+  Zap, Shield, Droplets, Gem, Bitcoin, LineChart
 } from 'lucide-react';
 
-interface MarketsPanelProps { data: any; spaceWeather?: any; }
+interface MarketTicker {
+  price?: number;
+  up?: boolean;
+  change_percent?: number;
+}
+
+interface SpaceWeatherData {
+  storm_color: string;
+  kp_index: number | string;
+  storm_level: string;
+  solar_flares?: Array<{ class: string }>;
+}
+
+interface MarketsData {
+  scm_alerts?: string[];
+  [key: string]: Record<string, MarketTicker> | string[] | undefined;
+}
+
+interface MarketsPanelData {
+  markets?: MarketsData;
+}
+
+interface MarketsPanelProps { data: MarketsPanelData; spaceWeather?: SpaceWeatherData; }
 
 const SECTIONS = [
   { key: 'indices', label: 'INDICES', icon: LineChart },
@@ -17,7 +39,7 @@ const SECTIONS = [
   { key: 'crypto', label: 'CRYPTO', icon: Bitcoin },
 ];
 
-function Ticker({ name, data: d }: { name: string; data: any }) {
+function Ticker({ name, data: d }: { name: string; data: MarketTicker }) {
   if (!d) return null;
   return (
     <div className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-[var(--hover-accent)] transition-colors">
@@ -37,7 +59,6 @@ function Ticker({ name, data: d }: { name: string; data: any }) {
 
 export default function MarketsPanel({ data, spaceWeather }: MarketsPanelProps) {
   const [expanded, setExpanded] = useState(true);
-  const [maximized, setMaximized] = useState(false);
   const [activeSection, setActiveSection] = useState('stocks');
   const markets = data.markets || {};
 
@@ -58,7 +79,7 @@ export default function MarketsPanel({ data, spaceWeather }: MarketsPanelProps) 
       <AnimatePresence>
         {expanded && (
           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }}>
-            {/* Space Weather Banner */}
+
             {spaceWeather && (
               <div className="mb-2 p-2 rounded-lg border" style={{ borderColor: `${spaceWeather.storm_color}33`, background: `${spaceWeather.storm_color}08` }}>
                 <div className="flex items-center justify-between">

@@ -2,6 +2,16 @@ import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
+interface IncidentEvent {
+  id: string;
+  lat: number;
+  lng: number;
+  name: string;
+  url: string;
+  html: string;
+  type: 'conflict';
+}
+
 /**
  * OSIRIS — Global Incidents API (GDELT Fallback / RSS OSINT Mapper)
  * Since GDELT v2 Geo is frequently down (404/Timeout), this fallback
@@ -56,7 +66,7 @@ const CONFLICT_KEYWORDS = ['attack', 'strike', 'missile', 'drone', 'war', 'troop
 
 export async function GET() {
   try {
-    const allEvents: any[] = [];
+    const allEvents: IncidentEvent[] = [];
     let eventId = 0;
 
     for (const feed of RSS_FEEDS) {
@@ -111,7 +121,7 @@ export async function GET() {
             });
           }
         }
-      } catch (e) {
+      } catch {
         console.warn(`Failed to fetch ${feed.source}`);
       }
     }
