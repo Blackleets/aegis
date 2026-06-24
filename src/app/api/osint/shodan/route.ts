@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 
+const getErrorMessage = (error: unknown) => error instanceof Error ? error.message : 'Unknown error';
+
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const ip = searchParams.get('ip');
@@ -30,9 +32,9 @@ export async function GET(req: Request) {
       throw new Error(`Shodan HTTP ${res.status}`);
     }
 
-    const data = await res.json();
+    const data: unknown = await res.json();
     return NextResponse.json(data);
-  } catch (error: any) {
-    return NextResponse.json({ error: 'Shodan lookup failed', detail: error.message }, { status: 502 });
+  } catch (error: unknown) {
+    return NextResponse.json({ error: 'Shodan lookup failed', detail: getErrorMessage(error) }, { status: 502 });
   }
 }

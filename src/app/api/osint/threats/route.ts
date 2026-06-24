@@ -1,6 +1,64 @@
 import { NextResponse } from 'next/server';
 import { isRateLimited, getClientIp } from '@/lib/ssrf-guard';
 
+type OtxPulse = {
+  name?: string;
+  description?: string;
+  created?: string;
+  modified?: string;
+  tags?: string[];
+  adversary?: string;
+  targeted_countries?: string[];
+  indicator_count?: number;
+};
+
+type OtxActivityResponse = {
+  results?: OtxPulse[];
+};
+
+type OtxIpIndicatorResponse = {
+  reputation?: number;
+  pulse_info?: { count?: number };
+  country_name?: string;
+  asn?: string;
+};
+
+type OtxDomainIndicatorResponse = {
+  pulse_info?: { count?: number };
+  whois?: {
+    registrar?: string;
+    creation_date?: string;
+    expiration_date?: string;
+  };
+};
+
+type ThreatResults = {
+  timestamp: string;
+  pulses?: Array<{
+    name?: string;
+    description?: string;
+    created?: string;
+    modified?: string;
+    tags?: string[];
+    adversary?: string;
+    targeted_countries?: string[];
+    indicators_count?: number;
+  }>;
+  tor_exit_node?: boolean | null;
+  otx?: {
+    reputation?: number;
+    pulse_count: number;
+    country?: string;
+    asn?: string;
+    whois?: {
+      registrar?: string;
+      creation_date?: string;
+      expiration_date?: string;
+    } | null;
+  };
+  threat_level?: 'HIGH' | 'MEDIUM' | 'LOW';
+};
+
 // Threat Intelligence — AlienVault OTX public pulse feed + Tor exit nodes
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -12,7 +70,7 @@ export async function GET(req: Request) {
   }
   
   try {
-    const results: any = { timestamp: new Date().toISOString() };
+    const results: ThreatResults = { timestamp: new Date().toISOString() };
 
     // 1. AlienVault OTX — public pulse feed (no key needed for public data)
     try {
@@ -26,8 +84,8 @@ export async function GET(req: Request) {
           signal: AbortSignal.timeout(8000),
         });
         if (actRes.ok) {
-          const data = await actRes.json();
-          results.pulses = (data.results || []).slice(0, 10).map((p: any) => ({
+          const data: OtxActivityResponse = await actRes.json();
+          results.pulses = (data.results || []).slice(0, 10).map((p) => ({
             name: p.name,
             description: p.description?.slice(0, 200),
             created: p.created,
@@ -65,7 +123,7 @@ export async function GET(req: Request) {
             signal: AbortSignal.timeout(5000),
           });
           if (res.ok) {
-            const data = await res.json();
+            const data: OtxIpIndicatorResponse = await res.json();
             results.otx = {
               reputation: data.reputation,
               pulse_count: data.pulse_info?.count || 0,
@@ -81,7 +139,7 @@ export async function GET(req: Request) {
             signal: AbortSignal.timeout(5000),
           });
           if (res.ok) {
-            const data = await res.json();
+            const data: OtxDomainIndicatorResponse = await res.json();
             results.otx = {
               pulse_count: data.pulse_info?.count || 0,
               whois: data.whois ? {

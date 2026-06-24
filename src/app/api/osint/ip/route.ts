@@ -2,6 +2,57 @@ import { NextResponse } from 'next/server';
 import { isRateLimited, getClientIp } from '@/lib/ssrf-guard';
 import { matchExact, type SanctionEntry } from '@/lib/sanctions';
 
+type IpApiResponse = {
+  status: 'success' | 'fail';
+  country?: string;
+  countryCode?: string;
+  regionName?: string;
+  city?: string;
+  lat?: number;
+  lon?: number;
+  timezone?: string;
+  isp?: string;
+  org?: string;
+  as?: string;
+  asname?: string;
+  mobile?: boolean;
+  proxy?: boolean;
+  hosting?: boolean;
+};
+
+type IpGeo = {
+  country?: string;
+  country_code?: string;
+  region?: string;
+  city?: string;
+  lat?: number;
+  lon?: number;
+  timezone?: string;
+  isp?: string;
+  org?: string;
+  as_number?: string;
+  as_name?: string;
+  is_mobile?: boolean;
+  is_proxy?: boolean;
+  is_hosting?: boolean;
+};
+
+type IpResults = {
+  ip: string;
+  timestamp: string;
+  geo?: IpGeo;
+  reputation?: {
+    is_proxy: boolean;
+    is_hosting: boolean;
+    is_mobile: boolean;
+    risk_level: 'HIGH' | 'MEDIUM' | 'LOW';
+  };
+  sanctions_match?: {
+    source: string;
+    hits: Array<{ matched_value: string; entries: SanctionEntry[] }>;
+  } | null;
+};
+
 // IP Geolocation + Reputation — combines multiple free sources.
 // Cross-checks the ASN owner / ISP / org strings against the OFAC SDN
 // list so an IP routed via a sanctioned operator surfaces a hit.
@@ -23,7 +74,7 @@ export async function GET(req: Request) {
   }
 
   try {
-    const results: any = { ip, timestamp: new Date().toISOString() };
+    const results: IpResults = { ip, timestamp: new Date().toISOString() };
 
     // 1. ip-api.com — geolocation (free, no key)
     try {
@@ -31,7 +82,7 @@ export async function GET(req: Request) {
         signal: AbortSignal.timeout(5000),
       });
       if (res.ok) {
-        const geo = await res.json();
+        const geo: IpApiResponse = await res.json();
         if (geo.status === 'success') {
           results.geo = {
             country: geo.country,

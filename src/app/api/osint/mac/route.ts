@@ -1,5 +1,15 @@
 import { NextResponse } from 'next/server';
 
+type MacVendorResponse = {
+  result?: {
+    company?: string;
+    address?: string;
+    mac_prefix?: string;
+  };
+};
+
+const getErrorMessage = (error: unknown) => error instanceof Error ? error.message : 'Unknown error';
+
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const mac = searchParams.get('mac');
@@ -21,7 +31,7 @@ export async function GET(req: Request) {
       throw new Error(`MacVendors API HTTP ${res.status}`);
     }
 
-    const data = await res.json();
+    const data: MacVendorResponse = await res.json();
     if (data && data.result && data.result.company) {
       return NextResponse.json({
         mac: cleanMac,
@@ -32,7 +42,7 @@ export async function GET(req: Request) {
     } else {
       return NextResponse.json({ mac: cleanMac, vendor: 'Not Found' });
     }
-  } catch (error: any) {
-    return NextResponse.json({ error: 'MAC lookup failed', detail: error.message }, { status: 502 });
+  } catch (error: unknown) {
+    return NextResponse.json({ error: 'MAC lookup failed', detail: getErrorMessage(error) }, { status: 502 });
   }
 }

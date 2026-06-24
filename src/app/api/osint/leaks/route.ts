@@ -1,5 +1,18 @@
 import { NextResponse } from 'next/server';
 
+type XposedExposureItem = {
+  data_classes?: string[];
+};
+
+type XposedAnalyticsResponse = {
+  BreachesSummary?: {
+    site?: string;
+  };
+  ExposedData?: XposedExposureItem[];
+};
+
+const getErrorMessage = (error: unknown) => error instanceof Error ? error.message : 'Unknown error';
+
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const email = searchParams.get('email');
@@ -18,18 +31,18 @@ export async function GET(req: Request) {
 
     if (!res.ok) throw new Error(`XposedOrNot API HTTP ${res.status}`);
 
-    const data = await res.json();
+    const data: XposedAnalyticsResponse = await res.json();
     
     // Parse the analytics data
-    let breachList = [];
-    let dataExposed = new Set<string>();
+    const breachList: string[] = [];
+    const dataExposed = new Set<string>();
 
     if (data.BreachesSummary && data.BreachesSummary.site) {
-       breachList = data.BreachesSummary.site.split(';').filter(Boolean);
+       breachList.push(...data.BreachesSummary.site.split(';').filter(Boolean));
     }
     
     if (data.ExposedData && Array.isArray(data.ExposedData)) {
-       data.ExposedData.forEach((item: any) => {
+       data.ExposedData.forEach((item) => {
           if (item.data_classes && Array.isArray(item.data_classes)) {
              item.data_classes.forEach((dc: string) => dataExposed.add(dc));
           }
@@ -42,7 +55,7 @@ export async function GET(req: Request) {
       breaches: breachList,
       data_exposed: Array.from(dataExposed).sort()
     });
-  } catch (error: any) {
-    return NextResponse.json({ error: 'Leak lookup failed', detail: error.message }, { status: 502 });
+  } catch (error: unknown) {
+    return NextResponse.json({ error: 'Leak lookup failed', detail: getErrorMessage(error) }, { status: 502 });
   }
 }
