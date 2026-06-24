@@ -1,4 +1,3 @@
-
 import { NextResponse } from 'next/server';
 
 /**
@@ -7,6 +6,8 @@ import { NextResponse } from 'next/server';
  * FREE — No API key required
  * Data: Kp index (geomagnetic), solar flares, CME alerts
  */
+
+type SpaceWeatherEntry = Record<string, string | number | undefined>;
 
 export async function GET() {
   try {
@@ -22,16 +23,14 @@ export async function GET() {
       }).then(r => r.json()),
     ]);
 
-    // Latest Kp index (geomagnetic storm indicator)
     let kpIndex = 0;
     let kpTimestamp = '';
     if (kpRes.status === 'fulfilled' && Array.isArray(kpRes.value) && kpRes.value.length > 0) {
-      const latest = kpRes.value[kpRes.value.length - 1];
-      kpIndex = parseFloat(latest.kp_index || latest.Kp || 0);
-      kpTimestamp = latest.time_tag || '';
+      const latest = kpRes.value[kpRes.value.length - 1] as SpaceWeatherEntry;
+      kpIndex = parseFloat(String(latest.kp_index || latest.Kp || 0));
+      kpTimestamp = String(latest.time_tag || '');
     }
 
-    // Storm level from Kp
     let stormLevel = 'Quiet';
     let stormColor = '#00E676';
     if (kpIndex >= 8) { stormLevel = 'Extreme (G5)'; stormColor = '#FF1744'; }
@@ -41,28 +40,26 @@ export async function GET() {
     else if (kpIndex >= 4) { stormLevel = 'Minor (G1)'; stormColor = '#FFD700'; }
     else if (kpIndex >= 3) { stormLevel = 'Unsettled'; stormColor = '#D4AF37'; }
 
-    // Recent alerts
-    const alerts: any[] = [];
+    const alerts: Array<{ id: string; issue_datetime?: string; message: string }> = [];
     if (alertsRes.status === 'fulfilled' && Array.isArray(alertsRes.value)) {
-      for (const alert of alertsRes.value.slice(0, 10)) {
+      for (const alert of (alertsRes.value as SpaceWeatherEntry[]).slice(0, 10)) {
         alerts.push({
-          id: alert.product_id || `alert-${Date.now()}`,
-          issue_datetime: alert.issue_datetime,
-          message: (alert.message || '').substring(0, 200),
+          id: String(alert.product_id || `alert-${Date.now()}`),
+          issue_datetime: alert.issue_datetime ? String(alert.issue_datetime) : undefined,
+          message: String(alert.message || '').substring(0, 200),
         });
       }
     }
 
-    // Recent solar flares
-    const flares: any[] = [];
+    const flares: Array<{ class: string; begin?: string; peak?: string; end?: string }> = [];
     if (flareRes.status === 'fulfilled' && Array.isArray(flareRes.value)) {
-      for (const flare of flareRes.value.slice(0, 5)) {
+      for (const flare of (flareRes.value as SpaceWeatherEntry[]).slice(0, 5)) {
         if (!flare.max_class) continue;
         flares.push({
-          class: flare.max_class,
-          begin: flare.begin_time,
-          peak: flare.max_time,
-          end: flare.end_time,
+          class: String(flare.max_class),
+          begin: flare.begin_time ? String(flare.begin_time) : undefined,
+          peak: flare.max_time ? String(flare.max_time) : undefined,
+          end: flare.end_time ? String(flare.end_time) : undefined,
         });
       }
     }
@@ -79,9 +76,12 @@ export async function GET() {
   } catch (error) {
     console.error('Space Weather API error:', error);
     return NextResponse.json({
-      kp_index: 0, storm_level: 'Unknown', storm_color: '#555',
-      alerts: [], solar_flares: [], error: 'Failed to fetch space weather data',
+      kp_index: 0,
+      storm_level: 'Unknown',
+      storm_color: '#555',
+      alerts: [],
+      solar_flares: [],
+      error: 'Failed to fetch space weather data',
     }, { status: 500 });
   }
 }
-

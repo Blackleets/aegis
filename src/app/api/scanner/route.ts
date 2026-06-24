@@ -89,10 +89,11 @@ export async function GET(req: Request) {
     });
     const data = await res.json();
     return NextResponse.json(data, { status: res.status });
-  } catch (e: any) {
+  } catch (error: unknown) {
+    const detail = error instanceof Error ? error.message : 'Unknown scanner error';
     return NextResponse.json({
       error: 'Scanner unreachable',
-      detail: e.message,
+      detail,
     }, { status: 502 });
   }
 }

@@ -13,7 +13,7 @@ export async function GET(req: Request) {
   }
 
   try {
-    const results: any = { query, timestamp: new Date().toISOString() };
+    const results: Record<string, unknown> = { query, timestamp: new Date().toISOString() };
 
     // Detect query type
     const isIP = /^(\d{1,3}\.){3}\d{1,3}$/.test(query);

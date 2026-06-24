@@ -54,7 +54,50 @@ const MILITARY_INDICATORS = new Set([
 
 const AIRLINE_CODE_RE = /^([A-Z]{3})\d/;
 
-async function fetchRegion(region: typeof REGIONS[0]): Promise<any[]> {
+type Region = (typeof REGIONS)[number];
+
+interface RawFlight {
+  t?: string;
+  flight?: string;
+  dbFlags?: number;
+  lat?: number | null;
+  lon?: number | null;
+  alt_baro?: number | null;
+  gs?: number | null;
+  track?: number | null;
+  hex?: string;
+  r?: string;
+  squawk?: string;
+  nac_p?: number;
+}
+
+interface ClassifiedFlight {
+  callsign: string;
+  lat: number;
+  lng: number;
+  alt: number;
+  heading: number;
+  speed_knots: number | null;
+  model: string;
+  icao24: string;
+  registration: string;
+  squawk: string;
+  airline_code: string;
+  aircraft_category: 'heli' | 'plane';
+  category: 'commercial' | 'private' | 'jet' | 'military';
+  grounded: boolean;
+  nac_p?: number;
+  type: 'flight';
+}
+
+interface JammingPoint {
+  lat: number;
+  lng: number;
+  nac_p: number;
+  callsign: string;
+}
+
+async function fetchRegion(region: Region): Promise<RawFlight[]> {
   try {
     const url = `https://api.adsb.lol/v2/lat/${region.lat}/lon/${region.lon}/dist/${region.dist}`;
     const res = await stealthFetch(url, {
@@ -70,7 +113,7 @@ async function fetchRegion(region: typeof REGIONS[0]): Promise<any[]> {
   return [];
 }
 
-function classifyFlight(f: any) {
+function classifyFlight(f: RawFlight): ClassifiedFlight | null {
   const modelUpper = (f.t || '').toUpperCase();
   const flightStr = (f.flight || '').trim().toUpperCase();
   const dbFlags = (f.dbFlags || 0);
@@ -130,10 +173,10 @@ function classifyFlight(f: any) {
 // 1. It coalesces concurrent requests within the same isolate
 // 2. It prevents hammering adsb.lol which would cause rate-limit bans
 // For a globally shared cache, migrate to Vercel KV or similar persistent store.
-let cachedData: any = null;
+let cachedData: Record<string, unknown> | null = null;
 let lastFetchTime = 0;
 const CACHE_TTL = 45000; // 45 seconds cache window
-let fetchPromise: Promise<any> | null = null;
+let fetchPromise: Promise<Record<string, unknown>> | null = null;
 
 export async function GET() {
   const now = Date.now();
@@ -167,7 +210,7 @@ export async function GET() {
       REGIONS.map(r => fetchRegion(r))
     );
 
-    const allRaw: any[] = [];
+    const allRaw: RawFlight[] = [];
     const seenHex = new Set<string>();
 
     for (const result of regionResults) {
@@ -183,11 +226,11 @@ export async function GET() {
     }
 
     // Classify all flights
-    const commercial: any[] = [];
-    const privateFl: any[] = [];
-    const jets: any[] = [];
-    const military: any[] = [];
-    const gpsJamming: any[] = [];
+    const commercial: ClassifiedFlight[] = [];
+    const privateFl: ClassifiedFlight[] = [];
+    const jets: ClassifiedFlight[] = [];
+    const military: ClassifiedFlight[] = [];
+    const gpsJamming: JammingPoint[] = [];
 
     for (const raw of allRaw) {
       const flight = classifyFlight(raw);
@@ -246,7 +289,7 @@ export async function GET() {
   }
 }
 
-function aggregateJamming(points: any[], threshold: number) {
+function aggregateJamming(points: JammingPoint[], threshold: number) {
   if (points.length === 0) return [];
   const grid = new Map<string, { lat: number; lng: number; count: number; total_nac_p: number }>();
   const GRID_SIZE = 2; // degrees
