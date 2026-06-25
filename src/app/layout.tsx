@@ -1,10 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import ErrorBoundary from '@/components/ErrorBoundary';
 
-const SITE_URL = "https://aegis.blackleets.dev";
-const SITE_NAME = "AEGIS";
-const SITE_TITLE = "AEGIS — AI-Enhanced Intelligence Platform | Live Tracking, Recon & Fusion Analysis";
-const SITE_DESCRIPTION = "AI-enhanced open intelligence command center for live flight, satellite, CCTV and cyber reconnaissance. Correlate 20+ feeds, generate fusion briefings, and turn public telemetry into actionable risk intelligence.";
+const SITE_URL = "https://worldwatch.blackleets.dev";
+const SITE_NAME = "WorldWatch";
+const SITE_TITLE = "WorldWatch — Global Monitoring Platform | Live Tracking, Recon & Intelligence";
+const SITE_DESCRIPTION = "Global monitoring and recon platform for live flight, satellite, CCTV, seismic and cyber signals. Correlate public telemetry, generate operator-ready briefings, and let each user bring their own AI key or run in zero-cost local mode.";
 
 export const viewport: Viewport = {
   themeColor: "#D4AF37",
@@ -18,44 +19,18 @@ export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
     default: SITE_TITLE,
-    template: "%s | AEGIS Intelligence",
+    template: "%s | WorldWatch",
   },
   description: SITE_DESCRIPTION,
   keywords: [
-    // OSINT Tools - Primary focus
-    "OSINT tools", "free OSINT tools", "online OSINT toolkit", "OSINT framework",
-    "nmap online", "nmap scanner online", "free nmap scan", "port scanner online",
-    "DNS lookup tool", "WHOIS lookup", "reverse DNS", "DNS records",
-    "SSL certificate checker", "certificate transparency", "cert lookup",
-    "BGP routing lookup", "ASN lookup", "IP geolocation",
-    "threat intelligence", "threat intel lookup", "IP reputation check",
-    "network reconnaissance", "recon tools", "penetration testing tools",
-    "cybersecurity tools", "infosec tools", "security scanner",
-    "linux OSINT tools", "kali linux tools online", "OSINT browser tools",
-    
-    // Intelligence Platform
-    "OSINT", "open source intelligence", "intelligence platform", "global intelligence",
-    "geospatial intelligence", "GEOINT", "SIGINT", "real-time tracking",
-    "palantir alternative", "open source palantir", "intelligence dashboard",
-    
-    // Tracking & Data
-    "flight tracker", "aircraft tracking", "ADS-B tracker", "live flight radar",
-    "satellite tracking", "ISS tracker", "space station tracker",
-    "CCTV cameras live", "security cameras worldwide", "live cameras",
-    "earthquake monitor", "seismic activity", "USGS earthquake",
-    "wildfire tracker", "NASA FIRMS", "active fires",
-    "nuclear facilities map", "nuclear power plants",
-    "severe weather alerts", "weather radar",
-    "cyber threats dashboard", "CVE tracker",
-    "space weather", "solar storm", "GPS jamming",
-    "defense stocks", "commodities tracker",
-    
-    // Brand
-    "aegis", "aegisai", "aegisai.live",
+    "OSINT tools", "global monitoring", "live tracking", "recon platform", "threat intelligence",
+    "flight tracker", "satellite tracking", "CCTV monitoring", "earthquake monitor", "cyber threats dashboard",
+    "open source intelligence", "geospatial intelligence", "intelligence dashboard", "operator dashboard",
+    "WorldWatch", "worldwatch", "worldwatch blackleets"
   ],
-  authors: [{ name: "Aegis Project", url: SITE_URL }],
-  creator: "Aegis Project",
-  publisher: "Aegis Project",
+  authors: [{ name: "WorldWatch Project", url: SITE_URL }],
+  creator: "WorldWatch Project",
+  publisher: "WorldWatch Project",
   robots: {
     index: true,
     follow: true,
@@ -74,24 +49,17 @@ export const metadata: Metadata = {
       { url: "/android-chrome-192x192.png", type: "image/png", sizes: "192x192" },
       { url: "/android-chrome-512x512.png", type: "image/png", sizes: "512x512" },
     ],
-    apple: [
-      { url: "/apple-touch-icon.png", sizes: "180x180" },
-    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
     shortcut: "/favicon.ico",
-    other: [
-      {
-        rel: "apple-touch-icon-precomposed",
-        url: "/apple-touch-icon.png",
-      },
-    ],
+    other: [{ rel: "apple-touch-icon-precomposed", url: "/apple-touch-icon.png" }],
   },
   manifest: "/site.webmanifest",
   alternates: {
     canonical: SITE_URL,
   },
   openGraph: {
-    title: "AEGIS — The Open-Source Palantir Alternative | Live Flights, CCTV, Satellites & OSINT Tools",
-    description: "Track 10K+ aircraft, 2K satellites & worldwide CCTV on a 3D globe. Run Nmap, DNS, WHOIS & threat intel scans from your browser. 20+ live intelligence feeds. Free. Open source.",
+    title: "WorldWatch — Live Global Monitoring, Recon & Intelligence",
+    description: "Track flights, satellites, CCTV, seismic events, markets and cyber signals in one operator-grade interface. Run free in local mode or let users attach their own AI key.",
     type: "website",
     siteName: SITE_NAME,
     locale: "en_US",
@@ -101,35 +69,34 @@ export const metadata: Metadata = {
         url: `${SITE_URL}/og-image.png`,
         width: 1200,
         height: 630,
-        alt: "AEGIS — Open Source Intelligence Platform with Live Tracking & OSINT Tools",
+        alt: "WorldWatch global monitoring platform",
         type: "image/png",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "🛰️ AEGIS — Open Source Palantir Alternative | Live Tracking + OSINT Tools",
-    description: "Track 10K+ flights, satellites & CCTV worldwide. Run Nmap, DNS, WHOIS scans from your browser. 20+ live intel feeds. Free & open source.",
+    title: "🛰️ WorldWatch — Global Monitoring + Recon Platform",
+    description: "Watch the world live across flights, satellites, CCTV, seismic and cyber signals. Zero-cost local mode plus optional BYOK AI.",
     images: [`${SITE_URL}/og-image.png`],
   },
   category: "technology",
-  classification: "Intelligence & Security",
+  classification: "Monitoring & Intelligence",
   other: {
     "apple-mobile-web-app-capable": "yes",
     "apple-mobile-web-app-status-bar-style": "black-translucent",
-    "apple-mobile-web-app-title": "AEGIS",
+    "apple-mobile-web-app-title": "WorldWatch",
     "mobile-web-app-capable": "yes",
     "msapplication-TileColor": "#06060C",
     "msapplication-config": "none",
   },
 };
 
-// JSON-LD Structured Data
 const jsonLd = {
   "@context": "https://schema.org",
   "@type": "WebApplication",
-  name: "AEGIS — OSINT Toolkit & Intelligence Platform",
-  alternateName: ["AEGIS", "AegisAI", "Aegis OSINT"],
+  name: "WorldWatch — Global Monitoring & Recon Platform",
+  alternateName: ["WorldWatch", "WorldWatch OSINT", "WorldWatch Recon"],
   url: SITE_URL,
   description: SITE_DESCRIPTION,
   applicationCategory: "SecurityApplication",
@@ -142,36 +109,21 @@ const jsonLd = {
     availability: "https://schema.org/InStock",
   },
   featureList: [
-    "Nmap port scanning from the browser — no install required",
-    "DNS record lookup (A, AAAA, MX, NS, TXT, CNAME)",
-    "WHOIS domain registration lookup",
-    "SSL/TLS certificate transparency search",
-    "BGP routing & ASN lookup",
-    "IP geolocation & threat intelligence",
-    "Real-time flight tracking (10,000+ aircraft via ADS-B)",
-    "Satellite tracking (2,000+ objects including ISS)",
-    "Worldwide CCTV camera monitoring (1,400+ feeds)",
-    "Earthquake monitoring (USGS live feed)",
-    "Wildfire detection (NASA FIRMS satellite data)",
-    "Nuclear facility mapping (worldwide)",
-    "Severe weather alerts & tracking",
-    "Cyber threat & CVE intelligence",
-    "Space weather & solar storm monitoring",
-    "GPS jamming detection",
-    "Defense & commodity market tracking",
-    "SIGINT news aggregation feed",
-    "Interactive 3D globe with day/night cycle",
-    "Region intelligence dossier reports",
+    "Live global monitoring dashboard",
+    "Flight, satellite, CCTV and seismic tracking",
+    "Browser-native recon workflows",
+    "Cyber and threat intelligence overlays",
+    "Operator briefings and fusion dossiers",
+    "Zero-cost local analysis mode",
+    "Bring-your-own-key AI mode"
   ],
   screenshot: `${SITE_URL}/og-image.png`,
   author: {
     "@type": "Organization",
-    name: "Aegis Project",
+    name: "WorldWatch Project",
     url: SITE_URL,
   },
 };
-
-import ErrorBoundary from '@/components/ErrorBoundary';
 
 export default function RootLayout({
   children,
@@ -188,16 +140,13 @@ export default function RootLayout({
         <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <link rel="canonical" href={SITE_URL} />
-        
-        {/* JSON-LD Structured Data */}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
-
       </head>
       <body className="antialiased">
-        <ErrorBoundary name="AEGIS Core">
+        <ErrorBoundary name="WorldWatch Core">
           {children}
         </ErrorBoundary>
       </body>

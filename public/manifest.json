@@ -1,7 +1,7 @@
 {
-  "name": "AEGIS — AI-Enhanced Intelligence Platform",
-  "short_name": "AEGIS",
-  "description": "AI-enhanced open intelligence command center for live flight, satellite, CCTV and cyber reconnaissance.",
+  "name": "WorldWatch — Global Monitoring Platform",
+  "short_name": "WorldWatch",
+  "description": "Global monitoring and recon command center for live flight, satellite, CCTV, seismic and cyber intelligence.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#06060C",

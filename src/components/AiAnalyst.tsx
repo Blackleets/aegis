@@ -186,7 +186,7 @@ function renderMarkdown(text: string): string {
 
 function formatFusionDossier(dossier: FusionDossier): string {
   const bullets = (items: string[]) => (items.length > 0 ? items.map((item) => `- ${item}`).join('\n') : '- None reported');
-  return `# AEGIS FUSION DOSSIER
+  return `# WORLDWATCH FUSION DOSSIER
 ## BLUF
 ${dossier.bluf}
 
@@ -218,11 +218,11 @@ export default function AiAnalyst({ data }: AiAnalystProps) {
   const [showSettings, setShowSettings] = useState(false);
   const [apiKeyInput, setApiKeyInput] = useState(() => {
     if (typeof window === 'undefined') return '';
-    return localStorage.getItem('aegis-gemini-key') || '';
+    return localStorage.getItem('worldwatch-ai-key') || localStorage.getItem('aegis-gemini-key') || '';
   });
   const [keySaved, setKeySaved] = useState(() => {
     if (typeof window === 'undefined') return false;
-    return Boolean(localStorage.getItem('aegis-gemini-key'));
+    return Boolean(localStorage.getItem('worldwatch-ai-key') || localStorage.getItem('aegis-gemini-key'));
   });
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -242,7 +242,7 @@ export default function AiAnalyst({ data }: AiAnalystProps) {
 
   const getHeaders = useCallback((): Record<string, string> => {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    const savedKey = localStorage.getItem('aegis-gemini-key');
+    const savedKey = localStorage.getItem('worldwatch-ai-key') || localStorage.getItem('aegis-gemini-key');
     if (savedKey) {
       headers['x-gemini-key'] = savedKey;
     }
@@ -359,7 +359,7 @@ export default function AiAnalyst({ data }: AiAnalystProps) {
     const userMsg: ChatMessage = {
       id: generateId(),
       role: 'user',
-      content: '⚡ Generate AEGIS fusion dossier with hotspots, actions, and watchlist',
+      content: '⚡ Generate WorldWatch fusion dossier with hotspots, actions, and watchlist',
       timestamp: new Date().toISOString(),
     };
     setMessages((prev) => [...prev, userMsg]);
@@ -416,13 +416,15 @@ export default function AiAnalyst({ data }: AiAnalystProps) {
   const saveApiKey = useCallback(() => {
     const key = apiKeyInput.trim();
     if (key) {
-      localStorage.setItem('aegis-gemini-key', key);
+      localStorage.setItem('worldwatch-ai-key', key);
+      localStorage.removeItem('aegis-gemini-key');
       setKeySaved(true);
       setTimeout(() => setShowSettings(false), 600);
     }
   }, [apiKeyInput]);
 
   const clearApiKey = useCallback(() => {
+    localStorage.removeItem('worldwatch-ai-key');
     localStorage.removeItem('aegis-gemini-key');
     setApiKeyInput('');
     setKeySaved(false);
@@ -518,9 +520,9 @@ export default function AiAnalyst({ data }: AiAnalystProps) {
                     <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-[var(--alert-green)] animate-aegis-pulse" />
                   </div>
                   <div className="flex flex-col">
-                    <span className="hud-text text-[11px] text-[var(--text-heading)]">AEGIS ANALYST</span>
+                    <span className="hud-text text-[11px] text-[var(--text-heading)]">WORLDWATCH ANALYST</span>
                     <span className="text-[7px] font-mono tracking-[0.2em] text-[var(--text-muted)]">
-                      GEMINI 2.0 FLASH • ONLINE
+                      LOCAL FREE MODE • BYOK OPTIONAL
                     </span>
                   </div>
                 </div>
@@ -576,7 +578,7 @@ export default function AiAnalyst({ data }: AiAnalystProps) {
                       <div className="flex items-center gap-2">
                         <Key className="w-3 h-3 text-[var(--gold-dim)]" />
                         <span className="hud-label" style={{ fontSize: '8px' }}>
-                          GEMINI API KEY (OPTIONAL)
+                          OPTIONAL USER AI KEY
                         </span>
                       </div>
                       <div className="flex gap-2">
@@ -617,7 +619,7 @@ export default function AiAnalyst({ data }: AiAnalystProps) {
                         )}
                       </div>
                       <p className="text-[8px] font-mono text-[var(--text-muted)] leading-relaxed">
-                        Your key is stored locally and sent only to the AEGIS server. Get a free key at{' '}
+                        WorldWatch runs in free local mode by default. Add your own Gemini key only if you want higher-quality model output. Your key stays in this browser and is sent only with your own requests. Get a free key at{' '}
                         <a
                           href="https://aistudio.google.com/apikey"
                           target="_blank"
@@ -749,7 +751,7 @@ export default function AiAnalyst({ data }: AiAnalystProps) {
                               : 'var(--gold-primary)',
                           }}
                         >
-                          {msg.role === 'user' ? 'OPERATOR' : 'AEGIS ANALYST'}
+                          {msg.role === 'user' ? 'OPERATOR' : 'WORLDWATCH ANALYST'}
                         </span>
                         <span className="text-[7px] font-mono text-[var(--text-muted)] ml-auto">
                           {new Date(msg.timestamp).toLocaleTimeString([], {
@@ -865,7 +867,7 @@ export default function AiAnalyst({ data }: AiAnalystProps) {
                       value={inputText}
                       onChange={(e) => setInputText(e.target.value)}
                       onKeyDown={handleKeyDown}
-                      placeholder="Ask AEGIS for a fusion assessment..."
+                      placeholder="Ask WorldWatch for a fusion assessment..."
                       rows={1}
                       className="w-full bg-transparent px-3 py-2.5 text-[11px] font-mono text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none resize-none"
                       style={{ maxHeight: '120px', minHeight: '36px' }}
@@ -906,7 +908,7 @@ export default function AiAnalyst({ data }: AiAnalystProps) {
                 {/* Footer */}
                 <div className="flex items-center justify-between mt-1.5 px-1">
                   <span className="text-[7px] font-mono text-[var(--text-muted)] tracking-wider">
-                    {keySaved ? '🔑 CUSTOM KEY' : '🔧 SERVER KEY'} • {messages.filter((m) => m.role === 'user').length} QUERIES
+                    {keySaved ? '🔑 USER KEY ACTIVE' : '🆓 LOCAL FREE MODE'} • {messages.filter((m) => m.role === 'user').length} QUERIES
                   </span>
                   <span className="text-[7px] font-mono text-[var(--text-muted)] tracking-wider">
                     FEEDS: {(data.earthquakes?.length || 0) + (data.news?.length || 0) + (data.gdelt?.length || 0)} ITEMS

@@ -1,9 +1,7 @@
 /**
- * ═══════════════════════════════════════════════════════════════
- *  AEGIS — Fusion Dossier Endpoint
- *  POST /api/ai/fusion
- *  Generates structured cross-domain fusion dossiers via Gemini
- * ═══════════════════════════════════════════════════════════════
+ * WORLDWATCH — Fusion Dossier Endpoint
+ * POST /api/ai/fusion
+ * Supports BYOK, server keys, and a zero-cost local fallback.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -11,6 +9,7 @@ import {
   analyzeIntelligence,
   createGeminiClient,
   rotateApiKey,
+  generateLocalFusionDossier,
   type IntelligenceContext,
 } from '@/lib/ai-engine';
 
@@ -44,10 +43,8 @@ function checkRateLimit(ip: string): { allowed: boolean; remaining: number; rese
 
 setInterval(() => {
   const now = Date.now();
-  for (const [ip, entry] of rateLimitMap.entries()) {
-    if (now > entry.resetAt) {
-      rateLimitMap.delete(ip);
-    }
+  for (const [ip, entry] of Array.from(rateLimitMap.entries())) {
+    if (now > entry.resetAt) rateLimitMap.delete(ip);
   }
 }, 120_000);
 
@@ -55,9 +52,7 @@ function getEnvApiKeys(): string[] {
   const keys: string[] = [];
   for (let i = 1; i <= 8; i++) {
     const key = process.env[`GEMINI_API_KEY_${i}`];
-    if (key && key.trim().length > 0) {
-      keys.push(key.trim());
-    }
+    if (key && key.trim().length > 0) keys.push(key.trim());
   }
   return keys;
 }
@@ -78,6 +73,7 @@ interface FusionDossier {
 interface FusionResponse {
   dossier: FusionDossier;
   generatedAt: string;
+  mode?: 'premium' | 'local';
 }
 
 interface ErrorResponse {
@@ -104,11 +100,7 @@ Rules:
 - If evidence is weak, lower confidence instead of inventing facts.`;
 
 function extractJsonObject(rawText: string): FusionDossier {
-  const cleaned = rawText
-    .replace(/```json/gi, '')
-    .replace(/```/g, '')
-    .trim();
-
+  const cleaned = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
   const start = cleaned.indexOf('{');
   const end = cleaned.lastIndexOf('}');
   if (start === -1 || end === -1 || end <= start) {
@@ -116,7 +108,6 @@ function extractJsonObject(rawText: string): FusionDossier {
   }
 
   const parsed = JSON.parse(cleaned.slice(start, end + 1)) as Partial<FusionDossier>;
-
   return {
     bluf: typeof parsed.bluf === 'string' ? parsed.bluf : 'No BLUF generated.',
     riskLevel:
@@ -161,26 +152,6 @@ export async function POST(
     );
   }
 
-  const userKey = request.headers.get('x-gemini-key')?.trim();
-  let apiKey = '';
-
-  if (userKey && userKey.length > 0) {
-    apiKey = userKey;
-  } else {
-    const envKeys = getEnvApiKeys();
-    if (envKeys.length === 0) {
-      return NextResponse.json(
-        {
-          error:
-            'No Gemini API key configured. Set GEMINI_API_KEY_1 in environment or provide a key via the settings panel.',
-          code: 'NO_API_KEY',
-        },
-        { status: 503 }
-      );
-    }
-    apiKey = rotateApiKey(envKeys);
-  }
-
   let body: FusionRequestBody;
   try {
     body = (await request.json()) as FusionRequestBody;
@@ -198,6 +169,25 @@ export async function POST(
     );
   }
 
+  const userKey = request.headers.get('x-gemini-key')?.trim();
+  const envKeys = getEnvApiKeys();
+  const apiKey = userKey && userKey.length > 0 ? userKey : envKeys.length > 0 ? rotateApiKey(envKeys) : '';
+
+  if (!apiKey) {
+    return NextResponse.json(
+      {
+        dossier: generateLocalFusionDossier(body.context),
+        generatedAt: new Date().toISOString(),
+        mode: 'local',
+      },
+      {
+        headers: {
+          'X-RateLimit-Remaining': String(rateCheck.remaining),
+        },
+      }
+    );
+  }
+
   try {
     const client = createGeminiClient(apiKey);
     const raw = await analyzeIntelligence(client, body.context, FUSION_PROMPT);
@@ -207,6 +197,7 @@ export async function POST(
       {
         dossier,
         generatedAt: new Date().toISOString(),
+        mode: 'premium',
       },
       {
         headers: {
@@ -217,20 +208,10 @@ export async function POST(
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown Gemini API error';
 
-    if (message.includes('API_KEY_INVALID') || message.includes('API key not valid')) {
+    if (userKey && (message.includes('API_KEY_INVALID') || message.includes('API key not valid'))) {
       return NextResponse.json(
         { error: 'Invalid Gemini API key. Please check your configuration.', code: 'INVALID_KEY' },
         { status: 401 }
-      );
-    }
-
-    if (message.includes('RESOURCE_EXHAUSTED') || message.includes('quota')) {
-      return NextResponse.json(
-        {
-          error: 'Gemini API quota exhausted. Try again later or provide your own API key.',
-          code: 'QUOTA_EXHAUSTED',
-        },
-        { status: 429 }
       );
     }
 
@@ -244,10 +225,17 @@ export async function POST(
       );
     }
 
-    console.error('[AEGIS AI] Fusion dossier error:', message);
     return NextResponse.json(
-      { error: 'Fusion dossier generation failed. Please try again.', code: 'FUSION_FAILED' },
-      { status: 500 }
+      {
+        dossier: generateLocalFusionDossier(body.context),
+        generatedAt: new Date().toISOString(),
+        mode: 'local',
+      },
+      {
+        headers: {
+          'X-RateLimit-Remaining': String(rateCheck.remaining),
+        },
+      }
     );
   }
 }

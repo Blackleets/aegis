@@ -861,7 +861,7 @@ export default function Dashboard() {
 
             {/* ── AEGIS title — letter-by-letter stagger ── */}
             <div className="flex items-center gap-[2px] mb-3 z-[2]">
-              {'AEGIS'.split('').map((letter, i) => (
+              {'WORLDWATCH'.split('').map((letter, i) => (
                 <motion.span
                   key={i}
                   initial={{ opacity: 0, y: 20, filter: 'blur(8px)' }}
@@ -1035,7 +1035,7 @@ export default function Dashboard() {
         <div className="hidden md:block absolute top-1/2 left-[52px] w-[200px] h-[1px] bg-gradient-to-r from-[var(--gold-primary)]/40 via-[var(--gold-primary)]/15 to-transparent" />
         <div className="flex flex-col">
           <div className="flex items-center gap-2">
-            <h1 className="text-base md:text-xl font-bold tracking-[0.4em] md:tracking-[0.5em] text-[var(--text-heading)] font-mono">AEGIS</h1>
+            <h1 className="text-base md:text-xl font-bold tracking-[0.4em] md:tracking-[0.5em] text-[var(--text-heading)] font-mono">WORLDWATCH</h1>
             <span className="hidden md:inline-flex items-center gap-1 px-1.5 py-[1px] rounded-sm border border-[var(--cyan-primary)]/40 bg-[var(--cyan-primary)]/10 text-[7px] font-mono font-bold tracking-[0.15em] text-[var(--cyan-primary)] uppercase" style={{ lineHeight: '1.4' }}>
               <Globe className="w-2.5 h-2.5" />
               OPEN SOURCE
@@ -1362,7 +1362,7 @@ export default function Dashboard() {
                       <div>
                         <div className="text-[7px] font-mono tracking-[0.22em] text-[var(--text-secondary)]">MOBILE COMMAND PANEL</div>
                         <span className="hud-text mt-1 block text-[9px] text-[var(--text-primary)]">
-                          {mobilePanel === 'layers' ? 'LAYERS & STATS' : mobilePanel === 'markets' ? 'MACRO ATLAS' : mobilePanel === 'intel' ? 'SIGNAL LEDGER' : mobilePanel === 'recon' ? 'AEGIS RECON' : 'SEARCH'}
+                          {mobilePanel === 'layers' ? 'LAYERS & STATS' : mobilePanel === 'markets' ? 'MACRO ATLAS' : mobilePanel === 'intel' ? 'SIGNAL LEDGER' : mobilePanel === 'recon' ? 'WORLDWATCH RECON' : 'SEARCH'}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">

@@ -1,9 +1,7 @@
 /**
- * ═══════════════════════════════════════════════════════════════
- *  AEGIS — AI Intelligence Analysis Endpoint
- *  POST /api/ai/analyze
- *  Rate-limited, multi-key Gemini integration
- * ═══════════════════════════════════════════════════════════════
+ * WORLDWATCH — AI Intelligence Analysis Endpoint
+ * POST /api/ai/analyze
+ * Supports BYOK, server keys, and a zero-cost local fallback.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -11,14 +9,11 @@ import {
   createGeminiClient,
   rotateApiKey,
   analyzeIntelligence,
+  generateLocalAnalysis,
   type IntelligenceContext,
 } from '@/lib/ai-engine';
 
 export const dynamic = 'force-dynamic';
-
-/* ─────────────────────────────────────────────────────────────
-   Rate Limiter — 5 requests per minute per IP
-   ───────────────────────────────────────────────────────────── */
 
 interface RateLimitEntry {
   count: number;
@@ -46,34 +41,21 @@ function checkRateLimit(ip: string): { allowed: boolean; remaining: number; rese
   return { allowed: true, remaining: RATE_LIMIT_MAX - entry.count, resetIn: entry.resetAt - now };
 }
 
-// Periodic cleanup to prevent memory leaks
 setInterval(() => {
   const now = Date.now();
-  for (const [ip, entry] of rateLimitMap.entries()) {
-    if (now > entry.resetAt) {
-      rateLimitMap.delete(ip);
+  for (const [ip, entry] of Array.from(rateLimitMap.entries())) {
+      if (now > entry.resetAt) rateLimitMap.delete(ip);
     }
-  }
 }, 120_000);
-
-/* ─────────────────────────────────────────────────────────────
-   Collect API keys from environment
-   ───────────────────────────────────────────────────────────── */
 
 function getEnvApiKeys(): string[] {
   const keys: string[] = [];
   for (let i = 1; i <= 8; i++) {
     const key = process.env[`GEMINI_API_KEY_${i}`];
-    if (key && key.trim().length > 0) {
-      keys.push(key.trim());
-    }
+    if (key && key.trim().length > 0) keys.push(key.trim());
   }
   return keys;
 }
-
-/* ─────────────────────────────────────────────────────────────
-   Request / Response types
-   ───────────────────────────────────────────────────────────── */
 
 interface AnalyzeRequestBody {
   query: string;
@@ -84,6 +66,7 @@ interface AnalyzeResponse {
   analysis: string;
   model: string;
   timestamp: string;
+  mode?: 'premium' | 'local';
 }
 
 interface ErrorResponse {
@@ -92,20 +75,14 @@ interface ErrorResponse {
   retryAfter?: number;
 }
 
-/* ─────────────────────────────────────────────────────────────
-   POST Handler
-   ───────────────────────────────────────────────────────────── */
-
 export async function POST(
   request: NextRequest
 ): Promise<NextResponse<AnalyzeResponse | ErrorResponse>> {
-  // Extract client IP
   const ip =
     request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
     request.headers.get('x-real-ip') ||
     'unknown';
 
-  // Rate limit check
   const rateCheck = checkRateLimit(ip);
   if (!rateCheck.allowed) {
     return NextResponse.json(
@@ -125,28 +102,6 @@ export async function POST(
     );
   }
 
-  // Determine API key — user-provided header takes priority
-  const userKey = request.headers.get('x-gemini-key')?.trim();
-  let apiKey: string;
-
-  if (userKey && userKey.length > 0) {
-    apiKey = userKey;
-  } else {
-    const envKeys = getEnvApiKeys();
-    if (envKeys.length === 0) {
-      return NextResponse.json(
-        {
-          error:
-            'No Gemini API key configured. Set GEMINI_API_KEY_1 in environment or provide a key via the settings panel.',
-          code: 'NO_API_KEY',
-        },
-        { status: 503 }
-      );
-    }
-    apiKey = rotateApiKey(envKeys);
-  }
-
-  // Parse request body
   let body: AnalyzeRequestBody;
   try {
     body = (await request.json()) as AnalyzeRequestBody;
@@ -171,7 +126,26 @@ export async function POST(
     );
   }
 
-  // Call Gemini
+  const userKey = request.headers.get('x-gemini-key')?.trim();
+  const envKeys = getEnvApiKeys();
+  const apiKey = userKey && userKey.length > 0 ? userKey : envKeys.length > 0 ? rotateApiKey(envKeys) : '';
+
+  if (!apiKey) {
+    return NextResponse.json(
+      {
+        analysis: generateLocalAnalysis(body.context, body.query.trim()),
+        model: 'worldwatch-local-analyst',
+        timestamp: new Date().toISOString(),
+        mode: 'local',
+      },
+      {
+        headers: {
+          'X-RateLimit-Remaining': String(rateCheck.remaining),
+        },
+      }
+    );
+  }
+
   try {
     const client = createGeminiClient(apiKey);
     const analysis = await analyzeIntelligence(client, body.context, body.query.trim());
@@ -181,6 +155,7 @@ export async function POST(
         analysis,
         model: 'gemini-2.0-flash',
         timestamp: new Date().toISOString(),
+        mode: 'premium',
       },
       {
         headers: {
@@ -191,21 +166,10 @@ export async function POST(
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown Gemini API error';
 
-    // Detect specific Gemini error types
-    if (message.includes('API_KEY_INVALID') || message.includes('API key not valid')) {
+    if (userKey && (message.includes('API_KEY_INVALID') || message.includes('API key not valid'))) {
       return NextResponse.json(
         { error: 'Invalid Gemini API key. Please check your configuration.', code: 'INVALID_KEY' },
         { status: 401 }
-      );
-    }
-
-    if (message.includes('RESOURCE_EXHAUSTED') || message.includes('quota')) {
-      return NextResponse.json(
-        {
-          error: 'Gemini API quota exhausted. Try again later or provide your own API key.',
-          code: 'QUOTA_EXHAUSTED',
-        },
-        { status: 429 }
       );
     }
 
@@ -219,10 +183,18 @@ export async function POST(
       );
     }
 
-    console.error('[AEGIS AI] Analysis error:', message);
     return NextResponse.json(
-      { error: 'Intelligence analysis failed. Please try again.', code: 'ANALYSIS_FAILED' },
-      { status: 500 }
+      {
+        analysis: generateLocalAnalysis(body.context, body.query.trim()),
+        model: 'worldwatch-local-analyst',
+        timestamp: new Date().toISOString(),
+        mode: 'local',
+      },
+      {
+        headers: {
+          'X-RateLimit-Remaining': String(rateCheck.remaining),
+        },
+      }
     );
   }
 }

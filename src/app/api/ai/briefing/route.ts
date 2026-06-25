@@ -1,9 +1,7 @@
 /**
- * ═══════════════════════════════════════════════════════════════
- *  AEGIS — AI Intelligence Briefing Endpoint
- *  POST /api/ai/briefing
- *  Generates structured threat briefings via Gemini
- * ═══════════════════════════════════════════════════════════════
+ * WORLDWATCH — AI Briefing Endpoint
+ * POST /api/ai/briefing
+ * Supports BYOK, server keys, and a zero-cost local fallback.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -11,14 +9,11 @@ import {
   createGeminiClient,
   rotateApiKey,
   generateBriefing,
+  generateLocalBriefing,
   type IntelligenceContext,
 } from '@/lib/ai-engine';
 
 export const dynamic = 'force-dynamic';
-
-/* ─────────────────────────────────────────────────────────────
-   Rate Limiter — 5 requests per minute per IP
-   ───────────────────────────────────────────────────────────── */
 
 interface RateLimitEntry {
   count: number;
@@ -32,47 +27,32 @@ const RATE_LIMIT_WINDOW_MS = 60_000;
 function checkRateLimit(ip: string): { allowed: boolean; remaining: number; resetIn: number } {
   const now = Date.now();
   const entry = rateLimitMap.get(ip);
-
   if (!entry || now > entry.resetAt) {
     rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
     return { allowed: true, remaining: RATE_LIMIT_MAX - 1, resetIn: RATE_LIMIT_WINDOW_MS };
   }
-
   if (entry.count >= RATE_LIMIT_MAX) {
     return { allowed: false, remaining: 0, resetIn: entry.resetAt - now };
   }
-
   entry.count++;
   return { allowed: true, remaining: RATE_LIMIT_MAX - entry.count, resetIn: entry.resetAt - now };
 }
 
 setInterval(() => {
   const now = Date.now();
-  for (const [ip, entry] of rateLimitMap.entries()) {
-    if (now > entry.resetAt) {
-      rateLimitMap.delete(ip);
+  for (const [ip, entry] of Array.from(rateLimitMap.entries())) {
+      if (now > entry.resetAt) rateLimitMap.delete(ip);
     }
-  }
 }, 120_000);
-
-/* ─────────────────────────────────────────────────────────────
-   Environment Key Collection
-   ───────────────────────────────────────────────────────────── */
 
 function getEnvApiKeys(): string[] {
   const keys: string[] = [];
   for (let i = 1; i <= 8; i++) {
     const key = process.env[`GEMINI_API_KEY_${i}`];
-    if (key && key.trim().length > 0) {
-      keys.push(key.trim());
-    }
+    if (key && key.trim().length > 0) keys.push(key.trim());
   }
   return keys;
 }
-
-/* ─────────────────────────────────────────────────────────────
-   Request / Response types
-   ───────────────────────────────────────────────────────────── */
 
 interface BriefingRequestBody {
   context: IntelligenceContext;
@@ -81,6 +61,7 @@ interface BriefingRequestBody {
 interface BriefingResponse {
   briefing: string;
   generatedAt: string;
+  mode?: 'premium' | 'local';
 }
 
 interface ErrorResponse {
@@ -88,10 +69,6 @@ interface ErrorResponse {
   code: string;
   retryAfter?: number;
 }
-
-/* ─────────────────────────────────────────────────────────────
-   POST Handler
-   ───────────────────────────────────────────────────────────── */
 
 export async function POST(
   request: NextRequest
@@ -119,26 +96,6 @@ export async function POST(
     );
   }
 
-  const userKey = request.headers.get('x-gemini-key')?.trim();
-  let apiKey: string;
-
-  if (userKey && userKey.length > 0) {
-    apiKey = userKey;
-  } else {
-    const envKeys = getEnvApiKeys();
-    if (envKeys.length === 0) {
-      return NextResponse.json(
-        {
-          error:
-            'No Gemini API key configured. Set GEMINI_API_KEY_1 in environment or provide a key via the settings panel.',
-          code: 'NO_API_KEY',
-        },
-        { status: 503 }
-      );
-    }
-    apiKey = rotateApiKey(envKeys);
-  }
-
   let body: BriefingRequestBody;
   try {
     body = (await request.json()) as BriefingRequestBody;
@@ -156,6 +113,25 @@ export async function POST(
     );
   }
 
+  const userKey = request.headers.get('x-gemini-key')?.trim();
+  const envKeys = getEnvApiKeys();
+  const apiKey = userKey && userKey.length > 0 ? userKey : envKeys.length > 0 ? rotateApiKey(envKeys) : '';
+
+  if (!apiKey) {
+    return NextResponse.json(
+      {
+        briefing: generateLocalBriefing(body.context),
+        generatedAt: new Date().toISOString(),
+        mode: 'local',
+      },
+      {
+        headers: {
+          'X-RateLimit-Remaining': String(rateCheck.remaining),
+        },
+      }
+    );
+  }
+
   try {
     const client = createGeminiClient(apiKey);
     const briefing = await generateBriefing(client, body.context);
@@ -164,6 +140,7 @@ export async function POST(
       {
         briefing,
         generatedAt: new Date().toISOString(),
+        mode: 'premium',
       },
       {
         headers: {
@@ -174,20 +151,10 @@ export async function POST(
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown Gemini API error';
 
-    if (message.includes('API_KEY_INVALID') || message.includes('API key not valid')) {
+    if (userKey && (message.includes('API_KEY_INVALID') || message.includes('API key not valid'))) {
       return NextResponse.json(
         { error: 'Invalid Gemini API key. Please check your configuration.', code: 'INVALID_KEY' },
         { status: 401 }
-      );
-    }
-
-    if (message.includes('RESOURCE_EXHAUSTED') || message.includes('quota')) {
-      return NextResponse.json(
-        {
-          error: 'Gemini API quota exhausted. Try again later or provide your own API key.',
-          code: 'QUOTA_EXHAUSTED',
-        },
-        { status: 429 }
       );
     }
 
@@ -201,10 +168,17 @@ export async function POST(
       );
     }
 
-    console.error('[AEGIS AI] Briefing error:', message);
     return NextResponse.json(
-      { error: 'Briefing generation failed. Please try again.', code: 'BRIEFING_FAILED' },
-      { status: 500 }
+      {
+        briefing: generateLocalBriefing(body.context),
+        generatedAt: new Date().toISOString(),
+        mode: 'local',
+      },
+      {
+        headers: {
+          'X-RateLimit-Remaining': String(rateCheck.remaining),
+        },
+      }
     );
   }
 }
