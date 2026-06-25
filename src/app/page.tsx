@@ -8,6 +8,8 @@ import { Layers, BarChart3, Newspaper, Search, X, Globe, MapPinned, Radar, Satel
 import IntelFeed from '@/components/IntelFeed';
 import MarketsPanel from '@/components/MarketsPanel';
 import ScmPanel from '@/components/ScmPanel';
+import { ToastProvider } from '@/components/Toast';
+import { useAegisData } from '@/hooks/useAegisData';
 import SearchBar from '@/components/SearchBar';
 import ScaleBar from '@/components/ScaleBar';
 import ErrorBoundary from '@/components/ErrorBoundary';
@@ -231,12 +233,14 @@ function getInitialUrlState() {
 
 export default function Dashboard() {
   const initialUrlState = useMemo(() => getInitialUrlState(), []);
-  const [data, setData] = useState<DashboardData>({});
 
-  const [backendStatus, setBackendStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
+  // ── DEFAULT: Most layers OFF — fast initial load ──
+  const [activeLayers, setActiveLayers] = useState<ActiveLayers>(initialUrlState.activeLayers);
+
+  const { data, backendStatus, globalStats, spaceWeather } = useAegisData(activeLayers);
+
   const [mapView, setMapView] = useState<MapView>(initialUrlState.mapView);
   const [flyToLocation, setFlyToLocation] = useState<FlyToLocation | null>(initialUrlState.flyToLocation);
-  const [globalStats, setGlobalStats] = useState<GlobalStats | null>(null);
   const [usageMetrics, setUsageMetrics] = useState<UsageMetrics | null>(null);
   const mouseCoordsRef = useRef<Coordinate | null>(null);
   const coordsDisplayRef = useRef<HTMLDivElement>(null);
@@ -245,7 +249,6 @@ export default function Dashboard() {
   const [dossierLoading, setDossierLoading] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
   const [activeCamera, setActiveCamera] = useState<ActiveCamera | null>(null);
-  const [spaceWeather, setSpaceWeather] = useState<SpaceWeather | null>(null);
   const [showLayers, setShowLayers] = useState(true);
   const [showMarkets, setShowMarkets] = useState(true);
   const [showScmPanel, setShowScmPanel] = useState(true);
@@ -261,8 +264,6 @@ export default function Dashboard() {
   const geocodeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastGeocodedPos = useRef<{ lat: number; lng: number } | null>(null);
 
-  // ── DEFAULT: Most layers OFF — fast initial load ──
-  const [activeLayers, setActiveLayers] = useState<ActiveLayers>(initialUrlState.activeLayers);
   const [liveFeedUrl, setLiveFeedUrl] = useState<string | null>(null);
   const [liveFeedName, setLiveFeedName] = useState('');
   const [liveFeedEmbedAllowed, setLiveFeedEmbedAllowed] = useState(true);
@@ -289,16 +290,6 @@ export default function Dashboard() {
       window.history.replaceState(null, '', url);
     }, 1500);
   }, [mapView, activeLayers]);
-
-  // Global Stats Fetch
-  useEffect(() => {
-    fetch('/api/stats')
-      .then(res => res.json())
-      .then((d: { stats?: GlobalStats }) => {
-        if (d.stats) setGlobalStats(d.stats);
-      })
-      .catch(console.error);
-  }, []);
 
   // Presence + cumulative usage counter
   useEffect(() => {
@@ -420,142 +411,6 @@ export default function Dashboard() {
       setLiveFeedEmbedAllowed(entity.embed_allowed !== false);
     }
   }, []);
-
-  // ── SHARED FETCH UTILITY (Fixes #107 — single definition, not 3 copies) ──
-  const fetchEndpoint = useCallback(async (url: string, transform?: (d: unknown) => Partial<DashboardData>, options?: RequestInit) => {
-    if (typeof document !== 'undefined' && document.hidden) return;
-    try {
-      const res = await fetch(url, options);
-      if (res.ok) {
-        const json = await res.json() as unknown;
-        const nextData = transform ? transform(json) : (json as Partial<DashboardData>);
-        setData(prev => ({ ...prev, ...nextData }));
-        setBackendStatus('connected');
-      }
-    } catch (e) {
-      console.warn('[AEGIS] Suppressed error:', e instanceof Error ? e.message : e);
-      setBackendStatus('error');
-    }
-  }, []);
-
-  // ── PROGRESSIVE DATA LOADING (request-optimized) ──
-  useEffect(() => {
-    const loadCoreFeeds = async () => {
-      await fetchEndpoint('/api/earthquakes');
-      await fetchEndpoint('/api/news');
-    };
-
-    // Priority 1: Core feeds (always needed for panels)
-    void loadCoreFeeds();
-    const marketTimer = setTimeout(() => fetchEndpoint('/api/markets', d => ({ markets: d })), 800);
-
-    // Priority 2: Space Weather (needed for MarketsPanel)
-    const spaceTimer = setTimeout(async () => {
-      try {
-        const r = await fetch('/api/space-weather');
-        if (r.ok) setSpaceWeather(await r.json());
-      } catch (e) { console.warn('[AEGIS] Suppressed error:', e instanceof Error ? e.message : e); }
-    }, 5000);
-
-    // Polling — OPTIMIZED intervals to minimize edge requests
-    const intervals = [
-      setInterval(() => fetchEndpoint('/api/earthquakes'), 900000),  // 15 min (was 5)
-      setInterval(() => fetchEndpoint('/api/news'), 1800000),        // 30 min (was 10)
-      setInterval(() => fetchEndpoint('/api/markets', d => ({ markets: d })), 900000), // 15 min (was 5)
-    ];
-    return () => {
-      clearTimeout(marketTimer);
-      clearTimeout(spaceTimer);
-      intervals.forEach(clearInterval);
-    };
-  }, [fetchEndpoint]);
-
-  // ── LAYER-AWARE DATA LOADING — only fetch when layer is toggled ON ──
-  const layerFetchedRef = useRef<Set<string>>(new Set());
-  useEffect(() => {
-
-    // Flights
-    if (activeLayers.flights || activeLayers.military || activeLayers.jets || activeLayers.private) {
-      if (!layerFetchedRef.current.has('flights')) {
-        fetchEndpoint('/api/flights');
-        layerFetchedRef.current.add('flights');
-      }
-    }
-    // Satellites
-    if (activeLayers.satellites && !layerFetchedRef.current.has('satellites')) {
-      fetchEndpoint('/api/satellites');
-      layerFetchedRef.current.add('satellites');
-    }
-    // Fires
-    if (activeLayers.fires && !layerFetchedRef.current.has('fires')) {
-      fetchEndpoint('/api/fires');
-      layerFetchedRef.current.add('fires');
-    }
-    // CCTV
-    if (activeLayers.cctv && !layerFetchedRef.current.has('cctv')) {
-      fetchEndpoint('/api/cctv?region=all&v=2');
-      layerFetchedRef.current.add('cctv');
-    }
-    // Maritime
-    if (activeLayers.maritime && !layerFetchedRef.current.has('maritime')) {
-      fetchEndpoint('/api/maritime', d => ({ maritime_ports: d.ports, maritime_chokepoints: d.chokepoints, maritime_ships: d.ships }));
-      layerFetchedRef.current.add('maritime');
-    }
-    // Balloons
-    if (activeLayers.balloons && !layerFetchedRef.current.has('balloons')) {
-      fetchEndpoint('/api/balloons', d => ({ balloons: d.balloons }));
-      layerFetchedRef.current.add('balloons');
-    }
-    // Radiation
-    if (activeLayers.radiation && !layerFetchedRef.current.has('radiation')) {
-      fetchEndpoint('/api/radiation', d => ({ radiation: d.stations }));
-      layerFetchedRef.current.add('radiation');
-    }
-    // Live News
-    if (activeLayers.live_news && !layerFetchedRef.current.has('live_news')) {
-      fetchEndpoint('/api/live-news', d => ({ live_feeds: d.feeds }));
-      layerFetchedRef.current.add('live_news');
-    }
-    // Weather
-    if (activeLayers.weather && !layerFetchedRef.current.has('weather')) {
-      fetchEndpoint('/api/weather', d => ({ weather_events: d.events }));
-      layerFetchedRef.current.add('weather');
-    }
-    // Infrastructure
-    if (activeLayers.infrastructure && !layerFetchedRef.current.has('infrastructure')) {
-      fetchEndpoint('/api/infrastructure', d => ({ infrastructure: d.infrastructure }));
-      layerFetchedRef.current.add('infrastructure');
-    }
-    // Global Incidents (GDELT)
-    if (activeLayers.global_incidents && !layerFetchedRef.current.has('gdelt')) {
-      fetchEndpoint('/api/gdelt', d => ({ gdelt: d.events }));
-      layerFetchedRef.current.add('gdelt');
-    }
-
-  }, [activeLayers, fetchEndpoint]);
-
-  // ── LAYER-AWARE POLLING — only poll data for active layers ──
-  useEffect(() => {
-    const intervals: ReturnType<typeof setInterval>[] = [];
-    if (activeLayers.flights || activeLayers.military || activeLayers.jets || activeLayers.private) {
-      intervals.push(setInterval(() => fetchEndpoint('/api/flights'), 300000)); // 5 min (was 2 min)
-    }
-
-    if (activeLayers.balloons) {
-      intervals.push(setInterval(() => fetchEndpoint('/api/balloons', d => ({ balloons: d.balloons })), 300000)); // 5m
-    }
-    if (activeLayers.radiation) {
-      intervals.push(setInterval(() => fetchEndpoint('/api/radiation', d => ({ radiation: d.stations })), 300000)); // 5m
-    }
-    if (activeLayers.maritime) {
-      intervals.push(setInterval(() => fetchEndpoint('/api/maritime', d => ({ maritime_ports: d.ports, maritime_chokepoints: d.chokepoints, maritime_ships: d.ships })), 10000)); // 10s
-    }
-    return () => intervals.forEach(clearInterval);
-  }, [activeLayers, fetchEndpoint]);
-
-  // CCTV: loaded once on layer toggle via layerFetchedRef (no viewport polling)
-
-  // Reactive layer fetch: handled by layerFetchedRef above (no duplicate)
 
   // ── AEGIS SDK — Intelligence Fusion Layer ──
   // Produces node coordinates for the SDK network mesh visualization.
@@ -720,6 +575,7 @@ export default function Dashboard() {
       : 'LINKING DATA MESH';
 
   return (
+    <ToastProvider>
     <main className="fixed inset-0 w-full h-full bg-[var(--bg-void)] overflow-hidden">
       {/* ── SPLASH ── */}
       <AnimatePresence>
@@ -1119,9 +975,9 @@ export default function Dashboard() {
             <ViewPresets onNavigate={(lat, lng, zoom) => { setFlyToLocation({ lat, lng, ts: Date.now() }); setMapView(v => ({ ...v, zoom })); }} />
           </>
         )}
-        {showScmPanel && <ScmPanel data={dataWithSdk} />}
-        {showMarkets && <MarketsPanel data={dataWithSdk} spaceWeather={spaceWeather} />}
-        {showIntel && <IntelFeed data={dataWithSdk} onLocate={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })} />}
+        {showScmPanel && <ErrorBoundary name="ScmPanel"><ScmPanel data={dataWithSdk} /></ErrorBoundary>}
+        {showMarkets && <ErrorBoundary name="MarketsPanel"><MarketsPanel data={dataWithSdk} spaceWeather={spaceWeather} /></ErrorBoundary>}
+        {showIntel && <ErrorBoundary name="IntelFeed"><IntelFeed data={dataWithSdk} onLocate={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })} /></ErrorBoundary>}
       </div>
 
       {/* ── RIGHT HUD (desktop): Search + RECON + Live Alerts ── */}
@@ -1130,17 +986,21 @@ export default function Dashboard() {
           <div className="flex-1"><SearchBar onLocate={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })} /></div>
           <div className="relative"><SharePanel mapView={mapView} activeLayers={activeLayers} mouseCoords={null} /></div>
         </div>
-        <OsintPanel onSweepVisualize={setSweepData} onScanGeolocate={(target: string, payload: OsintGeolocatePayload) => {
-          setScanTargets(prev => {
-            const existing = prev.filter(t => t.id !== target);
-            return [{ id: target, timestamp: Date.now(), ...payload }, ...existing].slice(0, 10);
-          });
-          setFlyToLocation({ lat: payload.lat, lng: payload.lng, ts: Date.now() });
-        }} />
-        <LiveAlerts data={dataWithSdk} onLocate={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })} onWatchFeed={(url, name) => { setLiveFeedUrl(url); setLiveFeedName(name); }} />
+        <ErrorBoundary name="OsintPanel">
+          <OsintPanel onSweepVisualize={setSweepData} onScanGeolocate={(target: string, payload: OsintGeolocatePayload) => {
+            setScanTargets(prev => {
+              const existing = prev.filter(t => t.id !== target);
+              return [{ id: target, timestamp: Date.now(), ...payload }, ...existing].slice(0, 10);
+            });
+            setFlyToLocation({ lat: payload.lat, lng: payload.lng, ts: Date.now() });
+          }} />
+        </ErrorBoundary>
+        <ErrorBoundary name="LiveAlerts">
+          <LiveAlerts data={dataWithSdk} onLocate={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })} onWatchFeed={(url, name) => { setLiveFeedUrl(url); setLiveFeedName(name); }} />
+        </ErrorBoundary>
       </div>
 
-      <AiAnalyst data={dataWithSdk} />
+      <ErrorBoundary name="AiAnalyst"><AiAnalyst data={dataWithSdk} /></ErrorBoundary>
 
       {/* ── LIVE FEED VIEWER OVERLAY ── */}
       <AnimatePresence>
@@ -1466,5 +1326,6 @@ export default function Dashboard() {
 
 
     </main>
+    </ToastProvider>
   );
 }
