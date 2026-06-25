@@ -44,3 +44,4 @@ scanner_backend_backup.js
 # Local Hermes/session artifacts
 /.hermes/
 /data/usage-metrics.json
+/.runtime/
