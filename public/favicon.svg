@@ -83,7 +83,7 @@
     <path d="M472 432 L432 432 M472 432 L472 392"/>
   </g>
   
-  <!-- "OSIRIS" text at bottom -->
+  <!-- "AEGIS" text at bottom -->
   <text x="256" y="460" text-anchor="middle" font-family="monospace" font-size="36" 
-        fill="#D4AF37" letter-spacing="12" font-weight="700" opacity="0.8">OSIRIS</text>
+        fill="#D4AF37" letter-spacing="12" font-weight="700" opacity="0.8">AEGIS</text>
 </svg>

@@ -1,6 +1,6 @@
 # AEGIS
 
-AI-enhanced open-source intelligence and situational awareness platform for live operator workflows.
+Strategic recon and situational intelligence platform for live operator workflows.
 
 ![License](https://img.shields.io/badge/license-MIT-gold)
 ![Next.js](https://img.shields.io/badge/Next.js-16-black)
