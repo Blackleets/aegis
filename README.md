@@ -1,35 +1,65 @@
 # AEGIS
 
-AI-enhanced open-source intelligence and situational awareness platform for real-time operator workflows.
+AI-enhanced open-source intelligence and situational awareness platform for live operator workflows.
 
 ![License](https://img.shields.io/badge/license-MIT-gold)
-![Next.js](https://img.shields.io/badge/Next.js-15-black)
+![Next.js](https://img.shields.io/badge/Next.js-16-black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)
-![Status](https://img.shields.io/badge/status-build%20verified-brightgreen)
+![Build](https://img.shields.io/badge/build-verified-brightgreen)
+![Lint](https://img.shields.io/badge/lint-clean-brightgreen)
 
-AEGIS delivers a sharper operator workspace with integrated AI analysis, fusion dossiers, live layers, recon tooling, and premium rebranding.
+AEGIS turns public telemetry into an operator-ready intelligence workspace with live map layers, browser-based recon tools, AI briefings, and fusion dossiers.
 
-## What changed
+## What it is
 
-- Unified AEGIS branding across UI, Docker metadata, SDK labels, and operator flows
-- AI analyst mounted directly in the main dashboard
-- New Fusion Dossier workflow and API endpoint: `/api/ai/fusion`
-- Local Gemini key namespace changed to `aegis-gemini-key`
-- Updated share text, proxy metadata, and operator-facing labels
-- Build validated after the changes
+AEGIS is a Next.js command-center style web app that combines:
+
+- live global tracking layers
+- open-source intelligence workflows
+- browser-accessible recon tooling
+- AI-generated analysis and fusion briefs
+- operator-focused UI for fast situational assessment
 
 ## Core capabilities
 
-- Live global map and intelligence overlays
-- Threat monitoring and recon workflows
-- AI analyst chat for operational assessment
-- Structured fusion dossiers with BLUF, risk, confidence, hotspots, actions, and watchlist
-- Region dossiers, alerts, markets, incidents, weather, satellites, and OSINT layers
+- Live global map with flights, satellites, fires, weather, maritime, CCTV, infrastructure, and incident overlays
+- RECON toolkit for DNS, WHOIS, SSL, headers, CVE, threat, phone, MAC, GitHub, and IP sweep workflows
+- AI analyst panel for operational questioning and synthesis
+- Fusion dossier generation with BLUF, confidence, risk framing, hotspots, actions, and watchlists
+- Region dossier workflow for compact geopolitical context
+- Live alerts, market context, and OSINT side panels inside one interface
+
+## Stack
+
+- Next.js 16.2.6
+- React 19
+- TypeScript
+- Tailwind CSS 4
+- MapLibre GL
+- Framer Motion
+- Gemini API integration for AI-assisted analysis
+
+## Verified status
+
+Verified locally on this repo revision:
+
+```bash
+npm run lint
+npm run build
+```
+
+Current status:
+
+- `npm run lint` ✅
+- `npm run build` ✅
 
 ## Quick start
 
 ```bash
+git clone https://github.com/Blackleets/aegis.git
+cd aegis
 npm install
+cp .env.example .env.local
 npm run dev
 ```
 
@@ -41,55 +71,88 @@ http://localhost:3000
 
 ## Environment
 
-Copy one of these files and fill only what you need:
+AEGIS runs without most third-party keys.
 
-- `.env.example`
-- `.env.template`
+Main options:
 
-Notes:
-- The platform can run without most third-party keys.
-- Some deployment env names may remain legacy for compatibility during transition.
-- RECON scanner features require `SCANNER_URL` and `SCANNER_KEY`.
+- `.env.example` → lightweight local setup template
+- `.env.template` → fuller self-hosting / deployment reference
 
-## AI setup
+Important notes:
 
-For the AI analyst and fusion features, add at least one Gemini key:
+- Most data layers work from public keyless sources
+- RECON features require a separate scanner backend
+- The current codepath mainly consumes `SCANNER_URL` and `SCANNER_KEY` for RECON
+- Gemini keys enable AI analyst and fusion flows
+
+Minimum AI setup:
 
 ```env
 GEMINI_API_KEY_1=your_key_here
 ```
 
-You can add more keys for rotation:
+Minimum RECON setup:
 
 ```env
-GEMINI_API_KEY_2=
-GEMINI_API_KEY_3=
+SCANNER_URL=http://your-scanner:7700
+SCANNER_KEY=your_shared_key
 ```
 
-## Build status
+## Docker
 
-Verified locally:
+For self-hosting with Docker / Docker Compose, see:
+
+- `DOCKER.md`
+
+Fast path:
 
 ```bash
-npm run build
+cp .env.template .env
+docker compose up -d
 ```
 
-Build passes.
+## Why this repo is useful
 
-`npm run lint` still reports a large amount of pre-existing debt from the inherited codebase. That cleanup is a separate hardening pass, not a blocker for the current build.
+AEGIS is useful if you want a customizable intelligence dashboard that already ships with:
+
+- a serious app shell instead of a toy demo
+- multiple real data routes and overlays
+- browser-native OSINT workflows
+- AI-assisted summarization on top of live feeds
+- a self-hostable base you can verticalize for security, geopolitical, logistics, or crisis-monitoring use cases
+
+## Project structure
+
+```text
+src/app/                 Next.js app router, UI shell, API routes
+src/components/          Dashboard panels, map UI, analyst and recon components
+src/lib/                 SDK, helpers, feed logic, source adapters
+public/                  Static assets
+DOCKER.md                Self-hosting and deployment guide
+.env.example             Minimal local environment template
+.env.template            Expanded deployment template
+```
+
+## Current polish pass
+
+This revision includes:
+
+- completed AEGIS branding cleanup across operator-facing surfaces
+- SDK/env naming stabilization for the rebrand transition
+- image warning cleanup via `next/image`
+- verified clean lint/build after the stabilization pass
 
 ## Attribution and license
 
 AEGIS is a derivative work based on an inherited open-source codebase by simplifaisoul.
 
-- Original license preserved: MIT
-- Original copyright notice preserved in `LICENSE`
-- This repo adds rebranding, integration work, and AI/operator workflow improvements on top of that base
+- License: MIT
+- Original attribution preserved in `LICENSE`
+- This repo adds rebranding, integration work, UI hardening, and AI/operator workflow improvements
 
-## Suggested next steps
+## Next high-value steps
 
-- Finish deeper naming cleanup in internal component/file names
-- Reduce inherited lint debt and `any` usage
-- Add screenshots and demo GIFs
-- Add authentication, saved workspaces, and alert persistence
-- Ship verticalized intelligence packs for specific niches
+- Add polished screenshots or a short demo GIF for the README header
+- Add verticalized presets or intelligence packs for specific niches
+- Add auth, saved workspaces, and alert persistence
+- Add lightweight CI to enforce lint/build on every push
