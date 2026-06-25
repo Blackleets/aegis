@@ -1,13 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Newspaper, ChevronDown, ChevronUp, ExternalLink, MapPin, Zap } from 'lucide-react';
-
-/* ═══════════════════════════════════════════════════════════════
-   AEGIS — Intelligence Feed
-   SIGINT-style news aggregation with risk scoring
-   ═══════════════════════════════════════════════════════════════ */
+import { ScrollText, ChevronDown, ChevronUp, ExternalLink, MapPin, Sparkles } from 'lucide-react';
 
 interface IntelFeedItem {
   id: string;
@@ -28,18 +23,11 @@ interface IntelFeedProps {
   onLocate?: (lat: number, lng: number) => void;
 }
 
-function getRiskClass(score: number): string {
-  if (score >= 8) return 'risk-critical';
-  if (score >= 6) return 'risk-high';
-  if (score >= 4) return 'risk-medium';
-  return 'risk-low';
-}
-
-function getRiskLabel(score: number): string {
-  if (score >= 8) return 'CRITICAL';
-  if (score >= 6) return 'HIGH';
-  if (score >= 4) return 'ELEVATED';
-  return 'LOW';
+function getRiskTone(score: number) {
+  if (score >= 8) return { label: 'Priority', className: 'bg-rose-500/12 text-rose-300 border-rose-500/20' };
+  if (score >= 6) return { label: 'Watch', className: 'bg-amber-500/12 text-amber-300 border-amber-500/20' };
+  if (score >= 4) return { label: 'Track', className: 'bg-sky-500/12 text-sky-300 border-sky-500/20' };
+  return { label: 'Brief', className: 'bg-emerald-500/12 text-emerald-300 border-emerald-500/20' };
 }
 
 function timeAgo(dateStr: string): string {
@@ -59,123 +47,152 @@ function timeAgo(dateStr: string): string {
 export default function IntelFeed({ data, onLocate }: IntelFeedProps) {
   const [expanded, setExpanded] = useState(true);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
-  const news = data.news || [];
+  const news = useMemo(() => data.news || [], [data.news]);
+
+  const summary = useMemo(() => {
+    const priority = news.filter((item) => item.risk_score >= 8).length;
+    const watch = news.filter((item) => item.risk_score >= 6 && item.risk_score < 8).length;
+    return { priority, watch };
+  }, [news]);
 
   return (
     <motion.div
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: 0.6, duration: 0.6 }}
-      className="glass-panel flex flex-col overflow-hidden pointer-events-auto"
+      className="glass-panel pointer-events-auto overflow-hidden border border-[var(--border-primary)]/70 bg-[linear-gradient(180deg,rgba(15,24,33,0.96),rgba(19,30,43,0.9))]"
     >
-      {/* Header */}
       <button
         onClick={() => setExpanded(!expanded)}
-        className="flex items-center justify-between px-4 py-3 hover:bg-[var(--hover-accent)] transition-colors"
+        className="flex w-full items-center justify-between px-4 py-3"
       >
-        <div className="flex items-center gap-2">
-          <Newspaper className="w-3.5 h-3.5 text-[var(--gold-primary)]" />
-          <span className="hud-text text-[12px] text-[var(--text-primary)]">SIGINT FEED</span>
-          <span className="gotham-tag gotham-tag--info" style={{ fontSize: '8px', padding: '1px 5px' }}>{news.length}</span>
-          {news.some((n) => n.risk_score >= 8) && (
-            <span className="gotham-tag gotham-tag--critical" style={{ fontSize: '7px', padding: '1px 4px' }}>ALERTS</span>
-          )}
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-2xl border border-[var(--border-primary)]/60 bg-white/[0.04]">
+            <ScrollText className="h-4 w-4 text-[var(--gold-primary)]" />
+          </div>
+          <div className="text-left">
+            <div className="text-[8px] font-mono uppercase tracking-[0.3em] text-[var(--text-muted)]">Editorial stream</div>
+            <div className="mt-1 text-[13px] font-semibold tracking-[0.08em] text-[var(--text-primary)]">Signal Ledger</div>
+          </div>
+          <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-[8px] font-semibold uppercase tracking-[0.16em] text-[var(--text-secondary)]">
+            {news.length} items
+          </span>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="w-1.5 h-1.5 rounded-full bg-[var(--alert-green)] animate-osiris-pulse" />
-          {expanded ? <ChevronUp className="w-3 h-3 text-[var(--text-muted)]" /> : <ChevronDown className="w-3 h-3 text-[var(--text-muted)]" />}
+        <div className="flex items-center gap-2 text-[var(--text-muted)]">
+          <div className="h-2 w-2 rounded-full bg-[var(--gold-primary)] shadow-[0_0_10px_rgba(126,169,201,0.6)]" />
+          {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
         </div>
       </button>
 
-      {/* News Items */}
       <AnimatePresence>
         {expanded && (
-          <motion.div
-            initial={{ height: 0 }}
-            animate={{ height: 'auto' }}
-            exit={{ height: 0 }}
-            className="overflow-hidden"
-          >
-            <div className="max-h-[400px] overflow-y-auto styled-scrollbar divide-y divide-[var(--border-secondary)]">
+          <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="overflow-hidden">
+            <div className="grid grid-cols-2 gap-2 px-4 pb-3">
+              <div className="rounded-2xl border border-white/6 bg-white/[0.03] px-3 py-2.5">
+                <div className="text-[8px] font-mono uppercase tracking-[0.22em] text-[var(--text-muted)]">Priority briefs</div>
+                <div className="mt-1 text-[16px] font-semibold text-rose-300">{summary.priority}</div>
+              </div>
+              <div className="rounded-2xl border border-white/6 bg-white/[0.03] px-3 py-2.5">
+                <div className="text-[8px] font-mono uppercase tracking-[0.22em] text-[var(--text-muted)]">Watchlist</div>
+                <div className="mt-1 text-[16px] font-semibold text-amber-300">{summary.watch}</div>
+              </div>
+            </div>
+
+            <div className="max-h-[430px] overflow-y-auto styled-scrollbar px-3 pb-3">
               {news.length === 0 ? (
-                <div className="px-4 py-6 text-center">
-                  <span className="text-[11px] font-mono text-[var(--text-muted)] tracking-widest">
-                    AWAITING INTELLIGENCE...
-                  </span>
+                <div className="rounded-2xl border border-dashed border-white/10 px-4 py-8 text-center text-[10px] font-mono uppercase tracking-[0.24em] text-[var(--text-muted)]">
+                  Awaiting fresh signals...
                 </div>
               ) : (
-                news.slice(0, 25).map((item, i) => (
-                  <div
-                    key={i}
-                    role="button"
-                    tabIndex={0}
-                    className="px-4 py-2.5 hover:bg-[var(--hover-accent)] transition-colors cursor-pointer"
-                    onClick={() => { if (item.link) window.open(item.link, '_blank', 'noopener,noreferrer'); else setSelectedIdx(selectedIdx === i ? null : i); }}
-                    onKeyDown={(e) => { if (e.key === 'Enter' && item.link) window.open(item.link, '_blank', 'noopener,noreferrer'); }}
-                  >
-                    {/* Top row: risk badge + source + time */}
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className={`text-[9px] font-mono font-bold tracking-widest ${getRiskClass(item.risk_score)}`}>
-                        {getRiskLabel(item.risk_score)}
-                      </span>
-                      <span className="text-[8px] font-mono text-[var(--text-muted)] bg-[var(--bg-tertiary)] px-1.5 py-0.5 rounded">
-                        {item.source}
-                      </span>
-                      {item.coords && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onLocate?.(item.coords[0], item.coords[1]);
-                          }}
-                          className="text-[var(--text-muted)] hover:text-[var(--cyan-primary)] transition-colors"
-                        >
-                          <MapPin className="w-2.5 h-2.5" />
-                        </button>
-                      )}
-                      <span className="text-[8px] font-mono text-[var(--text-muted)] ml-auto">
-                        {timeAgo(item.published)}
-                      </span>
-                    </div>
+                <div className="space-y-2">
+                  {news.slice(0, 25).map((item, index) => {
+                    const tone = getRiskTone(item.risk_score);
+                    const isExpanded = selectedIdx === index;
 
-                    {/* Title */}
-                    <h4 className="text-[11px] text-[var(--text-primary)] leading-tight line-clamp-2">
-                      {item.title}
-                    </h4>
+                    return (
+                      <div
+                        key={item.id || `${item.title}-${index}`}
+                        role="button"
+                        tabIndex={0}
+                        className="rounded-2xl border border-white/6 bg-white/[0.03] px-3.5 py-3 transition-colors hover:bg-white/[0.05]"
+                        onClick={() => {
+                          if (item.link) window.open(item.link, '_blank', 'noopener,noreferrer');
+                          else setSelectedIdx(isExpanded ? null : index);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && item.link) window.open(item.link, '_blank', 'noopener,noreferrer');
+                        }}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className={`rounded-full border px-2 py-1 text-[8px] font-semibold uppercase tracking-[0.18em] ${tone.className}`}>
+                            {tone.label}
+                          </span>
+                          <span className="rounded-full bg-[var(--bg-tertiary)] px-2 py-1 text-[8px] font-mono uppercase tracking-[0.14em] text-[var(--text-secondary)]">
+                            {item.source}
+                          </span>
+                          <span className="ml-auto text-[8px] font-mono uppercase tracking-[0.16em] text-[var(--text-muted)]">
+                            {timeAgo(item.published)}
+                          </span>
+                        </div>
 
-                    {/* Machine Assessment (if critical) */}
-                    {item.machine_assessment && (
-                      <div className="mt-1.5 flex items-start gap-1.5 bg-red-950/20 border border-red-900/20 rounded px-2 py-1">
-                        <Zap className="w-2.5 h-2.5 text-red-400 flex-shrink-0 mt-0.5" />
-                        <span className="text-[9px] font-mono text-red-400/80 leading-relaxed">
-                          {item.machine_assessment}
-                        </span>
+                        <h4 className="mt-2 text-[12px] font-semibold leading-snug text-[var(--text-primary)]">
+                          {item.title}
+                        </h4>
+
+                        {item.description && (
+                          <p className="mt-1 line-clamp-2 text-[10px] leading-relaxed text-[var(--text-secondary)]">
+                            {item.description}
+                          </p>
+                        )}
+
+                        <div className="mt-2 flex items-center justify-between gap-2">
+                          {item.machine_assessment ? (
+                            <div className="flex min-w-0 items-start gap-1.5 rounded-2xl border border-sky-400/14 bg-sky-400/8 px-2.5 py-2 text-[9px] leading-relaxed text-sky-200">
+                              <Sparkles className="mt-0.5 h-3 w-3 flex-shrink-0" />
+                              <span className="line-clamp-2">{item.machine_assessment}</span>
+                            </div>
+                          ) : <div />}
+
+                          <div className="flex items-center gap-2">
+                            {item.coords && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onLocate?.(item.coords[0], item.coords[1]);
+                                }}
+                                className="inline-flex items-center gap-1 rounded-full border border-white/10 px-2 py-1 text-[8px] font-semibold uppercase tracking-[0.16em] text-[var(--text-secondary)] hover:text-[var(--cyan-primary)]"
+                              >
+                                <MapPin className="h-3 w-3" />
+                                Locate
+                              </button>
+                            )}
+
+                            {item.link && (
+                              <a
+                                href={item.link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 rounded-full border border-white/10 px-2 py-1 text-[8px] font-semibold uppercase tracking-[0.16em] text-[var(--text-secondary)] hover:text-[var(--cyan-primary)]"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <ExternalLink className="h-3 w-3" />
+                                Source
+                              </a>
+                            )}
+                          </div>
+                        </div>
+
+                        <AnimatePresence>
+                          {isExpanded && item.link && !item.description && (
+                            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                              <div className="mt-2 text-[9px] text-[var(--text-muted)]">Open source article for full context.</div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </div>
-                    )}
-
-                    {/* Expanded details */}
-                    <AnimatePresence>
-                      {selectedIdx === i && (
-                        <motion.div
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: 'auto', opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          className="mt-2 overflow-hidden"
-                        >
-                          <a
-                            href={item.link}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-1 text-[10px] font-mono text-[var(--cyan-primary)] hover:underline"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <ExternalLink className="w-2.5 h-2.5" />
-                            OPEN SOURCE
-                          </a>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                ))
+                    );
+                  })}
+                </div>
               )}
             </div>
           </motion.div>
