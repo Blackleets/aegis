@@ -41,7 +41,7 @@ export default function KeyboardShortcuts() {
           <div className="absolute inset-0 bg-[var(--bg-void)]/80 backdrop-blur-sm" />
           <motion.div
             onClick={e => e.stopPropagation()}
-            className="relative glass-panel p-6 w-[320px] osiris-glow"
+            className="relative glass-panel p-6 w-[320px] aegis-glow"
           >
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">

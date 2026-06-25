@@ -95,7 +95,7 @@ export async function GET() {
         }
       }
     } catch (error) {
-      console.warn('[OSIRIS] Suppressed error:', error instanceof Error ? error.message : error);
+      console.warn('[AEGIS] Suppressed error:', error instanceof Error ? error.message : error);
     }
 
     const countries = Object.entries(RISK_FACTORS)

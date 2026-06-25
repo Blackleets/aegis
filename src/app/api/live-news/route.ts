@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server';
 
 /**
- * OSIRIS — Live News Feeds v3
+ * AEGIS — Live News Feeds v3
  * embed_allowed: true  → can be iframed directly (YouTube allows it for these channels)
  * embed_allowed: false → YouTube/broadcaster blocks embedding; open externally instead
  *

@@ -83,7 +83,7 @@ export default function SharePanel({ mapView, activeLayers, mouseCoords }: Share
             initial={{ opacity: 0, y: -10, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -10, scale: 0.95 }}
-            className="absolute top-12 right-0 w-72 glass-panel p-4 pointer-events-auto osiris-glow z-[300]"
+            className="absolute top-12 right-0 w-72 glass-panel p-4 pointer-events-auto aegis-glow z-[300]"
           >
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">

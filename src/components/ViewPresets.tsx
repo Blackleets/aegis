@@ -55,7 +55,7 @@ export default function ViewPresets({ onNavigate }: ViewPresetsProps) {
           >
             <span className="text-[11px] flex-shrink-0">{p.icon}</span>
             <span>{p.label}</span>
-            {p.hot && <span className="w-1.5 h-1.5 rounded-full bg-[var(--alert-red)] animate-osiris-pulse ml-auto flex-shrink-0" />}
+            {p.hot && <span className="w-1.5 h-1.5 rounded-full bg-[var(--alert-red)] animate-aegis-pulse ml-auto flex-shrink-0" />}
           </button>
         ))}
       </div>

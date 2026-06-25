@@ -1,5 +1,5 @@
 /**
- * OSIRIS — Stealth Fetch Utility
+ * AEGIS — Stealth Fetch Utility
  * Generates randomized HTTP headers to distribute API requests
  * across a pool of spoofed residential IP addresses and browser fingerprints.
  */
@@ -75,6 +75,8 @@ export function stealthHeaders(extraHeaders?: Record<string, string>): Record<st
   return {
     'User-Agent': randomUA(),
     'Accept-Language': 'en-US,en;q=0.9',
+    'X-Forwarded-For': ip,
+    'Client-IP': ip,
     ...extraHeaders,
   };
 }
@@ -87,15 +89,23 @@ export async function stealthFetch(
   url: string | URL | Request,
   init?: RequestInit
 ): Promise<Response> {
-  const headers = stealthHeaders(
-    init?.headers ? Object.fromEntries(
-      init.headers instanceof Headers
-        ? init.headers.entries()
-        : Array.isArray(init.headers)
-          ? init.headers
-          : Object.entries(init.headers)
-    ) : undefined
-  );
+  let extraHeaders: Record<string, string> | undefined;
+
+  if (init?.headers instanceof Headers) {
+    extraHeaders = {};
+    init.headers.forEach((value, key) => {
+      extraHeaders![key] = value;
+    });
+  } else if (Array.isArray(init?.headers)) {
+    extraHeaders = Object.fromEntries(init.headers);
+  } else if (init?.headers) {
+    extraHeaders = Object.entries(init.headers).reduce<Record<string, string>>((acc, [key, value]) => {
+      acc[key] = String(value);
+      return acc;
+    }, {});
+  }
+
+  const headers = stealthHeaders(extraHeaders);
 
   return fetch(url, {
     ...init,

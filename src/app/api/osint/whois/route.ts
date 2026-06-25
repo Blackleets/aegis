@@ -130,7 +130,7 @@ export async function GET(req: Request) {
         results.last_changed = events.find((event) => event.action === 'last changed')?.date;
       }
     } catch (error) {
-      console.warn('[OSIRIS] Suppressed error:', error instanceof Error ? error.message : error);
+      console.warn('[AEGIS] Suppressed error:', error instanceof Error ? error.message : error);
     }
 
     try {
@@ -163,7 +163,7 @@ export async function GET(req: Request) {
         grade: score >= 5 ? 'A' : score >= 3 ? 'B' : score >= 1 ? 'C' : 'F',
       };
     } catch (error) {
-      console.warn('[OSIRIS] Suppressed error:', error instanceof Error ? error.message : error);
+      console.warn('[AEGIS] Suppressed error:', error instanceof Error ? error.message : error);
     }
 
     try {
@@ -179,7 +179,7 @@ export async function GET(req: Request) {
       }
       results.sanctions_match = hits.length ? { source: 'OFAC SDN', hits } : null;
     } catch (error) {
-      console.warn('[OSIRIS] Sanctions cross-check failed:', error instanceof Error ? error.message : error);
+      console.warn('[AEGIS] Sanctions cross-check failed:', error instanceof Error ? error.message : error);
     }
 
     return NextResponse.json(results);

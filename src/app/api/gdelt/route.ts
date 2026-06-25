@@ -13,7 +13,7 @@ interface IncidentEvent {
 }
 
 /**
- * OSIRIS — Global Incidents API (GDELT Fallback / RSS OSINT Mapper)
+ * AEGIS — Global Incidents API (GDELT Fallback / RSS OSINT Mapper)
  * Since GDELT v2 Geo is frequently down (404/Timeout), this fallback
  * aggregates global news RSS (BBC, Al Jazeera, etc.) and performs
  * lightweight keyword geo-mapping to generate incident points.

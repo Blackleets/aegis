@@ -42,7 +42,7 @@ type AisMessagePayload = {
 };
 
 /**
- * OSIRIS — Maritime Intelligence
+ * AEGIS — Maritime Intelligence
  * Real-time AIS vessel tracking via aisstream.io + Static global ports.
  */
 
@@ -182,7 +182,7 @@ function connectAisStream() {
     ws.send(JSON.stringify(subscriptionMessage));
   });
 
-  // Map AIS ship types to OSIRIS categories
+  // Map AIS ship types to AEGIS categories
   const getOsirisShipType = (typeCode: number) => {
     if (!typeCode) return 'cargo';
     if (typeCode >= 80 && typeCode <= 89) return 'tanker';

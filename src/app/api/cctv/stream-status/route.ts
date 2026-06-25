@@ -17,7 +17,7 @@ export async function GET(req: Request) {
     const res = await safeFetch(url, {
       signal: AbortSignal.timeout(8000),
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; OSIRIS/1.0; +https://github.com/simplifaisoul/osiris)',
+        'User-Agent': 'Mozilla/5.0 (compatible; AEGIS/1.0; +https://github.com/Blackleets/aegis)',
         Accept: 'text/html,application/xhtml+xml',
       },
     });

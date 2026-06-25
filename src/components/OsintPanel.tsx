@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, memo } from 'react';
+import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, Radar, Globe, Shield, FileText,
@@ -696,7 +697,7 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
         <div>
           <SectionHeader title="GITHUB RECON" icon={Terminal} color="#87CEEB" />
           <div className="flex items-center gap-3 mb-2">
-            {r.avatar_url && <img src={r.avatar_url} alt="avatar" className="w-10 h-10 rounded-full border border-[#87CEEB]/30" />}
+            {r.avatar_url && <Image src={r.avatar_url} alt="avatar" width={40} height={40} unoptimized className="w-10 h-10 rounded-full border border-[#87CEEB]/30" />}
             <div>
               <div className="text-[12px] font-mono font-bold text-[#87CEEB]">{r.name || r.username}</div>
               <div className="text-[9px] font-mono text-[var(--text-muted)]">@{r.username} • {r.followers} followers</div>
@@ -1212,7 +1213,7 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
           <button onClick={() => setIsFullScreen(true)} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors" title="Full Screen">
              <Maximize2 className="w-3.5 h-3.5" />
           </button>
-          <div className="w-1.5 h-1.5 rounded-full bg-[var(--cyan-primary)] animate-osiris-pulse" />
+          <div className="w-1.5 h-1.5 rounded-full bg-[var(--cyan-primary)] animate-aegis-pulse" />
           <button onClick={() => setExpanded(!expanded)}>
             {expanded ? <ChevronUp className="w-3.5 h-3.5 text-[var(--text-muted)]" /> : <ChevronDown className="w-3.5 h-3.5 text-[var(--text-muted)]" />}
           </button>

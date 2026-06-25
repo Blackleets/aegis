@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
+import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Layers, BarChart3, Newspaper, Search, X, Globe, MapPinned, Radar, Satellite, Moon, ExternalLink, AlertTriangle, Activity, Database, Wifi } from 'lucide-react';
 import IntelFeed from '@/components/IntelFeed';
@@ -974,10 +975,10 @@ export default function Dashboard() {
       <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, delay: 2.5 }} className={`absolute top-3 left-3 md:top-5 md:left-5 z-[200] pointer-events-none flex items-center gap-2 md:gap-3`}>
         <div className="w-7 h-7 md:w-9 md:h-9 flex items-center justify-center relative">
           {/* Ambient glow ring — slow rotating */}
-          <div className="absolute inset-[-4px] md:inset-[-5px] rounded-full border border-[var(--gold-primary)]/20" style={{ animation: 'osiris-rotate 12s linear infinite' }}>
+          <div className="absolute inset-[-4px] md:inset-[-5px] rounded-full border border-[var(--gold-primary)]/20" style={{ animation: 'aegis-rotate 12s linear infinite' }}>
             <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1 h-1 rounded-full bg-[var(--gold-primary)] shadow-[0_0_6px_var(--gold-primary)]" />
           </div>
-          <div className="absolute inset-[-8px] md:inset-[-10px] rounded-full border border-[var(--gold-primary)]/10" style={{ animation: 'osiris-rotate 20s linear infinite reverse' }}>
+          <div className="absolute inset-[-8px] md:inset-[-10px] rounded-full border border-[var(--gold-primary)]/10" style={{ animation: 'aegis-rotate 20s linear infinite reverse' }}>
             <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-0.5 h-0.5 rounded-full bg-[var(--gold-primary)]/60" />
           </div>
           <div className="w-5 h-5 md:w-7 md:h-7 rounded-full border-2 border-[var(--gold-primary)] flex items-center justify-center animate-glow-pulse">
@@ -1053,7 +1054,7 @@ export default function Dashboard() {
               <div className="mt-1 text-[11px] font-semibold tracking-[0.18em] text-[var(--text-primary)]">{operationalModeLabel}</div>
             </div>
             <div className="flex items-center gap-2 rounded-full border border-[var(--border-primary)]/50 bg-white/[0.03] px-2.5 py-1 text-[9px] font-mono text-[var(--text-secondary)]">
-              <div className={`h-1.5 w-1.5 rounded-full ${backendStatus === 'connected' ? 'bg-[var(--alert-green)]' : backendStatus === 'error' ? 'bg-[var(--alert-red)]' : 'bg-[var(--gold-primary)]'} animate-osiris-pulse`} />
+              <div className={`h-1.5 w-1.5 rounded-full ${backendStatus === 'connected' ? 'bg-[var(--alert-green)]' : backendStatus === 'error' ? 'bg-[var(--alert-red)]' : 'bg-[var(--gold-primary)]'} animate-aegis-pulse`} />
               <span>{backendStatus === 'connected' ? 'LIVE' : backendStatus === 'error' ? 'DEGRADED' : 'SYNCING'}</span>
             </div>
           </div>
@@ -1083,7 +1084,7 @@ export default function Dashboard() {
       {isMobile && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 2.5 }} className="absolute top-3 right-3 z-[200] pointer-events-auto flex items-center gap-2">
           <a href='https://ko-fi.com/M8D41ZYW4Z' target='_blank' className="glass-panel px-2.5 py-1.5 flex items-center gap-1.5 text-[7px] font-mono tracking-[0.22em] hover:opacity-80 transition-opacity border-[var(--border-primary)]/80 bg-[rgba(15,23,32,0.92)]">
-            <div className="w-1.5 h-1.5 rounded-full bg-[var(--gold-primary)] animate-osiris-pulse" />
+            <div className="w-1.5 h-1.5 rounded-full bg-[var(--gold-primary)] animate-aegis-pulse" />
             <span className="text-[var(--text-primary)] font-bold">SUPPORT PROJECT</span>
           </a>
         </motion.div>
@@ -1160,7 +1161,7 @@ export default function Dashboard() {
               {/* Header */}
               <div className="flex items-center justify-between px-4 py-2.5 bg-[#111] border-b border-[var(--border-primary)]">
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-[#FF4081] animate-osiris-pulse" />
+                  <div className="w-2 h-2 rounded-full bg-[#FF4081] animate-aegis-pulse" />
                   <span className="text-[12px] font-mono font-bold text-white tracking-wider">{liveFeedName}</span>
                   <span className="px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 font-mono text-[9px] font-bold">LIVE STREAM</span>
                   {!liveFeedEmbedAllowed && (
@@ -1323,7 +1324,7 @@ export default function Dashboard() {
       {/* ── BOTTOM CENTER (desktop) ── */}
       {!isMobile && (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 3, duration: 0.8 }} className="desktop-only absolute bottom-5 left-1/2 -translate-x-1/2 z-[200] pointer-events-auto">
-          <div className="glass-panel px-5 py-2.5 flex items-center gap-0 osiris-glow relative overflow-hidden" style={{ borderImage: 'linear-gradient(90deg, rgba(212,175,55,0.05), rgba(212,175,55,0.2), rgba(212,175,55,0.05)) 1', borderImageSlice: 1, borderWidth: '1px', borderStyle: 'solid' }}>
+          <div className="glass-panel px-5 py-2.5 flex items-center gap-0 aegis-glow relative overflow-hidden" style={{ borderImage: 'linear-gradient(90deg, rgba(212,175,55,0.05), rgba(212,175,55,0.2), rgba(212,175,55,0.05)) 1', borderImageSlice: 1, borderWidth: '1px', borderStyle: 'solid' }}>
 
             {/* Animated scan line sweeping across the bar */}
             <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden="true">
@@ -1397,7 +1398,7 @@ export default function Dashboard() {
       {/* ── Region Dossier ── */}
       {(regionDossier || dossierLoading) && (
         <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="absolute top-16 md:top-20 left-2 right-2 md:left-1/2 md:right-auto md:-translate-x-1/2 z-[300] md:w-[480px] max-h-[65vh] overflow-y-auto styled-scrollbar">
-          <div className="glass-panel p-5 osiris-glow">
+          <div className="glass-panel p-5 aegis-glow">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-mono font-bold text-[var(--gold-primary)] tracking-wider">REGION DOSSIER</h2>
               <button onClick={() => { setRegionDossier(null); setDossierLoading(false); }} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] text-xs">✕</button>
@@ -1421,7 +1422,7 @@ export default function Dashboard() {
                   </div>
                 )}
                 {regionDossier.head_of_state && (<div><div className="hud-label mb-0.5">HEAD OF STATE</div><div className="text-xs text-[var(--gold-primary)]">{regionDossier.head_of_state.name}</div><div className="text-[8px] text-[var(--text-muted)]">{regionDossier.head_of_state.position}</div></div>)}
-                {regionDossier.wikipedia && (<div><div className="hud-label mb-1">INTELLIGENCE BRIEF</div><div className="flex gap-3">{regionDossier.wikipedia.thumbnail && <img src={regionDossier.wikipedia.thumbnail} alt="" className="w-14 h-14 rounded object-cover flex-shrink-0" />}<p className="text-[8px] text-[var(--text-secondary)] leading-relaxed">{regionDossier.wikipedia.extract}</p></div></div>)}
+                {regionDossier.wikipedia && (<div><div className="hud-label mb-1">INTELLIGENCE BRIEF</div><div className="flex gap-3">{regionDossier.wikipedia.thumbnail && <Image src={regionDossier.wikipedia.thumbnail} alt="" width={56} height={56} unoptimized className="w-14 h-14 rounded object-cover flex-shrink-0" /> }<p className="text-[8px] text-[var(--text-secondary)] leading-relaxed">{regionDossier.wikipedia.extract}</p></div></div>)}
               </div>
             )}
           </div>

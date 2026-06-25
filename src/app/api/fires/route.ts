@@ -26,7 +26,7 @@ interface EonetVolcanoResponse {
 }
 
 /**
- * OSIRIS — Active Fire & Wildfire Tracking
+ * AEGIS — Active Fire & Wildfire Tracking
  * Multi-source: NASA FIRMS Open Data (primary for global fires), NASA EONET (volcanoes)
  */
 
@@ -45,7 +45,7 @@ export async function GET() {
       try {
         const res = await fetch(url, {
           signal: AbortSignal.timeout(15000),
-          headers: { 'User-Agent': 'OSIRIS-Intelligence-Platform/3.5' },
+          headers: { 'User-Agent': 'AEGIS-Intelligence-Platform/3.5' },
         });
         if (res.ok) {
           const text = await res.text();
@@ -88,7 +88,7 @@ export async function GET() {
         fires = [...fires, ...volcanoes];
         if (!source) source = 'NASA-EONET';
       }
-    } catch (e) { console.warn('[OSIRIS] Suppressed EONET error:', e instanceof Error ? e.message : e); }
+    } catch (e) { console.warn('[AEGIS] Suppressed EONET error:', e instanceof Error ? e.message : e); }
 
     return NextResponse.json({
       fires,

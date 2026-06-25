@@ -1,17 +1,17 @@
 # AEGIS
 
-AI-enhanced open-source intelligence and situational awareness platform built on top of the original OSIRIS codebase.
+AI-enhanced open-source intelligence and situational awareness platform for real-time operator workflows.
 
 ![License](https://img.shields.io/badge/license-MIT-gold)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)
 ![Status](https://img.shields.io/badge/status-build%20verified-brightgreen)
 
-AEGIS turns the original global-intel dashboard into a sharper operator workspace with integrated AI analysis, fusion dossiers, live layers, recon tooling, and premium rebranding.
+AEGIS delivers a sharper operator workspace with integrated AI analysis, fusion dossiers, live layers, recon tooling, and premium rebranding.
 
-## What changed vs the original base
+## What changed
 
-- Rebrand from OSIRIS to AEGIS across primary UI and metadata
+- Unified AEGIS branding across UI, Docker metadata, SDK labels, and operator flows
 - AI analyst mounted directly in the main dashboard
 - New Fusion Dossier workflow and API endpoint: `/api/ai/fusion`
 - Local Gemini key namespace changed to `aegis-gemini-key`
@@ -48,7 +48,7 @@ Copy one of these files and fill only what you need:
 
 Notes:
 - The platform can run without most third-party keys.
-- Some legacy env names still use `OSIRIS_*` for compatibility with the inherited codebase and docker setup.
+- Some deployment env names may remain legacy for compatibility during transition.
 - RECON scanner features require `SCANNER_URL` and `SCANNER_KEY`.
 
 ## AI setup
@@ -76,11 +76,11 @@ npm run build
 
 Build passes.
 
-`npm run lint` still reports a large amount of pre-existing debt inherited from the original project. That cleanup is a separate hardening pass, not a blocker for the current build.
+`npm run lint` still reports a large amount of pre-existing debt from the inherited codebase. That cleanup is a separate hardening pass, not a blocker for the current build.
 
 ## Attribution and license
 
-AEGIS is a derivative work based on the original OSIRIS project by simplifaisoul.
+AEGIS is a derivative work based on an inherited open-source codebase by simplifaisoul.
 
 - Original license preserved: MIT
 - Original copyright notice preserved in `LICENSE`

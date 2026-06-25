@@ -515,7 +515,7 @@ export default function AiAnalyst({ data }: AiAnalystProps) {
                 <div className="flex items-center gap-2.5">
                   <div className="relative">
                     <Shield className="w-4.5 h-4.5 text-[var(--gold-primary)]" />
-                    <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-[var(--alert-green)] animate-osiris-pulse" />
+                    <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-[var(--alert-green)] animate-aegis-pulse" />
                   </div>
                   <div className="flex flex-col">
                     <span className="hud-text text-[11px] text-[var(--text-heading)]">AEGIS ANALYST</span>

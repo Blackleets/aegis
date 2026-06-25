@@ -33,7 +33,7 @@ type ConflictPoint = {
 };
 
 /**
- * OSIRIS — SCM Supplier Risk Overlay
+ * AEGIS — SCM Supplier Risk Overlay
  * Calculates intersection between live global threats (Earthquakes, Fires, Conflicts)
  * and static Tier 1/2 Supplier coordinates.
  */

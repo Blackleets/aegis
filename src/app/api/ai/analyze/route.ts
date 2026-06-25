@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════════════════════
- *  OSIRIS — AI Intelligence Analysis Endpoint
+ *  AEGIS — AI Intelligence Analysis Endpoint
  *  POST /api/ai/analyze
  *  Rate-limited, multi-key Gemini integration
  * ═══════════════════════════════════════════════════════════════
@@ -219,7 +219,7 @@ export async function POST(
       );
     }
 
-    console.error('[OSIRIS AI] Analysis error:', message);
+    console.error('[AEGIS AI] Analysis error:', message);
     return NextResponse.json(
       { error: 'Intelligence analysis failed. Please try again.', code: 'ANALYSIS_FAILED' },
       { status: 500 }

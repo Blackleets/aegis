@@ -18,7 +18,7 @@ import { fetchPolandCameras } from './poland';
 import { fetchJapanCameras } from './japan';
 
 /**
- * OSIRIS — Worldwide CCTV Camera API v2
+ * AEGIS — Worldwide CCTV Camera API v2
  * Viewport-aware: pass ?region=xx to load cameras for specific regions
  * Supports: uk, us-east, us-west, us-central, canada, europe, asia
  * Or pass ?lat=x&lng=y&radius=5 for proximity-based loading

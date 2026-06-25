@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { stealthFetch } from '@/lib/stealthFetch';
 
 /**
- * OSIRIS — Flight Data API
+ * AEGIS — Flight Data API
  * Fetches real-time aircraft positions from adsb.lol (no API key required)
  * Covers 6 global regions for maximum coverage
  */

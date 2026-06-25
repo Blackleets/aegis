@@ -1,18 +1,18 @@
-name: osiris
+name: aegis
 services:
-  osiris:
+  aegis:
     # Pulls the prebuilt image from GitHub Container Registry. The `build:`
     # block is kept as a fallback: `docker compose up -d` uses the registry
     # image if present/pullable, otherwise builds locally from the Dockerfile.
     # Run `docker compose pull` to fetch the latest published image.
-    image: ghcr.io/aiacos/osiris:latest
+    image: ghcr.io/blackleets/aegis:latest
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: osiris
-    # Host port is configurable via OSIRIS_PORT in .env (defaults to 3000).
+    container_name: aegis
+    # Host port is configurable via AEGIS_PORT in .env (defaults to 3000).
     ports:
-      - "${OSIRIS_PORT:-3000}:3000"
+      - "${AEGIS_PORT:-3000}:3000"
     # Optional API keys / scanner backend — copy .env.template to .env and
     # fill in what you need. Missing file is ignored (keyless feeds still work).
     env_file:
@@ -39,13 +39,13 @@ x-casaos:
   architectures:
     - amd64
     - arm64
-  main: osiris
+  main: aegis
   author: simplifaisoul
   developer: simplifaisoul
   category: Network
   description:
     en_us: >-
-      OSIRIS is a production-grade open-source OSINT situational-awareness
+      AEGIS is a production-grade open-source intelligence and situational-awareness
       dashboard. It aggregates real-time global intelligence across aviation,
       maritime, CCTV networks, seismic activity, wildfires, news feeds,
       weather, space weather, cyber threats (CVEs) and conflict zones into a
@@ -54,11 +54,11 @@ x-casaos:
   tagline:
     en_us: Real-time global OSINT intelligence dashboard
   title:
-    en_us: OSIRIS
-  icon: https://raw.githubusercontent.com/Aiacos/osiris/master/public/casaos-icon.png
-  thumbnail: https://raw.githubusercontent.com/Aiacos/osiris/master/public/og-image.png
+    en_us: AEGIS
+  icon: https://raw.githubusercontent.com/Blackleets/aegis/main/public/casaos-icon.png
+  thumbnail: https://raw.githubusercontent.com/Blackleets/aegis/main/public/og-image.png
   screenshot_link:
-    - https://raw.githubusercontent.com/Aiacos/osiris/master/public/og-image.png
+    - https://raw.githubusercontent.com/Blackleets/aegis/main/public/og-image.png
   scheme: http
   hostname: ""
   port_map: "3000"
@@ -70,7 +70,7 @@ x-casaos:
         en_us: "(Optional) RECON scanner backend URL, e.g. http://scanner:7700"
     - container: SCANNER_KEY
       description:
-        en_us: "(Optional) RECON scanner shared secret (must match backend OSIRIS_KEY)."
+        en_us: "(Optional) RECON scanner shared secret (must match the backend scanner key)."
     - container: FIRMS_API_KEY
       description:
         en_us: "(Optional) NASA FIRMS API key for active-fire data."

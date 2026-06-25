@@ -23,7 +23,7 @@ export default class ErrorBoundary extends React.Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error(`[OSIRIS] ${this.props.name || 'Component'} Error:`, error, errorInfo);
+    console.error(`[AEGIS] ${this.props.name || 'Component'} Error:`, error, errorInfo);
   }
 
   render() {

@@ -2,8 +2,20 @@
 import { NextResponse } from 'next/server';
 import { stealthFetch } from '@/lib/stealthFetch';
 
+interface SatnogsTleRecord {
+  tle0?: string;
+  tle1?: string;
+  tle2?: string;
+}
+
+interface CachedSatellite {
+  name: string;
+  line1: string;
+  line2: string;
+}
+
 /**
- * OSIRIS — Satellite Tracking API
+ * AEGIS — Satellite Tracking API
  * Fetches TLE data from multiple sources with fallbacks
  * Computes real-time positions using simplified SGP4
  */
@@ -133,13 +145,13 @@ function propagateSGP4Simple(line1: string, line2: string): { lat: number; lng: 
 // SatNOGS Open API - Provides full TLE JSON without API keys or IP blocks
 const SATNOGS_API = 'https://db.satnogs.org/api/tle/?format=json';
 
-let globalCachedSats: any[] = [];
+let globalCachedSats: CachedSatellite[] = [];
 let globalCacheTime = 0;
 
 export async function GET() {
   try {
     const nowTime = Date.now();
-    let allSats: any[] = globalCachedSats;
+    let allSats: CachedSatellite[] = globalCachedSats;
     let source = 'memory-cache';
 
     if (globalCachedSats.length === 0 || nowTime - globalCacheTime > 3600000) { // 1 hour cache
@@ -150,8 +162,8 @@ export async function GET() {
         });
         
         if (res.ok) {
-          const data = await res.json();
-          const fetchedSats: any[] = [];
+          const data = await res.json() as SatnogsTleRecord[];
+          const fetchedSats: CachedSatellite[] = [];
           const seen = new Set<string>();
 
           for (const item of data) {

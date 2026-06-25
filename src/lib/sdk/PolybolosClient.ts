@@ -3,7 +3,7 @@
  * ║  POLYBOLOS SDK — Client Controller                              ║
  * ║  Unified Intelligence Fusion Engine                             ║
  * ║                                                                 ║
- * ║  Subscribes to OSIRIS feeds + external providers (Lattice),     ║
+ * ║  Subscribes to AEGIS feeds + external providers (Lattice),      ║
  * ║  normalizes all data into PolybolosEntity[], and emits a        ║
  * ║  fused Common Operating Picture stream.                         ║
  * ╚══════════════════════════════════════════════════════════════════╝
@@ -20,7 +20,7 @@ import {
 } from './types';
 import { LatticeAdapter } from './LatticeAdapter';
 
-// ── OSIRIS Feed → Entity Translators ───────────────────────────────
+// ── AEGIS Feed → Entity Translators ────────────────────────────────
 
 interface FlightRecord {
   icao24?: string;
@@ -118,14 +118,14 @@ function translateFlights(flights: FlightRecord[], subtype: string): PolybolosEn
     jets: ThreatLevel.LOW, military: ThreatLevel.ELEVATED,
   };
   return flights.map((f) => ({
-    id: `osiris-air-${f.icao24 || f.callsign || Math.random().toString(36).slice(2)}`,
+    id: `aegis-air-${f.icao24 || f.callsign || Math.random().toString(36).slice(2)}`,
     name: f.callsign?.trim() || 'UNKNOWN',
     domain: Domain.AIR,
     entityType: EntityType.TRACK,
     position: { lat: f.lat, lng: f.lng, alt: f.alt, heading: f.heading, speed: f.speed_knots },
     threat: threatMap[subtype] || ThreatLevel.NONE,
     classification: Classification.UNCLASSIFIED,
-    source: { provider: 'osiris', feed: `flights-${subtype}`, originalId: f.icao24, confidence: 0.9 },
+    source: { provider: 'aegis', feed: `flights-${subtype}`, originalId: f.icao24, confidence: 0.9 },
     timestamp: new Date().toISOString(),
     properties: { model: f.model, registration: f.registration, icao24: f.icao24, subtype },
     display: { color: colorMap[subtype] || '#00E5FF', icon: `plane-${subtype === 'military' ? 'red' : 'cyan'}`, layerType: 'symbol' as const },
@@ -135,14 +135,14 @@ function translateFlights(flights: FlightRecord[], subtype: string): PolybolosEn
 function translateMaritime(ships: MaritimeRecord[]): PolybolosEntity[] {
   if (!ships?.length) return [];
   return ships.map((s) => ({
-    id: `osiris-sea-${s.mmsi || s.id || Math.random().toString(36).slice(2)}`,
+    id: `aegis-sea-${s.mmsi || s.id || Math.random().toString(36).slice(2)}`,
     name: s.name || `MMSI-${s.mmsi}`,
     domain: Domain.SEA,
     entityType: EntityType.TRACK,
     position: { lat: s.lat, lng: s.lng, heading: s.heading, speed: s.speed },
     threat: s.type === 'military' ? ThreatLevel.ELEVATED : ThreatLevel.NONE,
     classification: Classification.UNCLASSIFIED,
-    source: { provider: 'osiris', feed: 'maritime-ais', originalId: s.mmsi?.toString(), confidence: 0.85 },
+    source: { provider: 'aegis', feed: 'maritime-ais', originalId: s.mmsi?.toString(), confidence: 0.85 },
     timestamp: new Date().toISOString(),
     properties: { type: s.type, destination: s.destination, flag: s.flag, mmsi: s.mmsi },
     display: {
@@ -155,14 +155,14 @@ function translateMaritime(ships: MaritimeRecord[]): PolybolosEntity[] {
 function translateEarthquakes(events: EarthquakeRecord[]): PolybolosEntity[] {
   if (!events?.length) return [];
   return events.map((eq) => ({
-    id: `osiris-event-eq-${eq.id || Math.random().toString(36).slice(2)}`,
+    id: `aegis-event-eq-${eq.id || Math.random().toString(36).slice(2)}`,
     name: `M${eq.magnitude} ${eq.place || 'Earthquake'}`,
     domain: Domain.LAND,
     entityType: EntityType.EVENT,
     position: { lat: eq.lat, lng: eq.lng },
     threat: eq.magnitude >= 6 ? ThreatLevel.CRITICAL : eq.magnitude >= 5 ? ThreatLevel.HIGH : eq.magnitude >= 4 ? ThreatLevel.ELEVATED : ThreatLevel.LOW,
     classification: Classification.UNCLASSIFIED,
-    source: { provider: 'osiris', feed: 'usgs-earthquakes', originalId: eq.id, confidence: 0.99 },
+    source: { provider: 'aegis', feed: 'usgs-earthquakes', originalId: eq.id, confidence: 0.99 },
     timestamp: new Date().toISOString(),
     properties: { magnitude: eq.magnitude, depth: eq.depth, place: eq.place },
     display: { color: eq.magnitude >= 6 ? '#FF1744' : '#FF9500', icon: 'dot-red', layerType: 'circle' as const, glow: eq.magnitude >= 5 },
@@ -172,14 +172,14 @@ function translateEarthquakes(events: EarthquakeRecord[]): PolybolosEntity[] {
 function translateSatellites(sats: SatelliteRecord[]): PolybolosEntity[] {
   if (!sats?.length) return [];
   return sats.map((s) => ({
-    id: `osiris-space-${s.noradId || Math.random().toString(36).slice(2)}`,
+    id: `aegis-space-${s.noradId || Math.random().toString(36).slice(2)}`,
     name: s.name || 'UNKNOWN SAT',
     domain: Domain.SPACE,
     entityType: EntityType.TRACK,
     position: { lat: s.lat, lng: s.lng, alt: s.alt ? s.alt * 1000 : undefined },
     threat: ThreatLevel.NONE,
     classification: Classification.UNCLASSIFIED,
-    source: { provider: 'osiris', feed: 'satnogs', originalId: s.noradId?.toString(), confidence: 0.95 },
+    source: { provider: 'aegis', feed: 'satnogs', originalId: s.noradId?.toString(), confidence: 0.95 },
     timestamp: new Date().toISOString(),
     properties: { mission: s.mission, noradId: s.noradId, color: s.color },
     display: { color: s.color || '#D4AF37', icon: 'dot-gold', layerType: 'circle' as const },
@@ -189,14 +189,14 @@ function translateSatellites(sats: SatelliteRecord[]): PolybolosEntity[] {
 function translateFires(fires: FireRecord[]): PolybolosEntity[] {
   if (!fires?.length) return [];
   return fires.map((f, i: number) => ({
-    id: `osiris-event-fire-${i}`,
+    id: `aegis-event-fire-${i}`,
     name: 'Active Fire',
     domain: Domain.LAND,
     entityType: EntityType.EVENT,
     position: { lat: f.lat, lng: f.lng },
     threat: ThreatLevel.ELEVATED,
     classification: Classification.UNCLASSIFIED,
-    source: { provider: 'osiris', feed: 'nasa-firms', confidence: 0.9 },
+    source: { provider: 'aegis', feed: 'nasa-firms', confidence: 0.9 },
     timestamp: new Date().toISOString(),
     properties: { brightness: f.brightness },
     display: { color: '#FF6B00', icon: 'dot-fire', layerType: 'circle' as const },
@@ -206,14 +206,14 @@ function translateFires(fires: FireRecord[]): PolybolosEntity[] {
 function translateCCTV(cameras: CctvRecord[]): PolybolosEntity[] {
   if (!cameras?.length) return [];
   return cameras.map((c) => ({
-    id: `osiris-sensor-cctv-${c.id || Math.random().toString(36).slice(2)}`,
+    id: `aegis-sensor-cctv-${c.id || Math.random().toString(36).slice(2)}`,
     name: c.name || 'Camera',
     domain: Domain.LAND,
     entityType: EntityType.SENSOR,
     position: { lat: c.lat, lng: c.lng },
     threat: ThreatLevel.NONE,
     classification: Classification.UNCLASSIFIED,
-    source: { provider: 'osiris', feed: 'cctv-network', originalId: c.id, confidence: 1.0 },
+    source: { provider: 'aegis', feed: 'cctv-network', originalId: c.id, confidence: 1.0 },
     timestamp: new Date().toISOString(),
     properties: { city: c.city, country: c.country, source: c.source, feed_url: c.feed_url, stream_url: c.stream_url },
     display: { color: '#39FF14', icon: 'dot-cctv', layerType: 'circle' as const },
@@ -223,14 +223,14 @@ function translateCCTV(cameras: CctvRecord[]): PolybolosEntity[] {
 function translateRadiation(stations: RadiationRecord[]): PolybolosEntity[] {
   if (!stations?.length) return [];
   return stations.map((r) => ({
-    id: `osiris-sensor-rad-${r.name || Math.random().toString(36).slice(2)}`,
+    id: `aegis-sensor-rad-${r.name || Math.random().toString(36).slice(2)}`,
     name: r.name || 'Radiation Monitor',
     domain: Domain.LAND,
     entityType: EntityType.SENSOR,
     position: { lat: r.lat, lng: r.lng },
     threat: r.status === 'DANGER' ? ThreatLevel.CRITICAL : r.status === 'WARNING' ? ThreatLevel.HIGH : ThreatLevel.LOW,
     classification: Classification.UNCLASSIFIED,
-    source: { provider: 'osiris', feed: 'radiation-network', confidence: 0.95 },
+    source: { provider: 'aegis', feed: 'radiation-network', confidence: 0.95 },
     timestamp: new Date().toISOString(),
     properties: { reading: r.reading, status: r.status, network: r.network, city: r.city, country: r.country },
     display: {
@@ -273,13 +273,13 @@ export class PolybolosClient {
     this.config.onStatusChange?.(this.getStatus());
   }
 
-  /** Connect to the OSIRIS SSE stream endpoint */
+  /** Connect to the AEGIS SSE stream endpoint */
   private connectSSE(): void {
     if (typeof EventSource === 'undefined') return;
 
     try {
       this.sseConnection = new EventSource(
-        `${this.config.osirisBaseUrl}/api/sdk/stream`
+        `${this.config.apiBaseUrl}/api/sdk/stream`
       );
 
       this.sseConnection.onmessage = (event) => {
@@ -305,7 +305,7 @@ export class PolybolosClient {
   }
 
   /**
-   * Ingest raw OSIRIS data and translate it into Polybolos entities.
+   * Ingest raw AEGIS data and translate it into Polybolos entities.
    * This is the primary method called by page.tsx to feed data into the SDK.
    */
   ingestOsirisData(data: OsirisIngestPayload): void {
@@ -429,7 +429,7 @@ export class PolybolosClient {
 
   private getActiveFeedCount(): number {
     let count = 0;
-    // Count OSIRIS feeds that have data
+    // Count AEGIS feeds that have data
     const feeds = ['commercial_flights', 'private_flights', 'military_flights', 'maritime_ships',
       'satellites', 'earthquakes', 'fires', 'cameras', 'radiation'];
     if (this.entityStore.size > 0) count = feeds.length; // Simplified: if store has data, feeds are active

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 /**
- * OSIRIS — Global Stats API
+ * AEGIS — Global Stats API
  * Lightweight aggregation endpoint.
  * Fetches metrics from all local APIs and returns ONLY the counts.
  * 

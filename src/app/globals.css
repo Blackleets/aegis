@@ -2,8 +2,8 @@
 @import "tailwindcss";
 
 /* ═══════════════════════════════════════════════════════════════
-   OSIRIS — Global Intelligence Platform Design System
-   Egyptian Mythology × Dark Ops × Glassmorphism
+   AEGIS — Global Intelligence Platform Design System
+   Premium intelligence UI × dark glassmorphism
    ═══════════════════════════════════════════════════════════════ */
 
 :root {
@@ -123,15 +123,15 @@ html, body {
   border-radius: 14px;
 }
 
-/* ── Osiris Gold Glow ── */
-.osiris-glow {
+/* ── Aegis Gold Glow ── */
+.aegis-glow {
   box-shadow:
     0 0 20px rgba(212, 175, 55, 0.12),
     0 0 60px rgba(212, 175, 55, 0.06),
     0 4px 30px rgba(0, 0, 0, 0.5);
 }
 
-.osiris-glow-cyan {
+.aegis-glow-cyan {
   box-shadow:
     0 0 20px rgba(0, 229, 255, 0.1),
     0 0 60px rgba(0, 229, 255, 0.05);
@@ -165,17 +165,17 @@ html, body {
 /* ═══════════════════════════════════════════════════════════════
    ANIMATIONS
    ═══════════════════════════════════════════════════════════════ */
-@keyframes osiris-pulse {
+@keyframes aegis-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
 }
 
-@keyframes osiris-scan {
+@keyframes aegis-scan {
   0% { transform: translateY(-100%); }
   100% { transform: translateY(100vh); }
 }
 
-@keyframes osiris-rotate {
+@keyframes aegis-rotate {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
@@ -195,7 +195,7 @@ html, body {
   50% { opacity: 0.6; }
 }
 
-.animate-osiris-pulse { animation: osiris-pulse 2s ease-in-out infinite; }
+.animate-aegis-pulse { animation: aegis-pulse 2s ease-in-out infinite; }
 .animate-glow-pulse { animation: glow-pulse 3s ease-in-out infinite; }
 .animate-data-pulse { animation: data-pulse 2s ease-in-out infinite; }
 .animate-threat-flash { animation: threat-flash 1.5s ease-in-out infinite; }

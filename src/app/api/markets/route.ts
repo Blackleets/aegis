@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 /**
- * OSIRIS — Financial Markets & Commodities API
+ * AEGIS — Financial Markets & Commodities API
  * Defense stocks, oil, gold, silver, natural gas, wheat, crypto
  * Multiple source fallback: Yahoo Finance → Google Finance scraping → static estimates
  */

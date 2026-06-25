@@ -34,9 +34,9 @@ What the compose file does:
 - **`env_file: .env` (`required: false`)** — if a `.env` file exists its
   values are injected into the container; if it's missing, AEGIS still starts
   with the keyless feeds.
-- **`ports: ${OSIRIS_PORT:-3000}:3000`** — the web UI. The container always
-  listens on 3000; the published **host** port is `OSIRIS_PORT` (default
-  `3000`). Set `OSIRIS_PORT` in `.env` to remap it, e.g. `OSIRIS_PORT=3005`
+- **`ports: ${AEGIS_PORT:-3000}:3000`** — the web UI. The container always
+  listens on 3000; the published **host** port is `AEGIS_PORT` (default
+  `3000`). Set `AEGIS_PORT` in `.env` to remap it, e.g. `AEGIS_PORT=3005`
   when 3000 is already in use — no need to edit the compose file.
 - **`restart: unless-stopped`** — survives reboots.
 
@@ -92,12 +92,12 @@ reads.
 **Install:**
 
 1. On the CasaOS host, clone the repo somewhere persistent (e.g.
-   `/DATA/AppData/osiris`).
+   `/DATA/AppData/aegis`).
 2. CasaOS dashboard → **`+`** → **Install a customized app** → paste the
    contents of `docker-compose.yml`.
    *(or simply run `docker compose up -d` from the cloned directory).*
 3. AEGIS appears on the dashboard with its icon, reachable on host port
-   `3000` (or whatever `OSIRIS_PORT` you set in `.env`).
+   `3000` (or whatever `AEGIS_PORT` you set in `.env`).
 
 The app icon is the gold Eye-of-Horus mark in
 `public/casaos-icon.png` (512×512 PNG), referenced by the `icon:` URL in the
@@ -105,8 +105,8 @@ metadata.
 
 > CasaOS stores imported compose files under `/var/lib/casaos/apps/`, so a
 > relative `build:` context may not resolve there. If importing the YAML
-> directly, either build/tag `osiris:latest` first
-> (`docker build -t osiris:latest /path/to/osiris`) or set `image:` to a
+> directly, either build/tag `aegis:latest` first
+> (`docker build -t aegis:latest /path/to/aegis`) or set `image:` to a
 > prebuilt registry image.
 
 ---
@@ -120,7 +120,7 @@ Copy `.env.template` to `.env` and fill in only what you need.
 | Variable | Purpose | Required for |
 |----------|---------|--------------|
 | `SCANNER_URL` | RECON scanner backend base URL (e.g. `http://scanner:7700`) | RECON toolkit (quick/ssl/headers/rdns/subdomains/tech/whois/geoloc/vuln) |
-| `SCANNER_KEY` | Shared secret; **must equal the backend's `OSIRIS_KEY`** | RECON toolkit |
+| `SCANNER_KEY` | Shared secret; **must equal the backend scanner key** | RECON toolkit |
 
 Without `SCANNER_URL`/`SCANNER_KEY` the RECON endpoints return `503` and the
 rest of AEGIS works normally. Generate a key with `openssl rand -hex 32`.
@@ -145,8 +145,8 @@ them only if you extend the relevant route or hit rate limits.
 
 | Variable | Purpose | Default |
 |----------|---------|---------|
-| `OSIRIS_TELEGRAM_CHANNELS` | Comma-separated list of public Telegram channel usernames (no `@`) to scrape for the **Telegram OSINT** map layer. Overrides the curated default set. | `osintdefender,insiderpaper,aljazeeraenglish,nexta_live,war_monitor` |
-| `OSIRIS_PORT` | Host port the compose file publishes (container itself always listens on 3000). | `3000` |
+| `AEGIS_TELEGRAM_CHANNELS` | Comma-separated list of public Telegram channel usernames (no `@`) to scrape for the **Telegram OSINT** map layer. Overrides the curated default set. | `osintdefender,insiderpaper,aljazeeraenglish,nexta_live,war_monitor` |
+| `AEGIS_PORT` | Host port the compose file publishes (container itself always listens on 3000). | `3000` |
 
 ### Keyless sources (no configuration needed)
 

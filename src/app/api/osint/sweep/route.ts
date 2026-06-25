@@ -120,7 +120,7 @@ export async function GET(req: Request) {
       },
     });
   } catch (err) {
-    console.error('[OSIRIS] Sweep Init error:', err instanceof Error ? err.message : err);
+    console.error('[AEGIS] Sweep Init error:', err instanceof Error ? err.message : err);
     return NextResponse.json({ error: 'Sweep initialization failed' }, { status: 500 });
   }
 }

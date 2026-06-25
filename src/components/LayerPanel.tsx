@@ -147,7 +147,7 @@ function LayerPanel({ data, activeLayers, setActiveLayers }: LayerPanelProps) {
         <div className="flex items-center gap-2">
           <div className="relative">
             <Eye className="w-3.5 h-3.5 stroke-[1.5] text-[var(--gold-primary)]" />
-            <div className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-[var(--alert-green)] animate-osiris-pulse" />
+            <div className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-[var(--alert-green)] animate-aegis-pulse" />
           </div>
           <span className="hud-text text-[12px] text-[var(--text-primary)] tracking-widest">DATA LAYERS</span>
         </div>

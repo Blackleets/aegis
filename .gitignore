@@ -40,3 +40,7 @@ scanner/
 
 # Security - prevent accidental backup commits
 scanner_backend_backup.js
+
+# Local Hermes/session artifacts
+/.hermes/
+/data/usage-metrics.json
