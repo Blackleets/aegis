@@ -114,7 +114,7 @@ export default function ScmPanel({ data }: ScmPanelProps) {
               </div>
             </div>
 
-            <div className="mt-3 space-y-3 overflow-y-auto styled-scrollbar pr-1 pb-4">
+            <div className="mt-3 max-h-[320px] xl:max-h-[360px] space-y-3 overflow-y-auto styled-scrollbar pr-1 pb-4">
               {marketAlerts.length > 0 && (
                 <section className="rounded-2xl border border-amber-400/18 bg-amber-400/8 p-3">
                   <div className="mb-2 flex items-center gap-2 text-amber-200">

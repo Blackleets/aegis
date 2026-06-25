@@ -1,5 +1,5 @@
-# Osiris Global Intelligence Platform
-# https://osirisai.live
+# AEGIS Intelligence Platform
+# https://aegis.blackleets.dev
 
 User-agent: *
 Allow: /
@@ -11,7 +11,7 @@ Disallow: /api/osint/*
 Allow: /api/health
 
 # Sitemap
-Sitemap: https://osirisai.live/sitemap.xml
+Sitemap: https://aegis.blackleets.dev/sitemap.xml
 
 # Crawl-delay for respectful indexing
 Crawl-delay: 10

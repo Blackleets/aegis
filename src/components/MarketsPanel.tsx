@@ -197,7 +197,7 @@ export default function MarketsPanel({ data, spaceWeather }: MarketsPanelProps) 
               </div>
             )}
 
-            <div className="mt-3 space-y-2 overflow-y-auto styled-scrollbar">
+            <div className="mt-3 max-h-[280px] xl:max-h-[320px] space-y-2 overflow-y-auto styled-scrollbar pr-1">
               {activeEntries.length > 0 ? (
                 activeEntries.map(([name, ticker]) => <TickerRow key={name} name={name} data={ticker} />)
               ) : (

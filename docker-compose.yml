@@ -40,8 +40,8 @@ x-casaos:
     - amd64
     - arm64
   main: aegis
-  author: simplifaisoul
-  developer: simplifaisoul
+  author: Blackleets
+  developer: Blackleets
   category: Network
   description:
     en_us: >-

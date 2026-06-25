@@ -259,7 +259,10 @@ export default function Dashboard() {
   const isMobile = useIsMobile();
   const geocodeCache = useRef<Map<string, string>>(new Map());
   const geocodeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const geocodeAbortRef = useRef<AbortController | null>(null);
   const lastGeocodedPos = useRef<{ lat: number; lng: number } | null>(null);
+  const lastGeocodeKeyRef = useRef<string>('');
+  const lastLocationLabelRef = useRef<string>('');
 
   // ── DEFAULT: Most layers OFF — fast initial load ──
   const [activeLayers, setActiveLayers] = useState<ActiveLayers>(initialUrlState.activeLayers);
@@ -386,20 +389,51 @@ export default function Dashboard() {
         if (d < 0.5) return; // increased threshold — fewer geocode calls
       }
       const gk = `${coords.lat.toFixed(1)},${coords.lng.toFixed(1)}`; // coarser grid = more cache hits
-      if (geocodeCache.current.has(gk)) { setLocationLabel(geocodeCache.current.get(gk)!); lastGeocodedPos.current = coords; return; }
+      if (gk === lastGeocodeKeyRef.current) return;
+      if (geocodeCache.current.has(gk)) {
+        const cachedLabel = geocodeCache.current.get(gk)!;
+        if (cachedLabel !== lastLocationLabelRef.current) {
+          lastLocationLabelRef.current = cachedLabel;
+          setLocationLabel(cachedLabel);
+        }
+        lastGeocodeKeyRef.current = gk;
+        lastGeocodedPos.current = coords;
+        return;
+      }
+      geocodeAbortRef.current?.abort();
+      const controller = new AbortController();
+      geocodeAbortRef.current = controller;
       try {
-        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${coords.lat}&lon=${coords.lng}&format=json&zoom=10&addressdetails=1`, { headers: { 'Accept-Language': 'en' } });
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${coords.lat}&lon=${coords.lng}&format=json&zoom=10&addressdetails=1`, {
+          headers: { 'Accept-Language': 'en' },
+          signal: controller.signal,
+        });
         if (res.ok) {
           const d = await res.json();
           const a = d.address || {};
           const label = [a.city||a.town||a.village||a.county, a.state||a.region, a.country].filter(Boolean).join(', ') || 'Unknown';
           if (geocodeCache.current.size > 500) { const it = geocodeCache.current.keys(); for (let i=0;i<100;i++) { const k = it.next().value; if(k) geocodeCache.current.delete(k); }}
           geocodeCache.current.set(gk, label);
-          setLocationLabel(label);
+          lastGeocodeKeyRef.current = gk;
+          if (label !== lastLocationLabelRef.current) {
+            lastLocationLabelRef.current = label;
+            setLocationLabel(label);
+          }
           lastGeocodedPos.current = coords;
         }
-      } catch (e) { console.warn('[AEGIS] Suppressed error:', e instanceof Error ? e.message : e); }
+      } catch (e) {
+        if ((e as Error)?.name !== 'AbortError') {
+          console.warn('[AEGIS] Suppressed error:', e instanceof Error ? e.message : e);
+        }
+      }
     }, 3000); // 3s debounce (was 1.5s)
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (geocodeTimer.current) clearTimeout(geocodeTimer.current);
+      geocodeAbortRef.current?.abort();
+    };
   }, []);
 
   // Region dossier (right-click)
@@ -719,6 +753,16 @@ export default function Dashboard() {
       ? 'DEGRADED FEED STATE'
       : 'LINKING DATA MESH';
 
+  const commandRailFocus = backendStatus === 'connected'
+    ? activeIntelAlerts > 0
+      ? 'PRIORITY SIGNALS'
+      : maritimePressure > 0
+        ? 'SUPPLY-CHAIN WATCH'
+        : 'ROUTINE RECON'
+    : backendStatus === 'error'
+      ? 'DEGRADED COVERAGE'
+      : 'SYNCING SOURCES';
+
   return (
     <main className="fixed inset-0 w-full h-full bg-[var(--bg-void)] overflow-hidden">
       {/* ── SPLASH ── */}
@@ -936,7 +980,7 @@ export default function Dashboard() {
       {/* ── MAP VIEW CONTROLS (3D/2D + SATELLITE TOGGLE) ── */}
       <motion.div
         initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 3.5 }}
-        className="absolute bottom-[75px] md:bottom-6 left-3 md:left-[315px] z-[200] flex items-center gap-2 pointer-events-none"
+        className="absolute bottom-[75px] md:bottom-6 left-3 md:left-[19rem] xl:left-[20rem] z-[200] flex items-center gap-2 pointer-events-none"
       >
         {/* 3D/2D Toggle */}
         <button
@@ -1002,7 +1046,7 @@ export default function Dashboard() {
       </motion.div>
 
       {/* ── TOP-RIGHT STATUS (desktop) — C2 DISPLAY ── */}
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 3 }} className="status-bar-desktop absolute top-3 right-3 md:top-4 md:right-5 z-[200] pointer-events-none flex items-center gap-1.5 md:gap-3 text-[9px] md:text-[10px] font-mono tracking-[0.22em] text-[var(--text-muted)]">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 3 }} className="status-bar-desktop absolute top-3 right-3 md:top-4 md:right-5 z-[200] pointer-events-none flex items-center gap-1.5 xl:gap-2.5 2xl:gap-3 text-[8px] xl:text-[9px] 2xl:text-[10px] font-mono tracking-[0.16em] xl:tracking-[0.2em] text-[var(--text-muted)]">
 
         {/* Zulu Clock */}
         <span className="hidden lg:inline-flex items-center gap-1.5 rounded-full border border-[var(--border-primary)]/70 bg-[rgba(15,23,32,0.82)] px-2.5 py-1 shadow-[0_10px_30px_rgba(0,0,0,0.16)]">
@@ -1011,19 +1055,19 @@ export default function Dashboard() {
 
         <span className="hidden lg:inline text-[var(--border-primary)]">│</span>
 
-        <span className="flex items-center gap-1">SYS <span className={backendStatus === 'connected' ? 'text-[var(--alert-green)]' : 'text-[var(--alert-red)]'}>{backendStatus.toUpperCase()}</span></span>
+        <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-primary)]/70 bg-[rgba(15,23,32,0.82)] px-2 py-1 shadow-[0_10px_30px_rgba(0,0,0,0.16)]">SYS <span className={backendStatus === 'connected' ? 'text-[var(--alert-green)]' : 'text-[var(--alert-red)]'}>{backendStatus.toUpperCase()}</span></span>
 
-        {spaceWeather && <span className="hidden lg:inline">SOLAR: <span style={{ color: spaceWeather.storm_color, fontWeight: 700 }}>Kp{spaceWeather.kp_index}</span></span>}
+        {spaceWeather && <span className="hidden xl:inline">SOLAR: <span style={{ color: spaceWeather.storm_color, fontWeight: 700 }}>Kp{spaceWeather.kp_index}</span></span>}
 
         {/* Active Data Feeds */}
-        <span className="hidden lg:inline-flex items-center gap-1">
+        <span className="hidden xl:inline-flex items-center gap-1">
           <Wifi className="w-3 h-3 text-[var(--cyan-primary)]" />
           <span className="text-[var(--cyan-primary)] font-bold">{Object.values(activeLayers).filter(Boolean).length}</span>
           <span className="text-[var(--text-muted)]/60">FEEDS</span>
         </span>
 
         {usageMetrics && (
-          <span className="hidden lg:inline-flex items-center gap-2 rounded-full border border-[var(--border-primary)]/70 bg-[rgba(15,23,32,0.82)] px-2.5 py-1 shadow-[0_10px_30px_rgba(0,0,0,0.16)]">
+          <span className="hidden 2xl:inline-flex items-center gap-2 rounded-full border border-[var(--border-primary)]/70 bg-[rgba(15,23,32,0.82)] px-2.5 py-1 shadow-[0_10px_30px_rgba(0,0,0,0.16)]">
             <Activity className="h-3 w-3 text-[var(--alert-green)]" />
             <span className="text-[var(--text-secondary)]">LIVE</span>
             <span className="font-bold text-[var(--text-primary)]">{usageMetrics.onlineUsers}</span>
@@ -1034,10 +1078,10 @@ export default function Dashboard() {
           </span>
         )}
 
-        <UptimeClock />
+        <span className="hidden xl:inline-flex"><UptimeClock /></span>
         
-        <a href='https://ko-fi.com/M8D41ZYW4Z' target='_blank' className="pointer-events-auto hover:opacity-80 transition-opacity ml-1 flex items-center">
-          <span className="rounded-full border border-[var(--border-primary)]/80 bg-[rgba(15,23,32,0.9)] px-3 py-1 text-[11px] font-semibold tracking-[0.16em] text-[var(--text-primary)]">SUPPORT PROJECT</span>
+        <a href='https://ko-fi.com/M8D41ZYW4Z' target='_blank' className="pointer-events-auto hover:opacity-80 transition-opacity ml-1 hidden 2xl:flex items-center">
+          <span className="rounded-full border border-[var(--border-primary)]/80 bg-[rgba(15,23,32,0.9)] px-2.5 xl:px-3 py-1 text-[9px] xl:text-[10px] 2xl:text-[11px] font-semibold tracking-[0.14em] xl:tracking-[0.16em] text-[var(--text-primary)]">SUPPORT PROJECT</span>
         </a>
       </motion.div>
 
@@ -1045,7 +1089,7 @@ export default function Dashboard() {
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 3.15, duration: 0.5 }}
-        className="hidden xl:block absolute top-20 right-5 z-[200] w-[380px] pointer-events-none"
+        className="hidden 2xl:block absolute top-20 right-5 z-[200] w-[380px] pointer-events-none"
       >
         <div className="glass-panel pointer-events-auto overflow-hidden border border-[var(--border-primary)]/80 bg-[linear-gradient(135deg,rgba(13,22,31,0.96),rgba(19,31,44,0.9))] shadow-[0_18px_60px_rgba(0,0,0,0.2)]">
           <div className="flex items-center justify-between border-b border-[var(--border-primary)]/45 px-4 py-3">
@@ -1082,8 +1126,15 @@ export default function Dashboard() {
 
       {/* ── MOBILE: Compact top status ── */}
       {isMobile && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 2.5 }} className="absolute top-3 right-3 z-[200] pointer-events-auto flex items-center gap-2">
-          <a href='https://ko-fi.com/M8D41ZYW4Z' target='_blank' className="glass-panel px-2.5 py-1.5 flex items-center gap-1.5 text-[7px] font-mono tracking-[0.22em] hover:opacity-80 transition-opacity border-[var(--border-primary)]/80 bg-[rgba(15,23,32,0.92)]">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 2.5 }} className="absolute top-3 right-3 z-[200] pointer-events-auto flex flex-col items-end gap-1.5">
+          <div className="flex items-center gap-1.5 rounded-2xl border border-[var(--border-primary)]/70 bg-[rgba(15,23,32,0.92)] px-2.5 py-1.5 shadow-[0_10px_30px_rgba(0,0,0,0.18)] backdrop-blur-md">
+            <span className={`h-1.5 w-1.5 rounded-full ${backendStatus === 'connected' ? 'bg-[var(--alert-green)]' : backendStatus === 'error' ? 'bg-[var(--alert-red)]' : 'bg-[var(--gold-primary)]'} animate-aegis-pulse`} />
+            <span className="text-[7px] font-mono font-bold tracking-[0.18em] text-[var(--text-primary)]">{backendStatus === 'connected' ? 'LIVE' : backendStatus === 'error' ? 'DEGRADED' : 'SYNCING'}</span>
+            <span className="text-[var(--border-primary)]/70">•</span>
+            <span className="text-[7px] font-mono tracking-[0.18em] text-[var(--text-muted)]">ALERTS</span>
+            <span className="text-[9px] font-bold tabular-nums" style={{ color: activeIntelAlerts > 0 ? '#FF9500' : 'var(--alert-green)' }}>{activeIntelAlerts}</span>
+          </div>
+          <a href='https://ko-fi.com/M8D41ZYW4Z' target='_blank' className="glass-panel px-2.5 py-1.5 flex items-center gap-1.5 text-[7px] font-mono tracking-[0.18em] hover:opacity-80 transition-opacity border-[var(--border-primary)]/80 bg-[rgba(15,23,32,0.92)]">
             <div className="w-1.5 h-1.5 rounded-full bg-[var(--gold-primary)] animate-aegis-pulse" />
             <span className="text-[var(--text-primary)] font-bold">SUPPORT PROJECT</span>
           </a>
@@ -1093,7 +1144,7 @@ export default function Dashboard() {
 
 
       {/* ── LEFT HUD (desktop): Layers + Stats + Markets + Intel ── */}
-      <div className="desktop-panel absolute left-5 top-20 bottom-24 w-72 flex flex-col gap-3 z-[200] pointer-events-none overflow-y-auto styled-scrollbar pr-1">
+      <div className="desktop-panel absolute left-4 xl:left-5 top-20 bottom-24 xl:bottom-24 w-[17rem] xl:w-72 2xl:w-[19rem] flex flex-col gap-3 z-[200] min-h-0 pointer-events-none overflow-y-auto styled-scrollbar pr-1">
         {showLayers && (
           <>
             <LayerPanel data={dataWithSdk} activeLayers={activeLayers} setActiveLayers={setActiveLayers} />
@@ -1125,10 +1176,52 @@ export default function Dashboard() {
       </div>
 
       {/* ── RIGHT HUD (desktop): Search + RECON + Live Alerts ── */}
-      <div className="desktop-panel absolute right-5 top-20 bottom-24 w-80 flex flex-col gap-3 z-[200] pointer-events-auto overflow-y-auto styled-scrollbar pr-1">
-        <div className="flex gap-2 items-start">
-          <div className="flex-1"><SearchBar onLocate={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })} /></div>
-          <div className="relative"><SharePanel mapView={mapView} activeLayers={activeLayers} mouseCoords={null} /></div>
+      <div className="desktop-panel absolute right-4 xl:right-5 top-20 bottom-24 xl:bottom-24 w-[19rem] xl:w-80 2xl:w-[22rem] flex flex-col gap-3 z-[200] min-h-0 pointer-events-auto overflow-y-auto styled-scrollbar pr-1">
+        <div className="glass-panel overflow-hidden border border-[var(--border-primary)]/80 bg-[linear-gradient(180deg,rgba(14,24,34,0.96),rgba(18,29,42,0.9))] shadow-[0_16px_42px_rgba(0,0,0,0.18)]">
+          <div className="flex items-center justify-between border-b border-[var(--border-primary)]/45 px-3.5 py-2.5">
+            <div>
+              <div className="text-[8px] font-mono tracking-[0.26em] text-[var(--text-secondary)]">COMMAND POSTURE</div>
+              <div className="mt-1 text-[10px] font-semibold tracking-[0.16em] text-[var(--text-primary)]">{operationalModeLabel}</div>
+            </div>
+            <div className="flex items-center gap-2 rounded-full border border-[var(--border-primary)]/45 bg-white/[0.035] px-2 py-1 text-[8px] font-mono text-[var(--text-secondary)]">
+              <div className={`h-1.5 w-1.5 rounded-full ${backendStatus === 'connected' ? 'bg-[var(--alert-green)]' : backendStatus === 'error' ? 'bg-[var(--alert-red)]' : 'bg-[var(--gold-primary)]'} animate-aegis-pulse`} />
+              <span>{backendStatus === 'connected' ? 'LIVE' : backendStatus === 'error' ? 'DEGRADED' : 'SYNCING'}</span>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-2 p-3">
+            <div className="rounded-2xl border border-white/8 bg-white/[0.035] px-3 py-2.5 text-center">
+              <div className="text-[7px] font-mono tracking-[0.18em] text-[var(--text-muted)]">ALERTS</div>
+              <div className="mt-1 text-[13px] font-bold tabular-nums" style={{ color: activeIntelAlerts > 0 ? '#F59E0B' : 'var(--alert-green)' }}>{activeIntelAlerts}</div>
+            </div>
+            <div className="rounded-2xl border border-white/8 bg-white/[0.035] px-3 py-2.5 text-center">
+              <div className="text-[7px] font-mono tracking-[0.18em] text-[var(--text-muted)]">TRACKED</div>
+              <div className="mt-1 text-[13px] font-bold tabular-nums text-[var(--gold-primary)]">{trackedEntityCount.toLocaleString()}</div>
+            </div>
+            <div className="rounded-2xl border border-white/8 bg-white/[0.035] px-3 py-2.5 text-center">
+              <div className="text-[7px] font-mono tracking-[0.18em] text-[var(--text-muted)]">LIVE NOW</div>
+              <div className="mt-1 text-[13px] font-bold tabular-nums" style={{ color: usageMetrics && usageMetrics.onlineUsers > 0 ? 'var(--alert-green)' : 'var(--text-secondary)' }}>{usageMetrics ? usageMetrics.onlineUsers : 0}</div>
+            </div>
+          </div>
+        </div>
+        <div className="glass-panel overflow-hidden border border-[var(--border-primary)]/80 bg-[linear-gradient(180deg,rgba(14,24,34,0.94),rgba(16,27,39,0.88))] shadow-[0_16px_40px_rgba(0,0,0,0.16)]">
+          <div className="flex items-center justify-between border-b border-[var(--border-primary)]/45 px-3.5 py-2.5">
+            <div>
+              <div className="text-[8px] font-mono tracking-[0.26em] text-[var(--text-secondary)]">COMMAND RAIL</div>
+              <div className="mt-1 text-[10px] font-semibold tracking-[0.16em] text-[var(--text-primary)]">{commandRailFocus}</div>
+            </div>
+            <div className="rounded-full border border-white/8 bg-white/[0.035] px-2 py-1 text-[7px] font-mono tracking-[0.16em] text-[var(--cyan-primary)]">
+              SEARCH • SHARE • RECON
+            </div>
+          </div>
+          <div className="space-y-2.5 p-3">
+            <div className="flex gap-2 items-start">
+              <div className="flex-1"><SearchBar onLocate={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })} /></div>
+              <div className="relative"><SharePanel mapView={mapView} activeLayers={activeLayers} mouseCoords={null} /></div>
+            </div>
+            <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2 text-[7px] font-mono tracking-[0.16em] text-[var(--text-muted)]">
+              Search, share, or pivot directly into recon overlays from one rail.
+            </div>
+          </div>
         </div>
         <OsintPanel onSweepVisualize={setSweepData} onScanGeolocate={(target: string, payload: OsintGeolocatePayload) => {
           setScanTargets(prev => {
@@ -1264,11 +1357,21 @@ export default function Dashboard() {
               >
                 <div className="mobile-drawer-handle" />
                 <div className="px-3 pb-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="hud-text text-[9px] text-[var(--text-primary)]">
-                      {mobilePanel === 'layers' ? 'LAYERS & STATS' : mobilePanel === 'markets' ? 'MACRO ATLAS' : mobilePanel === 'intel' ? 'SIGNAL LEDGER' : mobilePanel === 'recon' ? 'AEGIS RECON' : 'SEARCH'}
-                    </span>
-                    <button onClick={() => setMobilePanel(null)} className="text-[var(--text-muted)] p-1"><X className="w-4 h-4" /></button>
+                  <div className="sticky top-0 z-10 -mx-3 mb-2 border-b border-[var(--border-primary)]/35 bg-[linear-gradient(180deg,rgba(10,18,25,0.96),rgba(10,18,25,0.82))] px-3 pb-2 pt-1 backdrop-blur-md">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-[7px] font-mono tracking-[0.22em] text-[var(--text-secondary)]">MOBILE COMMAND PANEL</div>
+                        <span className="hud-text mt-1 block text-[9px] text-[var(--text-primary)]">
+                          {mobilePanel === 'layers' ? 'LAYERS & STATS' : mobilePanel === 'markets' ? 'MACRO ATLAS' : mobilePanel === 'intel' ? 'SIGNAL LEDGER' : mobilePanel === 'recon' ? 'AEGIS RECON' : 'SEARCH'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="rounded-full border border-[var(--border-primary)]/40 bg-white/[0.04] px-2 py-1 text-[7px] font-mono tracking-[0.18em] text-[var(--text-secondary)]">
+                          {backendStatus === 'connected' ? 'LIVE' : backendStatus === 'error' ? 'DEGRADED' : 'SYNCING'}
+                        </div>
+                        <button onClick={() => setMobilePanel(null)} className="text-[var(--text-muted)] p-1"><X className="w-4 h-4" /></button>
+                      </div>
+                    </div>
                   </div>
                   <div className="mb-2 grid grid-cols-3 gap-2">
                     <div className="rounded-lg border border-[var(--border-secondary)]/35 bg-black/20 px-2 py-2">
@@ -1281,7 +1384,7 @@ export default function Dashboard() {
                     </div>
                     <div className="rounded-lg border border-[var(--border-secondary)]/35 bg-black/20 px-2 py-2 text-center">
                       <div className="text-[6px] font-mono tracking-[0.22em] text-[var(--text-muted)]">TRACKED</div>
-                      <div className="mt-1 text-[11px] font-bold tabular-nums text-[var(--gold-primary)]">{trackedEntityCount}</div>
+                      <div className="mt-1 text-[11px] font-bold tabular-nums text-[var(--gold-primary)]">{trackedEntityCount.toLocaleString()}</div>
                     </div>
                   </div>
                   {mobilePanel === 'layers' && (
@@ -1306,7 +1409,9 @@ export default function Dashboard() {
                   {mobilePanel === 'search' && (
                     <div className="space-y-2">
                       <SearchBar onLocate={(lat, lng) => { setFlyToLocation({ lat, lng, ts: Date.now() }); setMobilePanel(null); }} />
-                      <SharePanel mapView={mapView} activeLayers={activeLayers} mouseCoords={null} />
+                      <div className="flex justify-end">
+                        <SharePanel mapView={mapView} activeLayers={activeLayers} mouseCoords={null} />
+                      </div>
                     </div>
                   )}
                   {mobilePanel === 'recon' && (
@@ -1391,7 +1496,7 @@ export default function Dashboard() {
       )}
 
       {/* ── Scale Bar (desktop) ── */}
-      <div className="desktop-only absolute bottom-[4.5rem] left-[20rem] z-[201] pointer-events-none">
+      <div className="desktop-only absolute bottom-[4.5rem] left-[18.5rem] xl:left-[20rem] z-[201] pointer-events-none">
         <ScaleBar zoom={mapView.zoom} latitude={mapView.latitude} />
       </div>
 

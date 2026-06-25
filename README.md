@@ -142,12 +142,12 @@ This revision includes:
 - image warning cleanup via `next/image`
 - verified clean lint/build after the stabilization pass
 
-## Attribution and license
+## License
 
-AEGIS is a derivative work based on an inherited open-source codebase by simplifaisoul.
+This project builds on an inherited open-source base and is distributed under the MIT license.
 
 - License: MIT
-- Original attribution preserved in `LICENSE`
+- Required attribution is preserved in `LICENSE`
 - This repo adds rebranding, integration work, UI hardening, and AI/operator workflow improvements
 
 ## Next high-value steps

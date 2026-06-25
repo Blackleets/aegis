@@ -110,8 +110,6 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "🛰️ AEGIS — Open Source Palantir Alternative | Live Tracking + OSINT Tools",
     description: "Track 10K+ flights, satellites & CCTV worldwide. Run Nmap, DNS, WHOIS scans from your browser. 20+ live intel feeds. Free & open source.",
-    creator: "@simplifaisoul",
-    site: "@simplifaisoul",
     images: [`${SITE_URL}/og-image.png`],
   },
   category: "technology",

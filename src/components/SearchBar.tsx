@@ -80,7 +80,7 @@ export default function SearchBar({ onLocate }: SearchBarProps) {
         className="flex items-center gap-1.5 glass-panel-sm px-3 py-2 text-[9px] font-mono tracking-[0.15em] text-[var(--text-muted)] hover:text-[var(--gold-primary)] hover:border-[var(--border-active)] transition-all hover:shadow-[0_0_12px_rgba(212,175,55,0.08)]"
       >
         <Search className="w-3 h-3" />
-        CMD: LOCATE
+        LOCATE TARGET
       </button>
     );
   }

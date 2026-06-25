@@ -173,7 +173,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       createWarningIcon('warn-orange', '#FF9500');
       createWarningIcon('warn-yellow', '#FFD500');
 
-      map.addLayer({ id: 'conflict-icons', type: 'symbol', source: 'conflict-zones', layout: {
+      map.addLayer({ id: 'conflict-icons', type: 'symbol', source: 'conflict-zones', minzoom: 2, layout: {
         'icon-image': ['match', ['get','severity'], 'war','warn-icon', 'high','warn-orange', 'warn-yellow'],
         'icon-size': ['interpolate',['linear'],['zoom'], 1,0.6, 4,0.8, 8,1],
         'icon-allow-overlap': true,
@@ -197,7 +197,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
         'circle-color': ['interpolate',['linear'],['get','magnitude'], 2.5,'#FFD700', 4,'#FF9500', 6,'#FF1744'],
         'circle-opacity': 0.6, 'circle-blur': 0.3, 'circle-stroke-width': 1, 'circle-stroke-color': '#FFD700', 'circle-stroke-opacity': 0.3,
       }});
-      map.addLayer({ id: 'eq-label', type: 'symbol', source: 'earthquakes', filter: ['>=',['get','magnitude'],4.5], layout: {
+      map.addLayer({ id: 'eq-label', type: 'symbol', source: 'earthquakes', minzoom: 3, filter: ['>=',['get','magnitude'],4.5], layout: {
         'text-field': ['concat','M',['to-string',['get','magnitude']]], 'text-size': 9, 'text-font': ['Open Sans Regular'], 'text-offset': [0,1.5],
       }, paint: { 'text-color': '#FFD700', 'text-halo-color': '#000', 'text-halo-width': 1 }});
 
@@ -231,7 +231,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
 
       // GPS Jamming
       map.addLayer({ id: 'jam-fill', type: 'circle', source: 'gps-jamming', paint: { 'circle-radius': 30, 'circle-color': '#FF0000', 'circle-opacity': 0.15, 'circle-blur': 1 }});
-      map.addLayer({ id: 'jam-label', type: 'symbol', source: 'gps-jamming', layout: {
+      map.addLayer({ id: 'jam-label', type: 'symbol', source: 'gps-jamming', minzoom: 4, layout: {
         'text-field': ['concat','GPS JAM ',['to-string',['get','severity']],'%'], 'text-size': 10, 'text-font': ['Open Sans Bold'], 'text-allow-overlap': true,
       }, paint: { 'text-color': '#FF4444', 'text-halo-color': '#000', 'text-halo-width': 1 }});
 
@@ -246,7 +246,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
         'circle-opacity': 0.8,
         'circle-stroke-width': 2, 'circle-stroke-color': '#E040FB', 'circle-stroke-opacity': 0.4,
       }});
-      map.addLayer({ id: 'weather-label', type: 'symbol', source: 'weather', layout: {
+      map.addLayer({ id: 'weather-label', type: 'symbol', source: 'weather', minzoom: 4, layout: {
         'text-field': ['get','title'], 'text-size': 9, 'text-font': ['Open Sans Regular'],
         'text-offset': [0, 2], 'text-max-width': 14, 'text-allow-overlap': false,
       }, paint: { 'text-color': '#E040FB', 'text-halo-color': '#000', 'text-halo-width': 1, 'text-opacity': 0.8 }});
@@ -380,7 +380,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
         'circle-color': '#FF3D3D', 'circle-opacity': 0.95,
         'circle-stroke-width': 2, 'circle-stroke-color': '#FFFFFF', 'circle-stroke-opacity': 0.8,
       }});
-      map.addLayer({ id: 'scan-targets-label', type: 'symbol', source: 'scan-targets', layout: {
+      map.addLayer({ id: 'scan-targets-label', type: 'symbol', source: 'scan-targets', minzoom: 6, layout: {
         'text-field': ['get', 'id'], 'text-size': 11, 'text-font': ['Open Sans Bold'],
         'text-offset': [0, 2], 'text-max-width': 14, 'text-allow-overlap': false,
       }, paint: { 'text-color': '#FF3D3D', 'text-halo-color': '#000', 'text-halo-width': 1.5, 'text-opacity': 0.9 }});
@@ -433,21 +433,21 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       // -- GLOW LAYERS --
       map.addLayer({ id: 'sdk-sea-glow', type: 'line', source: 'sdk-links', filter: ['==',['get','domain'],'SEA'], paint: {
         'line-color': '#4FC3F7',
-        'line-width': ['interpolate',['linear'],['zoom'], 1, 3, 5, 6, 10, 10],
-        'line-opacity': ['interpolate',['linear'],['zoom'], 1, 0.15, 5, 0.25, 10, 0.35],
-        'line-blur': 4,
+        'line-width': ['interpolate',['linear'],['zoom'], 1, 2, 5, 4, 10, 7],
+        'line-opacity': ['interpolate',['linear'],['zoom'], 1, 0.08, 5, 0.16, 10, 0.24],
+        'line-blur': 2,
       }});
       map.addLayer({ id: 'sdk-air-glow', type: 'line', source: 'sdk-links', filter: ['==',['get','domain'],'AIR'], paint: {
         'line-color': '#B3E5FC',
-        'line-width': ['interpolate',['linear'],['zoom'], 1, 2, 5, 4, 10, 8],
-        'line-opacity': ['interpolate',['linear'],['zoom'], 1, 0.1, 5, 0.15, 10, 0.2],
-        'line-blur': 3,
+        'line-width': ['interpolate',['linear'],['zoom'], 1, 1.5, 5, 3, 10, 5],
+        'line-opacity': ['interpolate',['linear'],['zoom'], 1, 0.06, 5, 0.1, 10, 0.14],
+        'line-blur': 1.5,
       }});
       map.addLayer({ id: 'sdk-intel-glow', type: 'line', source: 'sdk-links', filter: ['==',['get','domain'],'INTEL'], paint: {
         'line-color': '#81D4FA',
-        'line-width': ['interpolate',['linear'],['zoom'], 1, 2, 5, 4, 10, 6],
-        'line-opacity': ['interpolate',['linear'],['zoom'], 1, 0.08, 5, 0.12, 10, 0.18],
-        'line-blur': 2,
+        'line-width': ['interpolate',['linear'],['zoom'], 1, 1.25, 5, 2.5, 10, 4],
+        'line-opacity': ['interpolate',['linear'],['zoom'], 1, 0.05, 5, 0.08, 10, 0.12],
+        'line-blur': 1,
       }});
 
       // -- CORE LINES --
@@ -487,13 +487,16 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
     });
 
     // Events
-    let lastMove = 0;
+    let mouseFrame = 0;
+    let pendingMouseCoords: { lat: number; lng: number } | null = null;
     map.on('mousemove', e => {
-      const now = Date.now();
-      if (now - lastMove > 100) {
-        lastMove = now;
-        onMouseCoords?.({ lat: e.lngLat.lat, lng: e.lngLat.lng });
-      }
+      if (map.isMoving()) return;
+      pendingMouseCoords = { lat: e.lngLat.lat, lng: e.lngLat.lng };
+      if (mouseFrame) return;
+      mouseFrame = window.requestAnimationFrame(() => {
+        mouseFrame = 0;
+        if (pendingMouseCoords) onMouseCoords?.(pendingMouseCoords);
+      });
     });
     map.on('contextmenu', e => { e.preventDefault(); onRightClick?.({ lat: e.lngLat.lat, lng: e.lngLat.lng }); });
     map.on('moveend', () => { const c = map.getCenter(); onViewStateChange?.({ zoom: map.getZoom(), latitude: c.lat }); });
@@ -590,7 +593,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
           <div><span style="color:#5C5A54;">ALT</span><br/><span style="color:#00E5FF;">${p.alt ? p.alt+' km' : '—'}</span></div>
           <div><span style="color:#5C5A54;">POS</span><br/><span style="color:#E8E6E0;">${coords[1].toFixed(2)}°, ${coords[0].toFixed(2)}°</span></div>
         </div>
-        ${p.noradId ? `<a href="https://db.satnogs.org/satellite/${p.noradId}/" target="_blank" style="display:block;text-align:center;padding:4px;margin-top:6px;font-size:8px;font-family:monospace;letter-spacing:0.1em;text-decoration:none;color:#00E5FF;border:1px solid rgba(0,229,255,0.4);background:rgba(0,229,255,0.1);border-radius:2px;cursor:pointer;">🔭 SOURCE: SATNOGS</a>` : ''}
+        ${p.noradId ? `<a href="https://db.satnogs.org/satellite/${p.noradId}/" target="_blank" style="display:block;text-align:center;padding:4px;margin-top:6px;font-size:8px;font-family:monospace;letter-spacing:0.1em;text-decoration:none;color:#00E5FF;border:1px solid rgba(0,229,255,0.4);background:rgba(0,229,255,0.1);border-radius:2px;cursor:pointer;">OPEN SOURCE ↗</a>` : ''}
       </div>`);
     });
 
@@ -891,7 +894,11 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       });
     });
 
-    return () => { map.remove(); mapRef.current = null; };
+    return () => {
+      if (mouseFrame) window.cancelAnimationFrame(mouseFrame);
+      map.remove();
+      mapRef.current = null;
+    };
   }, [createDot, createIcon, onEntityClick, onMouseCoords, onRightClick, onViewStateChange]);
 
   // Day/Night
@@ -1330,7 +1337,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
 
     setVis(['balloon-dots','balloon-label'], activeLayers.balloons);
     setVis(['rad-glow','rad-dots','rad-label'], activeLayers.radiation);
-    setVis(['sdk-sea','sdk-air','sdk-intel'], activeLayers.sdk_stream !== false);
+    setVis(['sdk-sea-glow','sdk-air-glow','sdk-intel-glow','sdk-sea','sdk-air','sdk-intel'], activeLayers.sdk_stream !== false);
     // Sweep layers always visible when data is present (controlled by useEffect)
     setVis(['sweep-connections','sweep-pulse-ring','sweep-device-glow','sweep-device-dots','sweep-device-labels'], true);
   }, [mapReady, activeLayers, setVis]);
