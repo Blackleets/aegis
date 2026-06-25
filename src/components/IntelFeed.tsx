@@ -44,10 +44,32 @@ function timeAgo(dateStr: string): string {
   }
 }
 
+function IntelSkeleton() {
+  return (
+    <div className="px-4 pb-3 space-y-2 animate-pulse">
+      <div className="grid grid-cols-2 gap-2 mb-3">
+        {[...Array(2)].map((_, i) => (
+          <div key={i} className="rounded-2xl border border-white/6 bg-white/[0.03] px-3 py-2.5">
+            <div className="h-1.5 w-16 rounded bg-white/10 mb-2" />
+            <div className="h-4 w-6 rounded bg-white/10" />
+          </div>
+        ))}
+      </div>
+      {[...Array(3)].map((_, i) => (
+        <div key={i} className="rounded-2xl border border-white/6 bg-white/[0.025] px-3 py-3">
+          <div className="h-2 w-3/4 rounded bg-white/10 mb-2" />
+          <div className="h-1.5 w-1/2 rounded bg-white/8" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function IntelFeed({ data, onLocate }: IntelFeedProps) {
   const [expanded, setExpanded] = useState(true);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const news = useMemo(() => data.news || [], [data.news]);
+  const isLoading = data.news === undefined;
 
   const summary = useMemo(() => {
     const priority = news.filter((item) => item.risk_score >= 8).length;
@@ -87,6 +109,8 @@ export default function IntelFeed({ data, onLocate }: IntelFeedProps) {
       <AnimatePresence>
         {expanded && (
           <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="overflow-hidden">
+            {isLoading ? <IntelSkeleton /> : (
+            <>
             <div className="grid grid-cols-2 gap-2 px-4 pb-3">
               <div className="rounded-2xl border border-white/6 bg-white/[0.03] px-3 py-2.5">
                 <div className="text-[8px] font-mono uppercase tracking-[0.22em] text-[var(--text-muted)]">Priority briefs</div>
@@ -195,6 +219,8 @@ export default function IntelFeed({ data, onLocate }: IntelFeedProps) {
                 </div>
               )}
             </div>
+            </>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
