@@ -165,6 +165,26 @@ def resolve_npm() -> str:
     return npm
 
 
+def resolve_node() -> str:
+    node = shutil.which('node') or shutil.which('node.exe')
+    if not node:
+        raise RuntimeError('node no está disponible en PATH')
+    return node
+
+
+def resolve_start_command() -> tuple[list[str], str]:
+    standalone_server = REPO / '.next' / 'standalone' / 'server.js'
+    next_config = REPO / 'next.config.ts'
+    if standalone_server.exists() and next_config.exists():
+        try:
+            config_text = next_config.read_text(encoding='utf-8', errors='replace')
+            if "output: 'standalone'" in config_text or 'output: "standalone"' in config_text:
+                return [resolve_node(), str(standalone_server)], 'standalone'
+        except OSError:
+            pass
+    return [resolve_npm(), 'run', 'start'], 'next-start'
+
+
 def build_running_snapshot(port: int) -> dict:
     managed_pid = read_pid()
     managed_alive = bool(managed_pid and process_alive(managed_pid))
@@ -269,9 +289,10 @@ def cmd_start(args: argparse.Namespace) -> int:
             write_pid(snapshot['listening_pids'][0])
         return 0
 
-    npm = resolve_npm()
+    start_cmd, start_mode = resolve_start_command()
     with LOG_FILE.open('a', encoding='utf-8') as log:
         log.write(f'\n===== START {time.strftime("%Y-%m-%d %H:%M:%S")} =====\n')
+        log.write(f"mode={start_mode} cmd={' '.join(start_cmd)}\n")
         log.flush()
         kwargs = {
             'cwd': str(REPO),
@@ -279,15 +300,16 @@ def cmd_start(args: argparse.Namespace) -> int:
             'stderr': log,
             'stdin': subprocess.DEVNULL,
             'close_fds': True,
+            'env': {**os.environ, 'PORT': str(port), 'HOSTNAME': '0.0.0.0'},
         }
         if os.name == 'nt':
             creationflags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS | subprocess.CREATE_NO_WINDOW
-            proc = subprocess.Popen([npm, 'run', 'start'], creationflags=creationflags, **kwargs)
+            proc = subprocess.Popen(start_cmd, creationflags=creationflags, **kwargs)
         else:
-            proc = subprocess.Popen([npm, 'run', 'start'], start_new_session=True, **kwargs)
+            proc = subprocess.Popen(start_cmd, start_new_session=True, **kwargs)
 
     write_pid(proc.pid)
-    print(f'AEGIS start lanzado con PID {proc.pid}; esperando healthcheck...')
+    print(f"AEGIS start lanzado en modo {start_mode} con PID {proc.pid}; esperando healthcheck...")
     ok = wait_for_health(port, args.timeout)
     snapshot = build_running_snapshot(port)
     print_snapshot(snapshot)
