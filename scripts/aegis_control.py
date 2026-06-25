@@ -101,6 +101,13 @@ def clear_pid() -> None:
 
 
 def process_alive(pid: int) -> bool:
+    if os.name == 'nt':
+        try:
+            proc = subprocess.run(['tasklist', '/FI', f'PID eq {pid}'], capture_output=True, timeout=10)
+            output = proc.stdout.decode(errors='replace')
+            return str(pid) in output and 'No tasks are running' not in output
+        except Exception:
+            return False
     try:
         os.kill(pid, 0)
         return True
@@ -162,6 +169,16 @@ def build_running_snapshot(port: int) -> dict:
     managed_pid = read_pid()
     managed_alive = bool(managed_pid and process_alive(managed_pid))
     listeners = netstat_listening_pids(port)
+
+    if listeners and (not managed_pid or not managed_alive):
+        managed_pid = listeners[0]
+        managed_alive = process_alive(managed_pid)
+        write_pid(managed_pid)
+    elif managed_pid and not managed_alive and not listeners:
+        clear_pid()
+        managed_pid = None
+        managed_alive = False
+
     health = healthcheck(port)
     branch_rc, branch_out, _ = run(['git', 'rev-parse', '--abbrev-ref', 'HEAD'])
     commit_rc, commit_out, _ = run(['git', 'rev-parse', '--short', 'HEAD'])
