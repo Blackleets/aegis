@@ -17,6 +17,7 @@ import KeyboardShortcuts from '@/components/KeyboardShortcuts';
 import GlobalStatusBar from '@/components/GlobalStatusBar';
 import LiveAlerts from '@/components/LiveAlerts';
 import AiAnalyst from '@/components/AiAnalyst';
+import SolarSystemMode, { type CelestialBodyId } from '@/components/SolarSystemMode';
 
 const AegisMap = dynamic(() => import('@/components/AegisMap'), { ssr: false });
 const LayerPanel = dynamic(() => import('@/components/LayerPanel'));
@@ -251,8 +252,12 @@ export default function Dashboard() {
   const [showMarkets, setShowMarkets] = useState(true);
   const [showScmPanel, setShowScmPanel] = useState(true);
   const [showIntel, setShowIntel] = useState(true);
+  const [leftRailFocus, setLeftRailFocus] = useState<'markets' | 'flow' | 'intel'>('markets');
+  const [rightRailFocus, setRightRailFocus] = useState<'alerts' | 'recon'>('alerts');
   const [mobilePanel, setMobilePanel] = useState<'layers'|'markets'|'intel'|'search'|'recon'|null>(null);
   const [mapProjection, setMapProjection] = useState<'globe'|'mercator'>('globe');
+  const [selectedCelestialBody, setSelectedCelestialBody] = useState<CelestialBodyId>('earth');
+
   const [mapStyle, setMapStyle] = useState<'dark'|'satellite'>('dark');
   const [sweepData, setSweepData] = useState<unknown>(null);
   const [scanTargets, setScanTargets] = useState<ScanTarget[]>([]);
@@ -978,6 +983,7 @@ export default function Dashboard() {
         />
       </ErrorBoundary>
 
+      <SolarSystemMode selected={selectedCelestialBody} onSelect={setSelectedCelestialBody} />
 
       {/* ── MAP VIEW CONTROLS (3D/2D + SATELLITE TOGGLE) ── */}
       <motion.div
@@ -1145,8 +1151,8 @@ export default function Dashboard() {
 
 
 
-      {/* ── LEFT HUD (desktop): Layers + Stats + Markets + Intel ── */}
-      <div className="desktop-panel absolute left-4 xl:left-5 top-20 bottom-24 xl:bottom-24 w-[17rem] xl:w-72 2xl:w-[19rem] flex flex-col gap-3 z-[200] min-h-0 pointer-events-none overflow-y-auto styled-scrollbar pr-1">
+      {/* ── LEFT HUD (desktop): Layers + Stats + focused desk ── */}
+      <div className="desktop-panel absolute left-4 xl:left-5 top-20 bottom-24 xl:bottom-24 w-[15.75rem] xl:w-[16.5rem] 2xl:w-[17.25rem] flex flex-col gap-2.5 z-[200] min-h-0 pointer-events-none overflow-y-auto styled-scrollbar pr-1">
         {showLayers && (
           <>
             <LayerPanel data={dataWithSdk} activeLayers={activeLayers} setActiveLayers={setActiveLayers} />
@@ -1172,13 +1178,27 @@ export default function Dashboard() {
             <ViewPresets onNavigate={(lat, lng, zoom) => { setFlyToLocation({ lat, lng, ts: Date.now() }); setMapView(v => ({ ...v, zoom })); }} />
           </>
         )}
-        {showScmPanel && <ScmPanel data={dataWithSdk} />}
-        {showMarkets && <MarketsPanel data={dataWithSdk} spaceWeather={spaceWeather} />}
-        {showIntel && <IntelFeed data={dataWithSdk} onLocate={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })} />}
+
+        <div className="glass-panel pointer-events-auto overflow-hidden border border-[var(--border-primary)]/70 bg-[linear-gradient(180deg,rgba(12,21,30,0.94),rgba(15,25,36,0.9))]">
+          <div className="flex items-center justify-between border-b border-[var(--border-primary)]/40 px-3 py-2">
+            <div>
+              <div className="text-[8px] font-mono tracking-[0.22em] text-[var(--text-secondary)]">FOCUSED DESK</div>
+              <div className="mt-1 text-[10px] font-semibold tracking-[0.14em] text-[var(--text-primary)]">One active block for clean operator focus</div>
+            </div>
+          </div>
+          <div className="flex gap-1.5 p-2">
+            <button onClick={() => setLeftRailFocus('markets')} className={`flex-1 rounded-xl border px-2 py-1.5 text-[7px] font-mono tracking-[0.16em] transition-colors ${leftRailFocus === 'markets' ? 'border-[rgba(34,211,238,0.45)] bg-[rgba(34,211,238,0.12)] text-[var(--cyan-primary)]' : 'border-white/8 bg-white/[0.03] text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>MARKETS</button>
+            <button onClick={() => setLeftRailFocus('flow')} className={`flex-1 rounded-xl border px-2 py-1.5 text-[7px] font-mono tracking-[0.16em] transition-colors ${leftRailFocus === 'flow' ? 'border-[rgba(212,175,55,0.45)] bg-[rgba(212,175,55,0.12)] text-[var(--gold-primary)]' : 'border-white/8 bg-white/[0.03] text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>FLOW</button>
+            <button onClick={() => setLeftRailFocus('intel')} className={`flex-1 rounded-xl border px-2 py-1.5 text-[7px] font-mono tracking-[0.16em] transition-colors ${leftRailFocus === 'intel' ? 'border-[rgba(16,185,129,0.45)] bg-[rgba(16,185,129,0.12)] text-[var(--alert-green)]' : 'border-white/8 bg-white/[0.03] text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>INTEL</button>
+          </div>
+        </div>
+        {leftRailFocus === 'flow' && showScmPanel && <ScmPanel data={dataWithSdk} />}
+        {leftRailFocus === 'markets' && showMarkets && <MarketsPanel data={dataWithSdk} spaceWeather={spaceWeather} />}
+        {leftRailFocus === 'intel' && showIntel && <IntelFeed data={dataWithSdk} onLocate={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })} />}
       </div>
 
-      {/* ── RIGHT HUD (desktop): Search + RECON + Live Alerts ── */}
-      <div className="desktop-panel absolute right-4 xl:right-5 top-20 bottom-24 xl:bottom-24 w-[19rem] xl:w-80 2xl:w-[22rem] flex flex-col gap-3 z-[200] min-h-0 pointer-events-auto overflow-y-auto styled-scrollbar pr-1">
+      {/* ── RIGHT HUD (desktop): Search + focused desk ── */}
+      <div className="desktop-panel absolute right-4 xl:right-5 top-20 bottom-24 xl:bottom-24 w-[16rem] xl:w-[17rem] 2xl:w-[18rem] flex flex-col gap-2.5 z-[200] min-h-0 pointer-events-auto overflow-y-auto styled-scrollbar pr-1">
         <div className="glass-panel overflow-hidden border border-[var(--border-primary)]/80 bg-[linear-gradient(180deg,rgba(14,24,34,0.96),rgba(18,29,42,0.9))] shadow-[0_16px_42px_rgba(0,0,0,0.18)]">
           <div className="flex items-center justify-between border-b border-[var(--border-primary)]/45 px-3.5 py-2.5">
             <div>
@@ -1205,6 +1225,7 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+
         <div className="glass-panel overflow-hidden border border-[var(--border-primary)]/80 bg-[linear-gradient(180deg,rgba(14,24,34,0.94),rgba(16,27,39,0.88))] shadow-[0_16px_40px_rgba(0,0,0,0.16)]">
           <div className="flex items-center justify-between border-b border-[var(--border-primary)]/45 px-3.5 py-2.5">
             <div>
@@ -1225,14 +1246,27 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
-        <OsintPanel onSweepVisualize={setSweepData} onScanGeolocate={(target: string, payload: OsintGeolocatePayload) => {
+
+        <div className="glass-panel overflow-hidden border border-[var(--border-primary)]/70 bg-[linear-gradient(180deg,rgba(12,21,30,0.94),rgba(15,25,36,0.9))] shadow-[0_16px_40px_rgba(0,0,0,0.16)]">
+          <div className="flex items-center justify-between border-b border-[var(--border-primary)]/40 px-3 py-2">
+            <div>
+              <div className="text-[8px] font-mono tracking-[0.22em] text-[var(--text-secondary)]">DESK STACK</div>
+              <div className="mt-1 text-[10px] font-semibold tracking-[0.14em] text-[var(--text-primary)]">Reduce clutter • keep one active mission rail</div>
+            </div>
+          </div>
+          <div className="flex gap-1.5 p-2">
+            <button onClick={() => setRightRailFocus('alerts')} className={`flex-1 rounded-xl border px-2 py-1.5 text-[7px] font-mono tracking-[0.16em] transition-colors ${rightRailFocus === 'alerts' ? 'border-[rgba(16,185,129,0.45)] bg-[rgba(16,185,129,0.12)] text-[var(--alert-green)]' : 'border-white/8 bg-white/[0.03] text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>NEWSWIRE</button>
+            <button onClick={() => setRightRailFocus('recon')} className={`flex-1 rounded-xl border px-2 py-1.5 text-[7px] font-mono tracking-[0.16em] transition-colors ${rightRailFocus === 'recon' ? 'border-[rgba(34,211,238,0.45)] bg-[rgba(34,211,238,0.12)] text-[var(--cyan-primary)]' : 'border-white/8 bg-white/[0.03] text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>RECON</button>
+          </div>
+        </div>
+        {rightRailFocus === 'recon' && <OsintPanel onSweepVisualize={setSweepData} onScanGeolocate={(target: string, payload: OsintGeolocatePayload) => {
           setScanTargets(prev => {
             const existing = prev.filter(t => t.id !== target);
             return [{ id: target, timestamp: Date.now(), ...payload }, ...existing].slice(0, 10);
           });
           setFlyToLocation({ lat: payload.lat, lng: payload.lng, ts: Date.now() });
-        }} />
-        <LiveAlerts data={dataWithSdk} onLocate={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })} onWatchFeed={(url, name) => { setLiveFeedUrl(url); setLiveFeedName(name); }} />
+        }} />}
+        {rightRailFocus === 'alerts' && <LiveAlerts data={dataWithSdk} onLocate={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })} onWatchFeed={(url, name) => { setLiveFeedUrl(url); setLiveFeedName(name); }} />}
       </div>
 
       <AiAnalyst data={dataWithSdk} />
