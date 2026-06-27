@@ -14,10 +14,13 @@ interface CelestialBody {
   day: string;
   accent: string;
   shadow: string;
-  surface: string;
-  size: string;
+  texture: string;
+  scale: string;
 }
 
+// Planetary texture maps are stored locally under /public/planet-textures.
+// Source: Solar System Scope texture maps, downloaded into the repo so the
+// production UI does not depend on fragile third-party image delivery at run time.
 const BODIES: CelestialBody[] = [
   {
     id: 'earth',
@@ -28,109 +31,131 @@ const BODIES: CelestialBody[] = [
     diameter: '12,742 km',
     day: '23h 56m',
     accent: '#00E5FF',
-    shadow: 'rgba(0,229,255,0.32)',
-    surface: 'radial-gradient(circle at 34% 24%, #e8f7ff 0 2%, transparent 3%), radial-gradient(circle at 44% 42%, #2fb36f 0 9%, transparent 10%), radial-gradient(circle at 62% 56%, #b99454 0 12%, transparent 13%), linear-gradient(135deg, #1d8bb3 0%, #16365f 45%, #0b1930 100%)',
-    size: 'h-7 w-7',
+    shadow: 'rgba(0,229,255,0.36)',
+    texture: '/planet-textures/2k_earth_daymap.jpg',
+    scale: 'scale-100',
   },
   {
     id: 'moon',
     name: 'Moon',
     code: 'LUNA-01',
-    subtitle: 'Quiet orbital body view',
-    detail: 'Clean visual mode only. Earth intelligence feeds are intentionally suspended here.',
+    subtitle: 'Lunar surface vista',
+    detail: 'Texture-based lunar globe view. Earth intelligence feeds are intentionally suspended here.',
     diameter: '3,474 km',
     day: '27.3 d',
     accent: '#CBD5E1',
     shadow: 'rgba(203,213,225,0.28)',
-    surface: 'radial-gradient(circle at 34% 30%, rgba(255,255,255,0.75) 0 5%, transparent 6%), radial-gradient(circle at 62% 58%, rgba(30,41,59,0.45) 0 9%, transparent 10%), radial-gradient(circle at 45% 72%, rgba(15,23,42,0.35) 0 6%, transparent 7%), linear-gradient(135deg, #d7dce3 0%, #8d97a5 48%, #3f4a59 100%)',
-    size: 'h-5 w-5',
+    texture: '/planet-textures/2k_moon.jpg',
+    scale: 'scale-[0.74]',
   },
   {
     id: 'mars',
     name: 'Mars',
     code: 'ARES-04',
     subtitle: 'Red terrain reconnaissance',
-    detail: 'Dry planet vista with no operational overlays. Designed for future mission/lab expansion.',
+    detail: 'Real terrain texture vista with no operational overlays. Reserved for future mission/lab expansion.',
     diameter: '6,779 km',
     day: '24h 37m',
     accent: '#F97316',
-    shadow: 'rgba(249,115,22,0.34)',
-    surface: 'radial-gradient(circle at 30% 25%, rgba(255,215,170,0.5) 0 8%, transparent 9%), radial-gradient(circle at 67% 65%, rgba(92,35,20,0.42) 0 16%, transparent 17%), linear-gradient(145deg, #f08a3c 0%, #a44427 45%, #471b18 100%)',
-    size: 'h-6 w-6',
+    shadow: 'rgba(249,115,22,0.36)',
+    texture: '/planet-textures/2k_mars.jpg',
+    scale: 'scale-[0.86]',
   },
   {
     id: 'venus',
     name: 'Venus',
     code: 'APH-02',
     subtitle: 'Cloud-veiled planet vista',
-    detail: 'Atmospheric visual study mode. No Earth data layers are rendered outside Earth.',
+    detail: 'Surface texture study mode. No Earth data layers are rendered outside Earth.',
     diameter: '12,104 km',
     day: '243 d',
     accent: '#FACC15',
     shadow: 'rgba(250,204,21,0.3)',
-    surface: 'radial-gradient(ellipse at 40% 30%, rgba(255,245,190,0.65) 0 14%, transparent 15%), linear-gradient(165deg, #ffe08a 0%, #c58b35 48%, #5c3416 100%)',
-    size: 'h-6 w-6',
+    texture: '/planet-textures/2k_venus_surface.jpg',
+    scale: 'scale-[0.98]',
   },
   {
     id: 'jupiter',
     name: 'Jupiter',
     code: 'JOV-05',
     subtitle: 'Gas giant observation',
-    detail: 'Large-scale atmospheric vista. Rings, storms and bands are stylized for command clarity.',
+    detail: 'Band-rich Jovian texture view. Oversized enough to feel like a gas giant without covering the command UI.',
     diameter: '139,820 km',
     day: '9h 56m',
     accent: '#FDBA74',
-    shadow: 'rgba(251,146,60,0.28)',
-    surface: 'linear-gradient(180deg, #ead7bb 0 11%, #a86f45 12% 20%, #f2dec0 21% 35%, #7d4d33 36% 44%, #e9cfa5 45% 58%, #b8794d 59% 70%, #f3dfc4 71% 100%)',
-    size: 'h-8 w-8',
+    shadow: 'rgba(251,146,60,0.3)',
+    texture: '/planet-textures/2k_jupiter.jpg',
+    scale: 'scale-[1.1]',
   },
   {
     id: 'saturn',
     name: 'Saturn',
     code: 'CRN-06',
     subtitle: 'Ring-plane vista',
-    detail: 'Stylized ring system view. Data overlays remain Earth-only to protect operational clarity.',
+    detail: 'Texture-based Saturn view with a clean tactical ring plane. Data overlays remain Earth-only.',
     diameter: '116,460 km',
     day: '10h 33m',
     accent: '#FDE68A',
-    shadow: 'rgba(253,230,138,0.28)',
-    surface: 'linear-gradient(180deg, #f7e4ad 0 18%, #c99b52 19% 27%, #fae8b7 28% 58%, #9f743b 59% 66%, #ead39a 67% 100%)',
-    size: 'h-8 w-8',
+    shadow: 'rgba(253,230,138,0.3)',
+    texture: '/planet-textures/2k_saturn.jpg',
+    scale: 'scale-[1.02]',
   },
   {
     id: 'neptune',
     name: 'Neptune',
     code: 'NEP-08',
     subtitle: 'Outer system blue world',
-    detail: 'Cold outer-system vista for visual exploration only. No live intelligence projected.',
+    detail: 'Cold outer-system texture view for visual exploration only. No live intelligence projected.',
     diameter: '49,244 km',
     day: '16h 6m',
     accent: '#60A5FA',
     shadow: 'rgba(96,165,250,0.34)',
-    surface: 'radial-gradient(circle at 36% 32%, rgba(191,219,254,0.5) 0 9%, transparent 10%), linear-gradient(145deg, #60a5fa 0%, #2563eb 48%, #1e1b4b 100%)',
-    size: 'h-7 w-7',
+    texture: '/planet-textures/2k_neptune.jpg',
+    scale: 'scale-[0.92]',
   },
 ];
 
 const bodyById = Object.fromEntries(BODIES.map((body) => [body.id, body])) as Record<CelestialBodyId, CelestialBody>;
 
-function PlanetDisc({ body, large = false }: { body: CelestialBody; large?: boolean }) {
+function TexturedPlanet({ body, large = false }: { body: CelestialBody; large?: boolean }) {
+  const size = large ? 'h-[min(52vh,560px)] w-[min(52vh,560px)]' : 'h-9 w-9';
+
   return (
-    <div
-      className={`relative shrink-0 rounded-full border border-white/15 ${large ? 'h-[min(46vh,520px)] w-[min(46vh,520px)]' : body.size}`}
-      style={{
-        background: body.surface,
-        boxShadow: `0 0 ${large ? 80 : 18}px ${body.shadow}, inset -18px -22px 40px rgba(0,0,0,0.38), inset 10px 8px 18px rgba(255,255,255,0.13)`,
-      }}
-    >
-      {body.id === 'saturn' && (
-        <div className="absolute left-1/2 top-1/2 h-[34%] w-[160%] -translate-x-1/2 -translate-y-1/2 -rotate-12 rounded-full border border-[#fde68a]/55 bg-[#fde68a]/8 shadow-[0_0_22px_rgba(253,230,138,0.2)]" />
+    <div className={`relative shrink-0 ${large ? body.scale : ''}`}>
+      {body.id === 'saturn' && large && (
+        <div
+          className="absolute left-1/2 top-1/2 z-0 h-[34%] w-[172%] -translate-x-1/2 -translate-y-1/2 -rotate-12 rounded-full border border-[#f7d98a]/45 bg-[linear-gradient(90deg,transparent_0%,rgba(253,230,138,0.08)_18%,rgba(253,230,138,0.28)_48%,rgba(253,230,138,0.1)_78%,transparent_100%)] shadow-[0_0_34px_rgba(253,230,138,0.16)]"
+          aria-hidden="true"
+        />
       )}
-      {large && (
-        <>
-          <div className="absolute inset-[-10%] rounded-full border border-white/5" />
-          <div className="absolute inset-[-20%] rounded-full border border-white/[0.03]" />
-        </>
+      <div
+        className={`relative z-10 overflow-hidden rounded-full border border-white/15 ${size}`}
+        style={{
+          backgroundImage: `linear-gradient(90deg, rgba(255,255,255,0.14), transparent 18%, transparent 68%, rgba(0,0,0,0.34)), url(${body.texture})`,
+          backgroundSize: large ? 'auto 100%, 200% 100%' : 'auto 100%, 190% 100%',
+          backgroundPosition: 'center, 0% 50%',
+          boxShadow: `0 0 ${large ? 92 : 22}px ${body.shadow}, inset -34px -22px 52px rgba(0,0,0,0.46), inset 18px 12px 30px rgba(255,255,255,0.14)`,
+        }}
+      >
+        {large && (
+          <>
+            <motion.div
+              className="absolute inset-0 opacity-90"
+              animate={{ backgroundPositionX: ['0%', '100%'] }}
+              transition={{ repeat: Infinity, duration: 90, ease: 'linear' }}
+              style={{
+                backgroundImage: `url(${body.texture})`,
+                backgroundSize: '200% 100%',
+                mixBlendMode: 'multiply',
+              }}
+            />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_28%,rgba(255,255,255,0.28),transparent_20%),radial-gradient(circle_at_68%_70%,rgba(0,0,0,0.48),transparent_48%)]" />
+            <div className="absolute inset-0 rounded-full ring-1 ring-inset ring-white/10" />
+          </>
+        )}
+      </div>
+      {body.id === 'saturn' && !large && (
+        <div className="absolute left-1/2 top-1/2 h-[30%] w-[170%] -translate-x-1/2 -translate-y-1/2 -rotate-12 rounded-full border border-[#f7d98a]/45" />
       )}
     </div>
   );
@@ -142,51 +167,54 @@ export default function SolarSystemMode({ selected, onSelect }: { selected: Cele
 
   return (
     <>
-      <AnimatePresence>
+      <AnimatePresence mode="wait">
         {!isEarth && (
           <motion.div
             key={selected}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.35 }}
-            className="absolute inset-0 z-[120] pointer-events-none overflow-hidden bg-[radial-gradient(circle_at_50%_45%,rgba(14,26,42,0.2),rgba(3,7,13,0.92)_62%,rgba(1,4,9,0.98)_100%)]"
+            transition={{ duration: 0.28 }}
+            className="absolute inset-0 z-[214] pointer-events-none overflow-hidden bg-[#020712]"
           >
-            <div className="absolute inset-0 opacity-35" style={{ backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.45) 1px, transparent 1.5px)', backgroundSize: '86px 86px' }} />
-            <div className="absolute left-[31%] right-[22%] top-[14%] bottom-[12%] flex items-center justify-center">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_44%,rgba(20,35,54,0.72),rgba(2,7,18,0.98)_58%,#020712_100%)]" />
+            <div className="absolute inset-0 opacity-35" style={{ backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.42) 1px, transparent 1.6px)', backgroundSize: '92px 92px' }} />
+            <div className="absolute inset-x-[18%] top-[8%] bottom-[19%] flex items-center justify-center">
               <motion.div
-                initial={{ scale: 0.86, y: 24 }}
+                initial={{ scale: 0.84, y: 20 }}
                 animate={{ scale: 1, y: 0 }}
-                transition={{ type: 'spring', stiffness: 80, damping: 18 }}
+                transition={{ type: 'spring', stiffness: 88, damping: 18 }}
                 className="relative flex items-center justify-center"
               >
-                <div className="absolute h-[132%] w-[132%] rounded-full border border-white/[0.04]" />
-                <div className="absolute h-[164%] w-[164%] rounded-full border border-white/[0.025]" />
-                <PlanetDisc body={activeBody} large />
+                <div className="absolute h-[132%] w-[132%] rounded-full border border-white/[0.045]" />
+                <div className="absolute h-[168%] w-[168%] rounded-full border border-white/[0.025]" />
+                <div className="absolute h-[210%] w-[210%] rounded-full border border-white/[0.018]" />
+                <TexturedPlanet body={activeBody} large />
               </motion.div>
             </div>
-            <div className="absolute left-[24rem] top-28 hidden max-w-[19rem] rounded-3xl border border-white/10 bg-[#08111d]/75 p-4 shadow-[0_20px_70px_rgba(0,0,0,0.35)] backdrop-blur-xl xl:block">
-              <div className="mb-2 text-[8px] font-mono tracking-[0.32em] text-[var(--text-secondary)]">CELESTIAL VISTA</div>
+
+            <div className="absolute left-[21rem] top-24 hidden w-[20rem] rounded-[2rem] border border-white/10 bg-[#08111d]/82 p-5 shadow-[0_24px_80px_rgba(0,0,0,0.42)] backdrop-blur-xl 2xl:block">
+              <div className="mb-3 text-[8px] font-mono tracking-[0.34em] text-[var(--text-secondary)]">TEXTURED PLANET VISTA</div>
               <div className="flex items-center gap-3">
-                <PlanetDisc body={activeBody} />
+                <TexturedPlanet body={activeBody} />
                 <div>
-                  <div className="text-xl font-bold tracking-[0.2em] text-[var(--text-heading)]">{activeBody.name.toUpperCase()}</div>
+                  <div className="text-2xl font-bold tracking-[0.22em] text-[var(--text-heading)]">{activeBody.name.toUpperCase()}</div>
                   <div className="mt-1 text-[8px] font-mono tracking-[0.22em]" style={{ color: activeBody.accent }}>{activeBody.code}</div>
                 </div>
               </div>
-              <p className="mt-3 text-[10px] leading-relaxed text-[var(--text-secondary)]">{activeBody.detail}</p>
-              <div className="mt-4 grid grid-cols-2 gap-2 text-[8px] font-mono uppercase tracking-[0.18em] text-[var(--text-muted)]">
-                <div className="rounded-2xl border border-white/8 bg-white/[0.035] p-2">
+              <p className="mt-4 text-[11px] leading-relaxed text-[var(--text-secondary)]">{activeBody.detail}</p>
+              <div className="mt-5 grid grid-cols-2 gap-2 text-[8px] font-mono uppercase tracking-[0.18em] text-[var(--text-muted)]">
+                <div className="rounded-2xl border border-white/8 bg-white/[0.035] p-3">
                   <div>Diameter</div>
-                  <div className="mt-1 text-[var(--text-primary)]">{activeBody.diameter}</div>
+                  <div className="mt-2 text-[var(--text-primary)]">{activeBody.diameter}</div>
                 </div>
-                <div className="rounded-2xl border border-white/8 bg-white/[0.035] p-2">
+                <div className="rounded-2xl border border-white/8 bg-white/[0.035] p-3">
                   <div>Day</div>
-                  <div className="mt-1 text-[var(--text-primary)]">{activeBody.day}</div>
+                  <div className="mt-2 text-[var(--text-primary)]">{activeBody.day}</div>
                 </div>
               </div>
-              <div className="mt-3 rounded-2xl border border-[var(--gold-primary)]/20 bg-[var(--gold-primary)]/8 px-3 py-2 text-[8px] font-mono tracking-[0.16em] text-[var(--gold-primary)]">
-                EARTH DATA LAYERS SUSPENDED IN THIS VIEW
+              <div className="mt-4 rounded-2xl border border-[var(--gold-primary)]/20 bg-[var(--gold-primary)]/8 px-3 py-2 text-[8px] font-mono tracking-[0.16em] text-[var(--gold-primary)]">
+                EARTH INTELLIGENCE LAYERS HIDDEN OUTSIDE EARTH
               </div>
             </div>
           </motion.div>
@@ -197,13 +225,13 @@ export default function SolarSystemMode({ selected, onSelect }: { selected: Cele
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 3.1, duration: 0.45 }}
-        className="absolute bottom-[124px] left-1/2 z-[230] hidden -translate-x-1/2 pointer-events-auto xl:block"
+        className="absolute bottom-[118px] left-1/2 z-[260] hidden -translate-x-1/2 pointer-events-auto xl:block"
       >
-        <div className="rounded-[2rem] border border-white/10 bg-[#07111d]/72 px-3 py-2 shadow-[0_18px_60px_rgba(0,0,0,0.28)] backdrop-blur-xl">
+        <div className="rounded-[2rem] border border-white/10 bg-[#07111d]/84 px-3 py-2 shadow-[0_18px_60px_rgba(0,0,0,0.34)] backdrop-blur-xl">
           <div className="mb-2 flex items-center justify-between gap-5 px-1">
             <div>
               <div className="text-[8px] font-mono tracking-[0.28em] text-[var(--text-secondary)]">SOLAR SYSTEM MODE</div>
-              <div className="mt-0.5 text-[9px] font-semibold tracking-[0.18em] text-[var(--text-primary)]">{isEarth ? 'Earth intelligence active' : `${activeBody.name} visual-only vista`}</div>
+              <div className="mt-0.5 text-[9px] font-semibold tracking-[0.18em] text-[var(--text-primary)]">{isEarth ? 'Earth intelligence active' : `${activeBody.name} high-resolution texture vista`}</div>
             </div>
             <div className="rounded-full border border-white/8 bg-white/[0.035] px-2 py-1 text-[7px] font-mono tracking-[0.18em]" style={{ color: activeBody.accent }}>
               {activeBody.code}
@@ -216,11 +244,11 @@ export default function SolarSystemMode({ selected, onSelect }: { selected: Cele
                 <button
                   key={body.id}
                   onClick={() => onSelect(body.id)}
-                  className={`group relative flex min-w-[4rem] flex-col items-center gap-1.5 rounded-2xl border px-2 py-2 transition-all ${active ? 'bg-white/[0.07]' : 'bg-white/[0.025] hover:bg-white/[0.05]'}`}
+                  className={`group relative flex min-w-[4.25rem] flex-col items-center gap-1.5 rounded-2xl border px-2 py-2 transition-all ${active ? 'bg-white/[0.08]' : 'bg-white/[0.025] hover:bg-white/[0.055]'}`}
                   style={{ borderColor: active ? body.accent : 'rgba(255,255,255,0.08)' }}
                   title={`${body.name} — ${body.subtitle}`}
                 >
-                  <PlanetDisc body={body} />
+                  <TexturedPlanet body={body} />
                   <span className="text-[7px] font-mono font-bold uppercase tracking-[0.18em] text-[var(--text-primary)]">{body.name}</span>
                   {active && <span className="absolute -top-1 h-1.5 w-1.5 rounded-full" style={{ background: body.accent, boxShadow: `0 0 10px ${body.accent}` }} />}
                 </button>
