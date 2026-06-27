@@ -17,7 +17,7 @@ interface ViewPreset {
 }
 
 const PRESETS: ViewPreset[] = [
-  { label: 'GLOBAL', lat: 20, lng: 0, zoom: 2.5, icon: '🌍' },
+  { label: 'GLOBAL', lat: 20, lng: 0, zoom: 2.05, icon: '🌍' },
   { label: 'EUROPE', lat: 48, lng: 10, zoom: 4, icon: '🇪🇺' },
   { label: 'MIDDLE EAST', lat: 30, lng: 45, zoom: 4.5, icon: '🔥', hot: true },
   { label: 'EAST ASIA', lat: 35, lng: 120, zoom: 4, icon: '🌏' },

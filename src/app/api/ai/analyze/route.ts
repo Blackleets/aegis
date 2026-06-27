@@ -134,7 +134,7 @@ export async function POST(
     return NextResponse.json(
       {
         analysis: generateLocalAnalysis(body.context, body.query.trim()),
-        model: 'worldwatch-local-analyst',
+        model: 'aegis-local-analyst',
         timestamp: new Date().toISOString(),
         mode: 'local',
       },
@@ -186,7 +186,7 @@ export async function POST(
     return NextResponse.json(
       {
         analysis: generateLocalAnalysis(body.context, body.query.trim()),
-        model: 'worldwatch-local-analyst',
+        model: 'aegis-local-analyst',
         timestamp: new Date().toISOString(),
         mode: 'local',
       },

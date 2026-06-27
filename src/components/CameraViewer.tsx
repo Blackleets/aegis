@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ExternalLink, RefreshCw, MapPin, Camera, Maximize2, Play, Shield } from 'lucide-react';
+import { X, ExternalLink, RefreshCw, MapPin, Camera, Maximize2, Play, Shield, Clock3, Radio } from 'lucide-react';
 import Hls from 'hls.js';
 
 interface CameraFeed {
@@ -17,6 +17,9 @@ interface CameraFeed {
   stream_url?: string;
   feed_url?: string;
   external_url?: string;
+  refresh_interval_seconds?: number;
+  captured_at?: string;
+  live_mode?: 'snapshot' | 'video' | 'external';
 }
 
 interface CameraViewerProps {
@@ -25,9 +28,10 @@ interface CameraViewerProps {
   onLocate?: (lat: number, lng: number) => void;
 }
 
-function buildJpgUrl(feedUrl?: string) {
+function buildJpgUrl(feedUrl?: string, refreshToken = 0) {
   if (!feedUrl) return null;
-  return feedUrl.includes('?') ? `${feedUrl}&_t=${Date.now()}` : `${feedUrl}?_t=${Date.now()}`;
+  const nonce = `${Date.now()}-${refreshToken}`;
+  return feedUrl.includes('?') ? `${feedUrl}&_t=${nonce}` : `${feedUrl}?_t=${nonce}`;
 }
 
 function sanitizeStreamUrl(url?: string) {
@@ -50,30 +54,95 @@ function isHighLoadStream(streamType: CameraFeed['stream_type'], streamUrl?: str
   return /youtube|m3u8|embed/i.test(streamUrl);
 }
 
+function inferRefreshIntervalSeconds(camera: CameraFeed | null) {
+  if (!camera) return 15;
+  if (typeof camera.refresh_interval_seconds === 'number' && Number.isFinite(camera.refresh_interval_seconds)) {
+    return Math.max(5, Math.round(camera.refresh_interval_seconds));
+  }
+
+  const source = `${camera.source || ''} ${camera.feed_url || ''} ${camera.stream_url || ''}`.toLowerCase();
+
+  if (source.includes('511.alberta.ca') || source.includes('alberta 511')) return 60;
+  if (source.includes('axis-cgi')) return 5;
+  if (source.includes('ottawa')) return 20;
+  if (source.includes('travelmidwest') || source.includes('idot')) return 20;
+  if (source.includes('fl511')) return 30;
+  if (source.includes('511on')) return 30;
+
+  return 15;
+}
+
+function getLiveMode(camera: CameraFeed) {
+  if (camera.live_mode) return camera.live_mode;
+  if (camera.external_url && !camera.feed_url && !camera.stream_url) return 'external';
+  if (camera.stream_type === 'hls' || camera.stream_type === 'iframe') return 'video';
+  return 'snapshot';
+}
+
+function formatRelativeSeconds(totalSeconds: number) {
+  if (totalSeconds < 60) return `${totalSeconds}s ago`;
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes < 60) return `${minutes}m ${seconds}s ago`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h ${minutes % 60}m ago`;
+}
+
+function formatCountdown(totalSeconds: number) {
+  if (totalSeconds <= 0) return 'now';
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return minutes > 0 ? `${minutes}:${seconds.toString().padStart(2, '0')}` : `${seconds}s`;
+}
+
+function getModeBadge(camera: CameraFeed) {
+  const liveMode = getLiveMode(camera);
+  if (liveMode === 'video') return 'LIVE VIDEO';
+  if (liveMode === 'external') return 'EXTERNAL LIVE';
+  return 'NEAR-LIVE SNAPSHOT';
+}
+
 function CameraViewerContent({
   camera,
   onClose,
   onLocate,
   onRefresh,
+  refreshToken,
 }: {
   camera: CameraFeed;
   onClose: () => void;
   onLocate?: (lat: number, lng: number) => void;
   onRefresh: () => void;
+  refreshToken: number;
 }) {
   const streamType = camera.stream_type || 'jpg';
+  const liveMode = getLiveMode(camera);
+  const refreshIntervalSeconds = inferRefreshIntervalSeconds(camera);
   const externalFeedUrl = camera.external_url || camera.feed_url || camera.stream_url;
   const externalOnly = Boolean(camera.external_url && !camera.feed_url && !camera.stream_url);
   const safeStreamUrl = useMemo(() => sanitizeStreamUrl(camera.stream_url), [camera.stream_url]);
-  const imageUrl = buildJpgUrl(camera.feed_url);
+  const imageUrl = useMemo(() => buildJpgUrl(camera.feed_url, refreshToken), [camera.feed_url, refreshToken]);
   const highLoad = isHighLoadStream(streamType, camera.stream_url);
-  const [loading, setLoading] = useState(() => !externalOnly && streamType === 'jpg' && Boolean(camera.feed_url));
-  const [error, setError] = useState(() => !externalOnly && !camera.stream_url && !camera.feed_url);
+  const [streamLoading, setStreamLoading] = useState(() => !externalOnly && streamType !== 'jpg' && Boolean(camera.stream_url));
+  const [streamError, setStreamError] = useState(() => !externalOnly && streamType !== 'jpg' && !camera.stream_url);
   const [fullscreen, setFullscreen] = useState(false);
   const [streamArmed, setStreamArmed] = useState(() => !highLoad && !externalOnly);
+  const [nowTs, setNowTs] = useState(() => Date.now());
+  const [lastFrameAt, setLastFrameAt] = useState<number | null>(() => {
+    if (!camera.captured_at) return null;
+    const ts = Date.parse(camera.captured_at);
+    return Number.isNaN(ts) ? null : ts;
+  });
+  const [loadedRefreshToken, setLoadedRefreshToken] = useState(() => (streamType === 'jpg' && camera.feed_url ? -1 : refreshToken));
+  const [jpgErrorToken, setJpgErrorToken] = useState<number | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => setNowTs(Date.now()), 1000);
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -116,13 +185,14 @@ function CameraViewerContent({
         hls.loadSource(safeStreamUrl);
         hls.attachMedia(videoRef.current);
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
-          setLoading(false);
+          setStreamLoading(false);
+          setLastFrameAt(Date.now());
           videoRef.current?.play().catch(() => {});
         });
         hls.on(Hls.Events.ERROR, (_event, data) => {
           if (data.fatal) {
-            setError(true);
-            setLoading(false);
+            setStreamError(true);
+            setStreamLoading(false);
             hls.destroy();
             hlsRef.current = null;
           }
@@ -137,7 +207,8 @@ function CameraViewerContent({
       if (videoRef.current?.canPlayType('application/vnd.apple.mpegurl')) {
         const currentVideo = videoRef.current;
         const handleLoadedMetadata = () => {
-          setLoading(false);
+          setStreamLoading(false);
+          setLastFrameAt(Date.now());
           currentVideo.play().catch(() => {});
         };
 
@@ -147,12 +218,22 @@ function CameraViewerContent({
       }
 
       queueMicrotask(() => {
-        setError(true);
-        setLoading(false);
+        setStreamError(true);
+        setStreamLoading(false);
       });
     }
   }, [safeStreamUrl, externalOnly, streamArmed, streamType]);
 
+  const loading = streamType === 'jpg'
+    ? Boolean(camera.feed_url) && loadedRefreshToken !== refreshToken && jpgErrorToken !== refreshToken
+    : streamLoading;
+  const error = streamType === 'jpg'
+    ? (!camera.feed_url && !externalOnly) || jpgErrorToken === refreshToken
+    : streamError;
+  const frameAgeSeconds = lastFrameAt ? Math.max(0, Math.floor((nowTs - lastFrameAt) / 1000)) : null;
+  const nextRefreshSeconds = liveMode === 'snapshot' && lastFrameAt
+    ? Math.max(0, refreshIntervalSeconds - (frameAgeSeconds ?? 0))
+    : null;
   const showSafeModeGate = !externalOnly && highLoad && !streamArmed && !error;
 
   return (
@@ -165,7 +246,7 @@ function CameraViewerContent({
         className={`fixed z-[500] ${
           fullscreen
             ? 'inset-2 md:inset-4'
-            : 'bottom-[70px] left-2 right-2 md:bottom-6 md:right-6 md:left-auto md:w-[420px]'
+            : 'bottom-[70px] left-2 right-2 md:bottom-6 md:right-6 md:left-auto md:w-[440px]'
         }`}
       >
         <div className="glass-panel aegis-glow overflow-hidden h-full flex flex-col" style={{ borderColor: 'rgba(57, 255, 20, 0.3)' }}>
@@ -174,10 +255,10 @@ function CameraViewerContent({
               <div className="w-2 h-2 rounded-full bg-[#39FF14] animate-aegis-pulse flex-shrink-0" />
               <Camera className="w-3.5 h-3.5 text-[#39FF14] flex-shrink-0" />
               <div className="min-w-0">
-                <div className="flex items-center gap-2 min-w-0">
+                <div className="flex items-center gap-2 min-w-0 flex-wrap">
                   <h3 className="text-[10px] md:text-[11px] font-mono font-bold text-[#39FF14] tracking-wider truncate">{camera.name}</h3>
-                  <span className="hidden md:inline-flex rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[6px] font-mono tracking-[0.18em] text-[var(--text-muted)]">
-                    {streamType === 'jpg' ? 'SNAPSHOT' : streamType === 'hls' ? 'LIVE VIDEO' : streamType === 'iframe' ? 'EMBEDDED' : 'FEED'}
+                  <span className="inline-flex rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[6px] font-mono tracking-[0.18em] text-[var(--text-muted)]">
+                    {getModeBadge(camera)}
                   </span>
                 </div>
                 <p className="text-[6px] md:text-[7px] font-mono text-[var(--text-muted)] truncate">{[camera.city, camera.country, camera.source].filter(Boolean).join(' · ') || 'Remote camera feed'}</p>
@@ -203,6 +284,35 @@ function CameraViewerContent({
             </div>
           </div>
 
+          <div className="px-3 md:px-4 py-2 border-b border-[var(--border-secondary)] bg-black/35 flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2 text-[7px] md:text-[8px] font-mono text-[var(--text-secondary)] tracking-[0.16em] uppercase">
+              <Radio className="w-3 h-3 text-[#39FF14]" />
+              <span>{liveMode === 'snapshot' ? 'Near-live cadence' : liveMode === 'video' ? 'Inline live transport' : 'Source-hosted live feed'}</span>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap text-[7px] md:text-[8px] font-mono">
+              {liveMode === 'snapshot' && (
+                <>
+                  <span className="inline-flex items-center gap-1 rounded-full border border-[#39FF14]/20 bg-[#39FF14]/8 px-2 py-1 text-[#39FF14] tracking-[0.16em]">
+                    <Clock3 className="w-3 h-3" />
+                    {refreshIntervalSeconds}s cadence
+                  </span>
+                  <span className="text-[var(--text-muted)] tracking-[0.14em]">
+                    {frameAgeSeconds !== null ? `updated ${formatRelativeSeconds(frameAgeSeconds)}` : 'awaiting first frame'}
+                  </span>
+                  <span className="text-[var(--gold-primary)] tracking-[0.14em]">
+                    next refresh {nextRefreshSeconds !== null ? formatCountdown(nextRefreshSeconds) : '—'}
+                  </span>
+                </>
+              )}
+              {liveMode === 'video' && (
+                <span className="text-[var(--text-muted)] tracking-[0.14em]">continuous stream · viewer-managed playback</span>
+              )}
+              {liveMode === 'external' && (
+                <span className="text-[var(--text-muted)] tracking-[0.14em]">live source opens in provider viewer</span>
+              )}
+            </div>
+          </div>
+
           <div className={`relative bg-black ${fullscreen ? 'flex-1' : 'aspect-video max-h-[35vh] md:max-h-none'}`}>
             {loading && !error && !externalOnly && !showSafeModeGate && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-10">
@@ -217,8 +327,8 @@ function CameraViewerContent({
               <div className="absolute inset-0 flex items-center justify-center bg-black/90">
                 <div className="text-center px-6">
                   <div className="w-8 h-8 rounded-full bg-[#39FF14]/15 flex items-center justify-center mx-auto mb-2"><ExternalLink className="w-4 h-4 text-[#39FF14]" /></div>
-                  <span className="text-[9px] font-mono text-[#39FF14] tracking-widest block mb-1">EXTERNAL FEED</span>
-                  <span className="text-[7px] font-mono text-[var(--text-muted)]">Live stream opens in source viewer</span>
+                  <span className="text-[9px] font-mono text-[#39FF14] tracking-widest block mb-1">EXTERNAL LIVE SOURCE</span>
+                  <span className="text-[7px] font-mono text-[var(--text-muted)]">This provider keeps playback in its own viewer.</span>
                   {externalFeedUrl && (
                     <a href={externalFeedUrl} target="_blank" rel="noopener noreferrer" className="block mx-auto mt-3 px-3 py-1 text-[8px] font-mono text-[#39FF14] border border-[#39FF14]/30 rounded hover:bg-[#39FF14]/10 transition-colors tracking-wider">
                       OPEN FEED
@@ -239,8 +349,8 @@ function CameraViewerContent({
                   <div className="flex flex-col sm:flex-row items-center justify-center gap-2">
                     <button
                       onClick={() => {
-                        setError(false);
-                        setLoading(streamType !== 'iframe');
+                        setStreamError(false);
+                        setStreamLoading(streamType !== 'iframe');
                         setStreamArmed(true);
                       }}
                       className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded border border-[#39FF14]/40 text-[#39FF14] font-mono text-[11px] hover:bg-[#39FF14]/10 transition-colors tracking-wider"
@@ -306,19 +416,23 @@ function CameraViewerContent({
                 unoptimized
                 sizes="100vw"
                 className={fullscreen ? 'object-contain' : 'object-cover'}
-                onLoad={() => setLoading(false)}
+                onLoad={() => {
+                  setLoadedRefreshToken(refreshToken);
+                  setJpgErrorToken(null);
+                  setLastFrameAt(Date.now());
+                }}
                 onError={() => {
-                  setLoading(false);
-                  setError(true);
+                  setLoadedRefreshToken(refreshToken);
+                  setJpgErrorToken(refreshToken);
                 }}
               />
             ) : null}
 
             {!error && !loading && !externalOnly && !showSafeModeGate && (
               <div className="absolute top-2 left-2 flex items-center gap-1.5 bg-black/70 backdrop-blur-sm px-2 py-1 rounded">
-                <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-aegis-pulse" />
+                <div className={`w-1.5 h-1.5 rounded-full ${liveMode === 'snapshot' ? 'bg-amber-400' : 'bg-red-500 animate-aegis-pulse'}`} />
                 <span className="text-[7px] font-mono text-white tracking-widest">
-                  {streamType === 'jpg' ? 'LIVE SNAPSHOT' : 'LIVE VIDEO'}
+                  {liveMode === 'snapshot' ? 'NEAR-LIVE FEED' : 'LIVE VIDEO'}
                 </span>
               </div>
             )}
@@ -335,10 +449,12 @@ function CameraViewerContent({
                   <ExternalLink className="w-2.5 h-2.5" /> FEED
                 </a>
               )}
-              <a href={`https://www.google.com/maps/@${camera.lat},${camera.lng},17z`} target="_blank" rel="noopener noreferrer"
-                className="flex items-center gap-1 text-[7px] font-mono text-[var(--cyan-primary)] hover:underline tracking-wider">
-                <MapPin className="w-2.5 h-2.5" /> MAP
-              </a>
+              {camera.lat !== undefined && camera.lng !== undefined && (
+                <a href={`https://www.google.com/maps/@${camera.lat},${camera.lng},17z`} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-[7px] font-mono text-[var(--cyan-primary)] hover:underline tracking-wider">
+                  <MapPin className="w-2.5 h-2.5" /> MAP
+                </a>
+              )}
             </div>
           </div>
         </div>
@@ -350,6 +466,7 @@ function CameraViewerContent({
 export default function CameraViewer({ camera, onClose, onLocate }: CameraViewerProps) {
   const [refreshKey, setRefreshKey] = useState(0);
   const streamType = camera?.stream_type || 'jpg';
+  const refreshIntervalSeconds = inferRefreshIntervalSeconds(camera);
 
   useEffect(() => {
     if (streamType !== 'jpg' || !camera?.feed_url) return;
@@ -359,19 +476,20 @@ export default function CameraViewer({ camera, onClose, onLocate }: CameraViewer
         return;
       }
       setRefreshKey((key) => key + 1);
-    }, 15000);
+    }, refreshIntervalSeconds * 1000);
 
     return () => clearInterval(intervalId);
-  }, [camera?.feed_url, streamType]);
+  }, [camera?.feed_url, streamType, refreshIntervalSeconds]);
 
   if (!camera) return null;
 
-  const contentKey = [camera.name, camera.feed_url || camera.stream_url || camera.external_url || 'feed', refreshKey].join(':');
+  const contentKey = [camera.name, camera.feed_url || camera.stream_url || camera.external_url || 'feed'].join(':');
 
   return (
     <CameraViewerContent
       key={contentKey}
       camera={camera}
+      refreshToken={refreshKey}
       onClose={onClose}
       onLocate={onLocate}
       onRefresh={() => setRefreshKey((key) => key + 1)}

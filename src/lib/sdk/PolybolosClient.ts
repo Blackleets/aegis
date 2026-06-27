@@ -95,7 +95,7 @@ interface RadiationRecord {
   country?: string;
 }
 
-interface OsirisIngestPayload {
+interface AegisIngestPayload {
   commercial_flights?: FlightRecord[];
   private_flights?: FlightRecord[];
   private_jets?: FlightRecord[];
@@ -308,7 +308,7 @@ export class PolybolosClient {
    * Ingest raw AEGIS data and translate it into Polybolos entities.
    * This is the primary method called by page.tsx to feed data into the SDK.
    */
-  ingestOsirisData(data: OsirisIngestPayload): void {
+  ingestAegisData(data: AegisIngestPayload): void {
     const entities: PolybolosEntity[] = [];
 
     // Air domain

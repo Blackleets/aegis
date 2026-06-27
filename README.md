@@ -1,4 +1,4 @@
-# WorldWatch
+# AEGIS
 
 Strategic recon and situational intelligence platform for live operator workflows.
 
@@ -8,11 +8,11 @@ Strategic recon and situational intelligence platform for live operator workflow
 ![Build](https://img.shields.io/badge/build-verified-brightgreen)
 ![Lint](https://img.shields.io/badge/lint-clean-brightgreen)
 
-WorldWatch turns public telemetry into an operator-ready monitoring workspace with live map layers, browser-based recon tools, AI briefings, and fusion dossiers.
+AEGIS turns public telemetry into an operator-ready monitoring workspace with live map layers, browser-based recon tools, AI briefings, and fusion dossiers.
 
 ## What it is
 
-WorldWatch is a Next.js command-center style web app that combines:
+AEGIS is a Next.js command-center style web app that combines:
 
 - live global tracking layers
 - open-source intelligence workflows
@@ -71,7 +71,7 @@ http://localhost:3000
 
 ## Environment
 
-WorldWatch runs without most third-party keys.
+AEGIS runs without most third-party keys.
 
 Main options:
 
@@ -113,7 +113,7 @@ docker compose up -d
 
 ## Why this repo is useful
 
-WorldWatch is useful if you want a customizable intelligence dashboard that already ships with:
+AEGIS is useful if you want a customizable intelligence dashboard that already ships with:
 
 - a serious app shell instead of a toy demo
 - multiple real data routes and overlays

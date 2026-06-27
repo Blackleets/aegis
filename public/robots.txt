@@ -1,5 +1,5 @@
-# WorldWatch Monitoring Platform
-# https://worldwatch.blackleets.dev
+# AEGIS Intelligence Surface
+# https://aegis.blackleets.dev
 
 User-agent: *
 Allow: /
@@ -7,7 +7,7 @@ Disallow: /api/
 Disallow: /api/scanner
 Disallow: /api/osint/*
 
-# Allow search engines to index the main page
+# Allow search engines to index the public health probe
 Allow: /api/health
 
 # Sitemap

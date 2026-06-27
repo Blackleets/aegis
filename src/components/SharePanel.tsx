@@ -131,7 +131,7 @@ export default function SharePanel({ mapView, activeLayers, mouseCoords }: Share
             {/* Quick Share */}
             <div className="flex gap-2">
               <a
-                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent('🛰️ WorldWatch — Global Monitoring & Recon Platform')}&url=${encodeURIComponent(generateShareUrl())}`}
+                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent('AEGIS — Verified Global Intelligence Surface')}&url=${encodeURIComponent(generateShareUrl())}`}
                 target="_blank"
                 className="flex-1 text-center py-1.5 rounded text-[7px] font-mono tracking-wider text-[var(--text-muted)] border border-[var(--border-primary)] hover:border-[#1DA1F2] hover:text-[#1DA1F2] transition-colors"
               >
@@ -145,7 +145,7 @@ export default function SharePanel({ mapView, activeLayers, mouseCoords }: Share
                 IN SHARE
               </a>
               <a
-                href={`https://reddit.com/submit?url=${encodeURIComponent(generateShareUrl())}&title=${encodeURIComponent('WorldWatch — Global Monitoring & Recon Platform')}`}
+                href={`https://reddit.com/submit?url=${encodeURIComponent(generateShareUrl())}&title=${encodeURIComponent('AEGIS — Verified Global Intelligence Surface')}`}
                 target="_blank"
                 className="flex-1 text-center py-1.5 rounded text-[7px] font-mono tracking-wider text-[var(--text-muted)] border border-[var(--border-primary)] hover:border-[#FF4500] hover:text-[#FF4500] transition-colors"
               >

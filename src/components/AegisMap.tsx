@@ -49,7 +49,7 @@ interface AegisMapProps {
   onMouseCoords?: (coords: { lat: number; lng: number }) => void;
   onRightClick?: (coords: { lat: number; lng: number }) => void;
   onViewStateChange?: (vs: { zoom: number; latitude: number }) => void;
-  flyToLocation?: { lat: number; lng: number; ts: number } | null;
+  flyToLocation?: { lat: number; lng: number; ts: number; zoom?: number; bbox?: [west: number, south: number, east: number, north: number] | null; label?: string } | null;
   projection?: 'mercator' | 'globe';
   mapStyle?: string;
   sweepData?: SweepData | null;
@@ -78,11 +78,106 @@ function computeSolarTerminator(): [number, number][] {
 
 const EMPTY_FC = { type: 'FeatureCollection' as const, features: [] };
 
+const GLOBE_OVERVIEW_ZOOM = 2.6;
+const GLOBE_DETAIL_ZOOM = 4.2;
+
+const OVERVIEW_LABEL_LAYERS = [
+  'eq-label',
+  'gdelt-hotspot-label',
+  'jam-label',
+  'weather-label',
+  'infra-label',
+  'maritime-label',
+  'choke-label',
+  'news-label',
+  'sigint-news-label',
+  'balloon-label',
+  'rad-label',
+  'ship-label',
+  'scan-targets-label',
+  'cctv-label',
+] as const;
+
+const OVERVIEW_GLOW_LAYERS = [
+  'cctv-glow',
+  'gdelt-hotspot-halo',
+  'weather-glow',
+  'infra-glow',
+  'maritime-glow',
+  'news-glow',
+  'sigint-news-glow',
+  'sdk-sea-glow',
+  'sdk-air-glow',
+  'sdk-intel-glow',
+  'rad-glow',
+] as const;
+
+const OVERVIEW_SECONDARY_DOT_LAYERS = [
+  'sat-dots',
+  'sat-glow',
+  'ship-dots',
+  'cctv-dots',
+  'cctv-glow',
+  'news-dots',
+  'news-glow',
+  'sigint-news-dots',
+  'sigint-news-glow',
+  'scan-targets-dots',
+  'scan-targets-glow',
+  'balloon-dots',
+  'rad-dots',
+  'sdk-air',
+  'sdk-intel',
+  'sdk-air-glow',
+  'sdk-intel-glow',
+] as const;
+
+const OVERVIEW_SECONDARY_SYMBOL_LAYERS = [
+  'fl-commercial',
+  'fl-private',
+  'fl-jets',
+  'fl-military',
+] as const;
+
+function getSeverityWeight(severity: unknown): number {
+  const normalized = String(severity || '').toLowerCase();
+  if (normalized === 'critical') return 52;
+  if (normalized === 'high') return 38;
+  if (normalized === 'elevated') return 24;
+  if (normalized === 'low') return 12;
+  return 16;
+}
+
+function getRecencyWeight(dateValue: unknown): number {
+  if (!dateValue) return 0;
+  const parsed = Date.parse(String(dateValue));
+  if (Number.isNaN(parsed)) return 0;
+  const ageHours = Math.max(0, (Date.now() - parsed) / 36e5);
+  if (ageHours <= 6) return 18;
+  if (ageHours <= 24) return 12;
+  if (ageHours <= 72) return 7;
+  if (ageHours <= 168) return 3;
+  return 0;
+}
+
+function getFusionScore(entity: MapEntity): number {
+  const mentions = typeof entity.mentions === 'number' ? entity.mentions : Number(entity.mentions || 0);
+  const mentionsWeight = Number.isFinite(mentions) && mentions > 0 ? Math.min(22, Math.round(Math.log2(mentions + 1) * 4.5)) : 0;
+  return getSeverityWeight(entity.severity) + getRecencyWeight(entity.date) + mentionsWeight;
+}
+
+function getHotspotLabel(entity: MapEntity): string {
+  const base = String(entity.title || entity.name || entity.theme || 'Unclassified hotspot').trim();
+  const words = base.split(/\s+/).slice(0, 4).join(' ');
+  return words.length > 34 ? `${words.slice(0, 31)}…` : words;
+}
+
 function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightClick, onViewStateChange, flyToLocation, projection = 'globe', mapStyle = 'dark', sweepData, scanTargets = [] }: AegisMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const popupRef = useRef<maplibregl.Popup | null>(null);
   const [mapReady, setMapReady] = useState(false);
+  const [adaptiveZoom, setAdaptiveZoom] = useState(projection === 'globe' ? 2.05 : 3.2);
   const prevStyleRef = useRef(mapStyle);
 
   // Create aircraft icon on canvas (for WebGL symbol layer)
@@ -121,18 +216,92 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
     map.addImage(id, { width: size, height: size, data: new Uint8Array(ctx.getImageData(0, 0, size, size).data) });
   }, []);
 
+  const applyAegisGlobeStyling = useCallback((map: maplibregl.Map, nextProjection: 'mercator' | 'globe', nextMapStyle: string) => {
+    const isDark = nextMapStyle === 'dark';
+    const isGlobe = nextProjection === 'globe';
+
+    try {
+      const fogApi = map as maplibregl.Map & { setFog?: (config: Record<string, unknown>) => void };
+      fogApi.setFog?.(
+        isGlobe
+          ? {
+              color: isDark ? 'rgba(16, 34, 52, 0.24)' : 'rgba(16, 24, 34, 0.16)',
+              'high-color': isDark ? 'rgba(54, 110, 168, 0.12)' : 'rgba(20, 30, 42, 0.08)',
+              'space-color': isDark ? 'rgba(3, 8, 16, 0.78)' : 'rgba(8, 12, 18, 0.66)',
+              'horizon-blend': 0.085,
+              'star-intensity': 0,
+            }
+          : {
+              color: 'rgba(16, 24, 34, 0.18)',
+              'high-color': 'rgba(18, 28, 40, 0.1)',
+              'space-color': 'rgba(0, 0, 0, 0)',
+              'horizon-blend': 0.02,
+              'star-intensity': 0,
+            },
+      );
+    } catch {}
+
+    try {
+      const skyApi = map as maplibregl.Map & { setSky?: (config: Record<string, unknown>) => void };
+      skyApi.setSky?.(
+        isGlobe
+          ? {
+              'sky-color': isDark ? '#07111d' : '#101923',
+              'sky-horizon-blend': isDark ? 0.2 : 0.03,
+              'horizon-color': isDark ? '#21507a' : '#223244',
+              'horizon-fog-blend': isDark ? 0.18 : 0.04,
+              'fog-color': isDark ? '#0a1625' : '#182433',
+              'fog-ground-blend': isDark ? 0.24 : 0.18,
+            }
+          : {
+              'sky-color': isDark ? '#07101a' : '#121d28',
+              'sky-horizon-blend': 0.03,
+              'horizon-color': isDark ? '#0d1622' : '#1b2a3a',
+              'horizon-fog-blend': 0.03,
+            },
+      );
+    } catch {}
+
+    if (map.getLayer('satellite-layer')) {
+      try {
+        map.setPaintProperty('satellite-layer', 'raster-opacity', isGlobe ? 0.5 : 0.82);
+        map.setPaintProperty('satellite-layer', 'raster-saturation', isGlobe ? 0.2 : 0);
+        map.setPaintProperty('satellite-layer', 'raster-contrast', isGlobe ? 0.12 : 0);
+        map.setPaintProperty('satellite-layer', 'raster-brightness-min', isGlobe ? 0.1 : 0);
+        map.setPaintProperty('satellite-layer', 'raster-brightness-max', isGlobe ? 0.92 : 1);
+      } catch {}
+    }
+
+    if (map.getLayer('day-night-fill')) {
+      try {
+        map.setPaintProperty('day-night-fill', 'fill-color', '#05101f');
+        map.setPaintProperty('day-night-fill', 'fill-opacity', isGlobe ? 0.05 : 0.16);
+      } catch {}
+    }
+  }, []);
+
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
+
     const map = new maplibregl.Map({
       container: containerRef.current,
       style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
-      center: [25.48, 42.70], zoom: 6.5, minZoom: 1.5, maxZoom: 18,
+      center: [0, 20],
+      zoom: projection === 'globe' ? 2.05 : 3.2,
+      minZoom: 1.5,
+      maxZoom: 18,
+      pitch: projection === 'globe' ? 14 : 0,
       attributionControl: false,
-      maxPitch: 85,
+
     });
 
     map.on('load', () => {
       mapRef.current = map;
+      try {
+        (map as maplibregl.Map & { setProjection?: (projection: { type: 'mercator' | 'globe' }) => void }).setProjection({ type: projection });
+      } catch {}
+
+      applyAegisGlobeStyling(map, projection, mapStyle);
       // Create icons
       createIcon(map, 'plane-cyan', '#00E5FF', 24);
       createIcon(map, 'plane-green', '#00E676', 24);
@@ -147,7 +316,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       createDot(map, 'dot-cctv', '#39FF14', 10);
 
       // Sources
-      const sources = ['flights','military','jets','private-fl','satellites','earthquakes','gdelt','gps-jamming','day-night','cctv','fires','weather','infrastructure','maritime','maritime-choke','maritime-ships','live-news','sigint-news','conflict-zones', 'war-alerts-targets', 'war-alerts-lines', 'balloons', 'radiation', 'ip-sweep-devices', 'ip-sweep-pulse', 'ip-sweep-connections', 'scan-targets', 'sdk-entities', 'sdk-links'];
+      const sources = ['flights','military','jets','private-fl','satellites','earthquakes','gdelt','gdelt-hotspots','gps-jamming','day-night','cctv','fires','weather','infrastructure','maritime','maritime-choke','maritime-ships','live-news','sigint-news','conflict-zones', 'war-alerts-targets', 'war-alerts-lines', 'balloons', 'radiation', 'ip-sweep-devices', 'ip-sweep-pulse', 'ip-sweep-connections', 'scan-targets', 'sdk-entities', 'sdk-links'];
       sources.forEach(s => map.addSource(s, { type: 'geojson', data: EMPTY_FC }));
 
       // Warning icon generator (parameterized — eliminates 3x copy-paste)
@@ -226,7 +395,39 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
 
       // GDELT
       map.addLayer({ id: 'gdelt-dots', type: 'circle', source: 'gdelt', paint: {
-        'circle-radius': 4, 'circle-color': '#FF3D3D', 'circle-opacity': 0.5, 'circle-stroke-width': 1, 'circle-stroke-color': '#FF3D3D', 'circle-stroke-opacity': 0.3,
+        'circle-radius': ['interpolate',['linear'],['zoom'], 1,3, 5,5, 10,8],
+        'circle-color': ['match', ['get','severity'], 'critical','#FF1744', 'high','#FF6B00', 'elevated','#FFD500', '#64B5F6'],
+        'circle-opacity': 0.72,
+        'circle-stroke-width': 1.5,
+        'circle-stroke-color': ['match', ['get','severity'], 'critical','#FF1744', 'high','#FF6B00', 'elevated','#FFD500', '#64B5F6'],
+        'circle-stroke-opacity': 0.38,
+      }});
+      map.addLayer({ id: 'gdelt-hotspot-halo', type: 'circle', source: 'gdelt-hotspots', paint: {
+        'circle-radius': ['interpolate',['linear'],['zoom'], 1,10, 5,['+',10,['*',['get','fusionScore'],0.18]], 10,['+',16,['*',['get','fusionScore'],0.28]]],
+        'circle-color': ['match', ['get','severity'], 'critical','#FF1744', 'high','#FF6B00', 'elevated','#FFD500', '#64B5F6'],
+        'circle-opacity': ['interpolate',['linear'],['zoom'], 1,0.10, 5,0.16, 10,0.22],
+        'circle-blur': 0.85,
+      }});
+      map.addLayer({ id: 'gdelt-hotspot-core', type: 'circle', source: 'gdelt-hotspots', paint: {
+        'circle-radius': ['interpolate',['linear'],['zoom'], 1,4, 5,['+',5,['*',['get','priorityRank'],0.55]], 10,['+',8,['*',['get','priorityRank'],0.8]]],
+        'circle-color': ['match', ['get','severity'], 'critical','#FF1744', 'high','#FF6B00', 'elevated','#FFD500', '#90CAF9'],
+        'circle-opacity': 0.96,
+        'circle-stroke-width': ['interpolate',['linear'],['zoom'], 1,1.4, 10,2.2],
+        'circle-stroke-color': '#F8FAFC',
+        'circle-stroke-opacity': 0.78,
+      }});
+      map.addLayer({ id: 'gdelt-hotspot-label', type: 'symbol', source: 'gdelt-hotspots', minzoom: 2, layout: {
+        'text-field': ['concat', 'HOT ', ['to-string',['get','priorityRank']], ' • ', ['get','hotspotLabel']],
+        'text-size': ['interpolate',['linear'],['zoom'], 2,9, 5,10, 8,12],
+        'text-font': ['Open Sans Bold'],
+        'text-offset': [0, 1.8],
+        'text-max-width': 16,
+        'text-allow-overlap': false,
+      }, paint: {
+        'text-color': ['match', ['get','severity'], 'critical','#FFB4B4', 'high','#FFD0A8', 'elevated','#FFF0A6', '#C7E3FF'],
+        'text-halo-color': 'rgba(2, 7, 18, 0.92)',
+        'text-halo-width': 1.4,
+        'text-opacity': 0.92,
       }});
 
       // GPS Jamming
@@ -499,7 +700,15 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       });
     });
     map.on('contextmenu', e => { e.preventDefault(); onRightClick?.({ lat: e.lngLat.lat, lng: e.lngLat.lng }); });
-    map.on('moveend', () => { const c = map.getCenter(); onViewStateChange?.({ zoom: map.getZoom(), latitude: c.lat }); });
+    map.on('moveend', () => {
+      const c = map.getCenter();
+      const nextZoom = map.getZoom();
+      setAdaptiveZoom(nextZoom);
+      onViewStateChange?.({ zoom: nextZoom, latitude: c.lat });
+    });
+    map.on('zoomend', () => {
+      setAdaptiveZoom(map.getZoom());
+    });
 
     // ── POPUP HELPER ──
     const popup = (coords: Coordinates, html: string) => {
@@ -612,19 +821,37 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       </div>`);
     });
 
-    // ── GDELT Conflicts (with source article) ──
-    map.on('click', 'gdelt-dots', e => {
-      if (!e.features?.length) return;
-      const p = e.features[0].properties as EntityProperties;
-      const coords = (e.features[0].geometry).coordinates;
+    const openGdeltPopup = (coords: Coordinates, props: EntityProperties) => {
+      const severityColor = props.severity === 'critical' ? '#FF1744' : props.severity === 'high' ? '#FF6B00' : props.severity === 'elevated' ? '#FFD500' : '#64B5F6';
       popup(coords, `<div style="${pStyle}border:1px solid rgba(255,61,61,0.3);">
-        <div style="color:#FF3D3D;font-size:12px;font-weight:700;margin-bottom:6px;">⚠️ CONFLICT EVENT</div>
-        <div style="font-size:9px;color:#E8E6E0;margin-bottom:8px;line-height:1.4;">${p.name||'Unclassified incident'}</div>
-        <div style="display:flex;gap:6px;">
-          ${p.url ? `<a href="${p.url}" target="_blank" style="${linkStyle}color:#FF3D3D;border:1px solid rgba(255,61,61,0.4);background:rgba(255,61,61,0.1);">SOURCE</a>` : ''}
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;">
+          <div style="color:${severityColor};font-size:12px;font-weight:700;">⚠️ ${String(props.severity || 'incident').toUpperCase()} INCIDENT</div>
+          ${props.fusionScore ? `<span style="padding:3px 7px;border-radius:999px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.08);color:#C7E3FF;font-size:9px;letter-spacing:0.08em;">FUSION ${props.fusionScore}</span>` : ''}
+        </div>
+        <div style="font-size:9px;color:#E8E6E0;margin-bottom:6px;line-height:1.4;">${props.title || props.name || 'Unclassified incident'}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:9px;margin-bottom:8px;">
+          <div><span style="color:#5C5A54;">SOURCE</span><br/><span style="color:#E8E6E0;">${props.source || 'GDELT'}</span></div>
+          <div><span style="color:#5C5A54;">THEME</span><br/><span style="color:#E8E6E0;">${props.theme || 'Geopolitical Incident'}</span></div>
+          <div><span style="color:#5C5A54;">MENTIONS</span><br/><span style="color:#E8E6E0;">${props.mentions || 1}</span></div>
+          <div><span style="color:#5C5A54;">COORDS</span><br/><span style="color:#E8E6E0;">${coords[1].toFixed(2)}°, ${coords[0].toFixed(2)}°</span></div>
+          ${props.priorityRank ? `<div><span style="color:#5C5A54;">HOTSPOT</span><br/><span style="color:${severityColor};">TOP ${props.priorityRank}</span></div>` : ''}
+          ${props.date ? `<div><span style="color:#5C5A54;">DATE</span><br/><span style="color:#E8E6E0;">${props.date}</span></div>` : ''}
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          ${props.url ? `<a href="${props.url}" target="_blank" style="${linkStyle}color:#FF3D3D;border:1px solid rgba(255,61,61,0.4);background:rgba(255,61,61,0.1);">SOURCE</a>` : ''}
           <a href="https://www.google.com/maps/@${coords[1]},${coords[0]},12z" target="_blank" style="${linkStyle}color:#448AFF;border:1px solid rgba(68,138,255,0.4);background:rgba(68,138,255,0.1);">MAP</a>
         </div>
       </div>`);
+    };
+
+    // ── GDELT Conflicts (with source article) ──
+    ['gdelt-dots', 'gdelt-hotspot-core', 'gdelt-hotspot-halo'].forEach(layer => {
+      map.on('click', layer, e => {
+        if (!e.features?.length) return;
+        const p = e.features[0].properties as EntityProperties;
+        const coords = (e.features[0].geometry).coordinates;
+        openGdeltPopup(coords, p);
+      });
     });
 
     // ── Global Event / Conflict Markers ──
@@ -679,7 +906,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
     });
 
     // ── Generic hover for clickables ──
-    ['conflict-icons','cctv-dots','eq-circles','sat-dots','fires-heat','gdelt-dots','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots','sigint-news-dots','balloon-dots','rad-dots','ship-dots','sweep-device-dots','scan-targets-dots','sdk-sea','sdk-sea-glow','sdk-air','sdk-air-glow','sdk-intel','sdk-intel-glow'].forEach(layer => {
+    ['conflict-icons','cctv-dots','eq-circles','sat-dots','fires-heat','gdelt-dots','gdelt-hotspot-core','gdelt-hotspot-halo','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots','sigint-news-dots','balloon-dots','rad-dots','ship-dots','sweep-device-dots','scan-targets-dots','sdk-sea','sdk-sea-glow','sdk-air','sdk-air-glow','sdk-intel','sdk-intel-glow'].forEach(layer => {
       map.on('mouseenter', layer, () => { map.getCanvas().style.cursor = 'pointer'; });
       map.on('mouseleave', layer, () => { map.getCanvas().style.cursor = ''; });
     });
@@ -899,7 +1126,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       map.remove();
       mapRef.current = null;
     };
-  }, [createDot, createIcon, onEntityClick, onMouseCoords, onRightClick, onViewStateChange]);
+  }, [applyAegisGlobeStyling, createDot, createIcon, mapStyle, onEntityClick, onMouseCoords, onRightClick, onViewStateChange, projection]);
 
   // Day/Night
   useEffect(() => {
@@ -928,6 +1155,43 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
     ids.forEach(id => { if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none'); });
   }, []);
 
+  const applyAdaptiveDeclutter = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const isGlobe = projection === 'globe';
+    const isOverview = isGlobe && adaptiveZoom <= GLOBE_OVERVIEW_ZOOM;
+    const isDetail = adaptiveZoom >= GLOBE_DETAIL_ZOOM;
+
+    setVis([...OVERVIEW_LABEL_LAYERS], !isOverview);
+    setVis([...OVERVIEW_GLOW_LAYERS], !isOverview || isDetail);
+    setVis([...OVERVIEW_SECONDARY_DOT_LAYERS], !isOverview);
+    setVis([...OVERVIEW_SECONDARY_SYMBOL_LAYERS], !isOverview);
+
+    if (map.getLayer('conflict-icons')) {
+      map.setLayoutProperty('conflict-icons', 'visibility', activeLayers.conflict_zones !== false ? 'visible' : 'none');
+      map.setPaintProperty('conflict-icons', 'text-opacity', isOverview ? 0.62 : 0.9);
+    }
+
+    if (map.getLayer('gdelt-hotspot-core')) {
+      map.setPaintProperty('gdelt-hotspot-core', 'circle-opacity', isOverview ? 0.78 : 0.96);
+      map.setPaintProperty('gdelt-hotspot-core', 'circle-stroke-opacity', isOverview ? 0.52 : 0.78);
+    }
+
+    if (map.getLayer('gdelt-hotspot-halo')) {
+      map.setPaintProperty('gdelt-hotspot-halo', 'circle-opacity', isOverview ? 0.06 : ['interpolate',['linear'],['zoom'], 1,0.10, 5,0.16, 10,0.22]);
+    }
+
+    if (map.getLayer('gdelt-dots')) {
+      map.setPaintProperty('gdelt-dots', 'circle-opacity', isOverview ? 0.4 : 0.72);
+      map.setPaintProperty('gdelt-dots', 'circle-stroke-opacity', isOverview ? 0.22 : 0.38);
+    }
+
+    if (map.getLayer('day-night-fill')) {
+      map.setPaintProperty('day-night-fill', 'fill-opacity', isOverview ? 0.08 : projection === 'globe' ? 0.05 : 0.16);
+    }
+  }, [activeLayers.conflict_zones, adaptiveZoom, projection, setVis]);
+
   // Flight data → GeoJSON (GPU rendered)
   useEffect(() => {
     if (!mapReady) return;
@@ -955,7 +1219,54 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
 
   useEffect(() => {
     if (!mapReady) return;
-    setGeo('gdelt', activeLayers.global_incidents && data.gdelt ? data.gdelt.map((e: MapEntity) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [e.lng, e.lat] }, properties: { name: e.name } })) : []);
+    const incidents = activeLayers.global_incidents && data.gdelt ? data.gdelt.filter((e: MapEntity) => typeof e.lng === 'number' && typeof e.lat === 'number') : [];
+    setGeo('gdelt', incidents.map((e: MapEntity) => ({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [e.lng, e.lat] },
+      properties: {
+        name: e.name,
+        title: e.title,
+        url: e.url,
+        source: e.source,
+        severity: e.severity,
+        theme: e.theme,
+        mentions: e.mentions,
+        date: e.date,
+        fusionScore: getFusionScore(e),
+      },
+    })));
+
+    const hotspotMap = new Map<string, MapEntity & { fusionScore: number }>();
+    incidents.forEach((incident: MapEntity) => {
+      const fusionScore = getFusionScore(incident);
+      const label = getHotspotLabel(incident);
+      const existing = hotspotMap.get(label);
+      if (!existing || fusionScore > existing.fusionScore) {
+        hotspotMap.set(label, { ...incident, fusionScore });
+      }
+    });
+
+    const hotspotFeatures = Array.from(hotspotMap.values())
+      .sort((a, b) => b.fusionScore - a.fusionScore)
+      .slice(0, 5)
+      .map((incident, index) => ({
+        type: 'Feature' as const,
+        geometry: { type: 'Point' as const, coordinates: [incident.lng, incident.lat] },
+        properties: {
+          name: incident.name,
+          title: incident.title,
+          url: incident.url,
+          source: incident.source,
+          severity: incident.severity,
+          theme: incident.theme,
+          mentions: incident.mentions,
+          date: incident.date,
+          fusionScore: incident.fusionScore,
+          hotspotLabel: getHotspotLabel(incident),
+          priorityRank: index + 1,
+        },
+      }));
+    setGeo('gdelt-hotspots', hotspotFeatures);
   }, [mapReady, data.gdelt, activeLayers.global_incidents, setGeo]);
 
   useEffect(() => {
@@ -1316,8 +1627,8 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
   useEffect(() => {
     if (!mapReady) return;
     setVis(['eq-circles','eq-label'], activeLayers.earthquakes);
-    setVis(['sat-dots'], activeLayers.satellites);
-    setVis(['gdelt-dots'], activeLayers.global_incidents);
+    setVis(['sat-dots','sat-glow'], activeLayers.satellites);
+    setVis(['gdelt-dots','gdelt-hotspot-halo','gdelt-hotspot-core','gdelt-hotspot-label'], activeLayers.global_incidents);
     setVis(['jam-fill','jam-label'], activeLayers.gps_jamming);
     setVis(['day-night-fill'], activeLayers.day_night);
     setVis(['fl-commercial'], activeLayers.flights);
@@ -1340,7 +1651,13 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
     setVis(['sdk-sea-glow','sdk-air-glow','sdk-intel-glow','sdk-sea','sdk-air','sdk-intel'], activeLayers.sdk_stream !== false);
     // Sweep layers always visible when data is present (controlled by useEffect)
     setVis(['sweep-connections','sweep-pulse-ring','sweep-device-glow','sweep-device-dots','sweep-device-labels'], true);
-  }, [mapReady, activeLayers, setVis]);
+    applyAdaptiveDeclutter();
+  }, [mapReady, activeLayers, setVis, applyAdaptiveDeclutter]);
+
+  useEffect(() => {
+    if (!mapReady) return;
+    applyAdaptiveDeclutter();
+  }, [mapReady, adaptiveZoom, projection, applyAdaptiveDeclutter]);
 
   // IP Sweep visualization
   useEffect(() => {
@@ -1361,7 +1678,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
     // Switch to globe and fly to the sweep location
     try {
       (map as maplibregl.Map & { setProjection?: (projection: { type: 'mercator' | 'globe' }) => void }).setProjection({ type: 'globe' });
-      map.setSky({ 'sky-color': '#0A0A0F', 'sky-horizon-blend': 0.02, 'horizon-color': '#0A0A0F', 'horizon-fog-blend': 0.02 });
+      applyAegisGlobeStyling(map, 'globe', mapStyle);
     } catch { /* projection may not be supported */ }
 
     map.flyTo({ center: centerCoord, zoom: 14, pitch: 50, bearing: -20, duration: 3000, essential: true });
@@ -1411,7 +1728,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
     }, 3000);
 
     return () => clearTimeout(timer);
-  }, [mapReady, sweepData, setGeo]);
+  }, [applyAegisGlobeStyling, mapReady, sweepData, setGeo, mapStyle]);
 
   // Scan Targets visualization
   useEffect(() => {
@@ -1431,8 +1748,30 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
   // Fly-to
   useEffect(() => {
     if (!mapReady || !mapRef.current || !flyToLocation) return;
-    mapRef.current.flyTo({ center: [flyToLocation.lng, flyToLocation.lat], zoom: 8, duration: 2000 });
-  }, [mapReady, flyToLocation]);
+    const map = mapRef.current;
+    const targetZoom = flyToLocation.zoom ?? (projection === 'globe' ? 6.5 : 10);
+
+    if (flyToLocation.bbox) {
+      const [west, south, east, north] = flyToLocation.bbox;
+      map.fitBounds(
+        [[west, south], [east, north]],
+        {
+          padding: { top: 80, bottom: 80, left: 80, right: 80 },
+          maxZoom: Math.max(targetZoom, 4),
+          duration: 2200,
+        }
+      );
+      return;
+    }
+
+    map.flyTo({
+      center: [flyToLocation.lng, flyToLocation.lat],
+      zoom: targetZoom,
+      pitch: projection === 'globe' ? 22 : 0,
+      duration: 2000,
+      essential: true,
+    });
+  }, [mapReady, flyToLocation, projection]);
 
   // Dynamic projection switching (lightweight — no terrain DEM)
   useEffect(() => {
@@ -1440,36 +1779,26 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
     const map = mapRef.current;
     try {
       (map as maplibregl.Map & { setProjection?: (projection: { type: 'mercator' | 'globe' }) => void }).setProjection({ type: projection });
+      applyAegisGlobeStyling(map, projection, mapStyle);
       if (projection === 'globe') {
-        map.easeTo({ pitch: 20, duration: 1200 });
-        try {
-          (map as maplibregl.Map & { setSky?: (config: Record<string, unknown>) => void }).setSky({
-            'sky-color': '#04040A',
-            'sky-horizon-blend': 0.5,
-            'horizon-color': '#0a0a1a',
-            'horizon-fog-blend': 0.3,
-            'fog-color': '#04040A',
-            'fog-ground-blend': 0.9,
-          });
-        } catch (e) { console.warn('[AEGIS] Suppressed error:', e instanceof Error ? e.message : e); }
+        map.easeTo({ center: [0, 20], zoom: Math.min(map.getZoom(), 2.05), pitch: 14, duration: 1200 });
       } else {
         map.easeTo({ pitch: 0, duration: 800 });
       }
     } catch (e) {
       console.warn('Projection switch failed:', e);
     }
-  }, [mapReady, projection]);
+  }, [applyAegisGlobeStyling, mapReady, projection, mapStyle]);
 
-  // Satellite / Dark style switching
+  // Satellite / globe presentation switching
   useEffect(() => {
     if (!mapReady || !mapRef.current) return;
-    if (mapStyle === prevStyleRef.current) return;
     prevStyleRef.current = mapStyle;
     const map = mapRef.current;
+    const shouldShowSatelliteLayer = projection === 'globe' || mapStyle !== 'dark';
 
     try {
-      if (mapStyle !== 'dark') {
-        // Add satellite raster tiles
+      if (shouldShowSatelliteLayer) {
         if (!map.getSource('satellite-tiles')) {
           map.addSource('satellite-tiles', {
             type: 'raster',
@@ -1477,19 +1806,36 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
             tileSize: 256,
             maxzoom: 18,
           });
-          map.addLayer({ id: 'satellite-layer', type: 'raster', source: 'satellite-tiles', paint: { 'raster-opacity': 0.85 } }, 'day-night-fill');
+        }
+
+        if (!map.getLayer('satellite-layer')) {
+          map.addLayer(
+            {
+              id: 'satellite-layer',
+              type: 'raster',
+              source: 'satellite-tiles',
+              paint: {
+                'raster-opacity': projection === 'globe' ? 0.5 : 0.85,
+                'raster-saturation': projection === 'globe' ? 0.2 : 0,
+                'raster-contrast': projection === 'globe' ? 0.12 : 0,
+                'raster-brightness-min': projection === 'globe' ? 0.1 : 0,
+                'raster-brightness-max': projection === 'globe' ? 0.92 : 1,
+              },
+            },
+            'day-night-fill',
+          );
         } else {
-          map.setLayoutProperty('satellite-layer', 'visibility', 'visible');
+
         }
-      } else {
-        if (map.getLayer('satellite-layer')) {
-          map.setLayoutProperty('satellite-layer', 'visibility', 'none');
-        }
+      } else if (map.getLayer('satellite-layer')) {
+        map.setLayoutProperty('satellite-layer', 'visibility', 'none');
       }
+
+      applyAegisGlobeStyling(map, projection, mapStyle);
     } catch (e) {
       console.warn('Style switch failed:', e);
     }
-  }, [mapReady, mapStyle]);
+  }, [applyAegisGlobeStyling, mapReady, mapStyle, projection]);
 
   return <div ref={containerRef} className="absolute inset-0 w-full h-full" />;
 }

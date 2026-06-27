@@ -64,6 +64,7 @@ interface NewsItem {
 }
 
 interface GdeltEvent {
+  name?: string;
   title: string;
   type: string;
   lat: number;
@@ -71,6 +72,9 @@ interface GdeltEvent {
   date: string;
   source: string;
   tone: number;
+  severity?: 'critical' | 'high' | 'elevated' | 'low';
+  theme?: string;
+  mentions?: number;
 }
 
 interface MarketData {
@@ -112,6 +116,8 @@ interface AiAnalystProps {
   data: DashboardData;
 }
 
+type AnalystBridgeAction = 'open' | 'briefing' | 'fusion';
+
 /* ─────────────────────────────────────────────────────────────
    Helpers
    ───────────────────────────────────────────────────────────── */
@@ -149,9 +155,9 @@ function buildContext(data: DashboardData): IntelligenceContext {
   const threats = (data.gdelt || []).slice(0, 15).map((ev) => ({
     id: generateId(),
     type: ev.type || 'INCIDENT',
-    title: ev.title,
-    description: ev.title,
-    severity: (ev.tone < -5 ? 'CRITICAL' : ev.tone < -2 ? 'HIGH' : ev.tone < 0 ? 'ELEVATED' : 'LOW') as
+    title: ev.title || ev.name || 'Global Incident',
+    description: `${ev.theme || 'Geopolitical Incident'} • ${ev.source || 'GDELT'}${ev.mentions ? ` • ${ev.mentions} mention${ev.mentions > 1 ? 's' : ''}` : ''}`,
+    severity: (ev.severity === 'critical' ? 'CRITICAL' : ev.severity === 'high' ? 'HIGH' : ev.severity === 'elevated' ? 'ELEVATED' : ev.severity === 'low' ? 'LOW' : (ev.tone < -5 ? 'CRITICAL' : ev.tone < -2 ? 'HIGH' : ev.tone < 0 ? 'ELEVATED' : 'LOW')) as
       | 'CRITICAL'
       | 'HIGH'
       | 'ELEVATED'
@@ -359,7 +365,7 @@ export default function AiAnalyst({ data }: AiAnalystProps) {
     const userMsg: ChatMessage = {
       id: generateId(),
       role: 'user',
-      content: '⚡ Generate WorldWatch fusion dossier with hotspots, actions, and watchlist',
+      content: '⚡ Generate AEGIS fusion dossier with hotspots, actions, and watchlist',
       timestamp: new Date().toISOString(),
     };
     setMessages((prev) => [...prev, userMsg]);
@@ -433,6 +439,30 @@ export default function AiAnalyst({ data }: AiAnalystProps) {
   const clearMessages = useCallback(() => {
     setMessages([]);
   }, []);
+
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const customEvent = event as CustomEvent<{ action?: AnalystBridgeAction }>;
+      const action = customEvent.detail?.action || 'open';
+
+      setIsOpen(true);
+      setShowSettings(false);
+
+      if (action === 'briefing') {
+        void handleBriefing();
+        return;
+      }
+
+      if (action === 'fusion') {
+        void handleFusionDossier();
+      }
+    };
+
+    window.addEventListener('aegis:ai-analyst', handler as EventListener);
+    return () => {
+      window.removeEventListener('aegis:ai-analyst', handler as EventListener);
+    };
+  }, [handleBriefing, handleFusionDossier]);
 
   /* ── Floating Trigger Button ── */
   const triggerButton = (
@@ -619,7 +649,7 @@ export default function AiAnalyst({ data }: AiAnalystProps) {
                         )}
                       </div>
                       <p className="text-[8px] font-mono text-[var(--text-muted)] leading-relaxed">
-                        WorldWatch runs in free local mode by default. Add your own Gemini key only if you want higher-quality model output. Your key stays in this browser and is sent only with your own requests. Get a free key at{' '}
+                        AEGIS runs in free local mode by default. Add your own Gemini key only if you want higher-quality model output. Your key stays in this browser and is sent only with your own requests. Get a free key at{' '}
                         <a
                           href="https://aistudio.google.com/apikey"
                           target="_blank"
@@ -666,10 +696,10 @@ export default function AiAnalyst({ data }: AiAnalystProps) {
 
                     <div className="space-y-2">
                       <h3 className="hud-text text-[12px] text-[var(--text-heading)]">
-                        INTELLIGENCE ANALYST READY
+                        AEGIS ANALYST READY
                       </h3>
                       <p className="text-[10px] font-mono text-[var(--text-muted)] leading-relaxed max-w-[280px]">
-                        I correlate live seismic, OSINT, threat, and cyber data to deliver actionable intelligence assessments.
+                        I correlate live seismic, OSINT, risk, and cyber data to deliver operator-ready assessments.
                       </p>
                     </div>
 
@@ -867,7 +897,7 @@ export default function AiAnalyst({ data }: AiAnalystProps) {
                       value={inputText}
                       onChange={(e) => setInputText(e.target.value)}
                       onKeyDown={handleKeyDown}
-                      placeholder="Ask WorldWatch for a fusion assessment..."
+                      placeholder="Ask AEGIS for a fusion assessment..."
                       rows={1}
                       className="w-full bg-transparent px-3 py-2.5 text-[11px] font-mono text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none resize-none"
                       style={{ maxHeight: '120px', minHeight: '36px' }}

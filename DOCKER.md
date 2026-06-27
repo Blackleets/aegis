@@ -99,9 +99,8 @@ reads.
 3. AEGIS appears on the dashboard with its icon, reachable on host port
    `3000` (or whatever `AEGIS_PORT` you set in `.env`).
 
-The app icon is the gold Eye-of-Horus mark in
-`public/casaos-icon.png` (512×512 PNG), referenced by the `icon:` URL in the
-metadata.
+The app icon should use the AEGIS geometric mark from
+`public/favicon.svg`, referenced by the app metadata and public manifests.
 
 > CasaOS stores imported compose files under `/var/lib/casaos/apps/`, so a
 > relative `build:` context may not resolve there. If importing the YAML

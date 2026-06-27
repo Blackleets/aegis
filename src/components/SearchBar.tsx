@@ -8,20 +8,17 @@ import { Search, X, MapPin } from 'lucide-react';
    Coordinate and place name search with geocoding
    ═══════════════════════════════════════════════════════════════ */
 
-interface SearchResult {
+export interface SearchResult {
   label: string;
   lat: number;
   lng: number;
-}
-
-interface NominatimResult {
-  display_name: string;
-  lat: string;
-  lon: string;
+  bbox?: [west: number, south: number, east: number, north: number] | null;
+  zoom?: number;
+  kind?: string;
 }
 
 interface SearchBarProps {
-  onLocate: (lat: number, lng: number) => void;
+  onLocate: (result: SearchResult) => void;
 }
 
 export default function SearchBar({ onLocate }: SearchBarProps) {
@@ -36,10 +33,17 @@ export default function SearchBar({ onLocate }: SearchBarProps) {
     if (open) inputRef.current?.focus();
   }, [open]);
 
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
+
   const parseCoords = (s: string): { lat: number; lng: number } | null => {
     const m = s.trim().match(/^([+-]?\d+\.?\d*)[,\s]+([+-]?\d+\.?\d*)$/);
     if (!m) return null;
-    const lat = parseFloat(m[1]), lng = parseFloat(m[2]);
+    const lat = parseFloat(m[1]);
+    const lng = parseFloat(m[2]);
     if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) return { lat, lng };
     return null;
   };
@@ -48,29 +52,42 @@ export default function SearchBar({ onLocate }: SearchBarProps) {
     setValue(q);
     const coords = parseCoords(q);
     if (coords) {
-      setResults([{ label: `${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)}`, ...coords }]);
+      setResults([{ label: `${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)}`, ...coords, zoom: 12, kind: 'coordinates' }]);
+      setLoading(false);
       return;
     }
+
     if (timerRef.current) clearTimeout(timerRef.current);
-    if (q.trim().length < 2) { setResults([]); return; }
+    if (q.trim().length < 2) {
+      setResults([]);
+      setLoading(false);
+      return;
+    }
+
     timerRef.current = setTimeout(async () => {
       setLoading(true);
       try {
-        const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5`, {
-          headers: { 'Accept-Language': 'en' },
-        });
-        const data: NominatimResult[] = await res.json();
-        setResults(data.map((r) => ({ label: r.display_name, lat: parseFloat(r.lat), lng: parseFloat(r.lon) })));
-      } catch { setResults([]); }
-      setLoading(false);
+        const res = await fetch(`/api/geocode?q=${encodeURIComponent(q)}&limit=6`);
+        const data = await res.json();
+        setResults(Array.isArray(data.results) ? data.results : []);
+      } catch {
+        setResults([]);
+      } finally {
+        setLoading(false);
+      }
     }, 350);
   }, []);
 
-  const handleSelect = (r: { lat: number; lng: number }) => {
-    onLocate(r.lat, r.lng);
+  const resetAndClose = () => {
     setOpen(false);
     setValue('');
     setResults([]);
+    setLoading(false);
+  };
+
+  const handleSelect = (r: SearchResult) => {
+    onLocate(r);
+    resetAndClose();
   };
 
   if (!open) {
@@ -92,30 +109,35 @@ export default function SearchBar({ onLocate }: SearchBarProps) {
         <input
           ref={inputRef}
           value={value}
-          onChange={(e) => handleSearch(e.target.value)}
+          onChange={(e) => void handleSearch(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Escape') { setOpen(false); setValue(''); setResults([]); }
+            if (e.key === 'Escape') resetAndClose();
             if (e.key === 'Enter' && results.length > 0) handleSelect(results[0]);
           }}
-          placeholder="ENTER COORDINATES OR TARGET NAME..."
+          placeholder="ENTER COUNTRY, CITY, ADDRESS OR COORDINATES..."
           className="flex-1 bg-transparent text-[10px] text-[var(--text-primary)] font-mono tracking-wider outline-none placeholder:text-[var(--text-muted)]"
         />
         {loading && <div className="w-3 h-3 border border-[var(--gold-primary)] border-t-transparent rounded-full animate-spin" />}
-        <button onClick={() => { setOpen(false); setValue(''); setResults([]); }} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+        <button onClick={resetAndClose} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]">
           <X className="w-3 h-3" />
         </button>
       </div>
 
       {results.length > 0 && (
-        <div className="absolute top-full left-0 right-0 mt-1 glass-panel overflow-hidden shadow-[0_8px_30px_rgba(0,0,0,0.5)] max-h-[200px] overflow-y-auto styled-scrollbar z-50">
+        <div className="absolute top-full left-0 right-0 mt-1 glass-panel overflow-hidden shadow-[0_8px_30px_rgba(0,0,0,0.5)] max-h-[220px] overflow-y-auto styled-scrollbar z-50">
           {results.map((r, i) => (
             <button
-              key={i}
+              key={`${r.label}-${i}`}
               onClick={() => handleSelect(r)}
-              className="w-full text-left px-3 py-2.5 hover:bg-[var(--hover-accent)] transition-colors border-b border-[var(--border-secondary)] last:border-0 flex items-center gap-2"
+              className="w-full text-left px-3 py-2.5 hover:bg-[var(--hover-accent)] transition-colors border-b border-[var(--border-secondary)] last:border-0 flex items-start gap-2"
             >
-              <MapPin className="w-3 h-3 text-[var(--gold-primary)] flex-shrink-0" />
-              <span className="text-[9px] text-[var(--text-secondary)] font-mono truncate">{r.label}</span>
+              <MapPin className="mt-0.5 w-3 h-3 text-[var(--gold-primary)] flex-shrink-0" />
+              <div className="min-w-0 flex-1">
+                <div className="text-[9px] text-[var(--text-secondary)] font-mono truncate">{r.label}</div>
+                <div className="mt-0.5 text-[7px] font-mono uppercase tracking-[0.16em] text-[var(--text-muted)]">
+                  {(r.kind || 'place').replace(/_/g, ' ')} · {r.lat.toFixed(4)}, {r.lng.toFixed(4)}
+                </div>
+              </div>
             </button>
           ))}
         </div>

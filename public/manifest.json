@@ -1,31 +1,19 @@
 {
-  "name": "WorldWatch — Global Monitoring Platform",
-  "short_name": "WorldWatch",
-  "description": "Global monitoring and recon command center for live flight, satellite, CCTV, seismic and cyber intelligence.",
+  "name": "AEGIS — Verified Global Intelligence Surface",
+  "short_name": "AEGIS",
+  "description": "Original intelligence surface for live flight, satellite, CCTV, seismic, market and cyber telemetry.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#06060C",
+  "background_color": "#03070D",
   "theme_color": "#D4AF37",
   "orientation": "landscape-primary",
-  "categories": ["security", "intelligence", "analytics", "news"],
+  "categories": ["security", "intelligence", "analytics", "osint"],
   "icons": [
     {
       "src": "/favicon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
-    },
-    {
-      "src": "/android-chrome-512x512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
     }
   ]
 }

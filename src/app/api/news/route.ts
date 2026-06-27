@@ -18,20 +18,17 @@ interface NewsItem extends FeedItem {
   machine_assessment: string | null;
 }
 
-const TELEGRAM_CHANNELS = [
-  'OSINTtechnical',
-  'Faytuks',
-  'Liveuamap',
-  'CyberKnow',
+const RSS_FEEDS: Array<{ source: string; url: string }> = [
+  { source: 'BBC World', url: 'https://feeds.bbci.co.uk/news/world/rss.xml' },
+  { source: 'Al Jazeera', url: 'https://www.aljazeera.com/xml/rss/all.xml' },
+  { source: 'GDACS', url: 'https://www.gdacs.org/xml/rss.xml' },
 ];
 
-const FALLBACK_FEEDS: Record<string, string> = {
-  BBC: 'https://feeds.bbci.co.uk/news/world/rss.xml',
-  AlJazeera: 'https://www.aljazeera.com/xml/rss/all.xml',
-  GDACS: 'https://www.gdacs.org/xml/rss.xml',
-};
-
-const RISK_KEYWORDS = ['war', 'missile', 'strike', 'attack', 'crisis', 'tension', 'military', 'conflict', 'defense', 'clash', 'nuclear', 'invasion', 'bomb', 'drone', 'weapon', 'sanctions', 'ceasefire', 'escalation', 'killed', 'destroyed', 'operation', 'casualty', 'frontline', 'threat'];
+const RISK_KEYWORDS = [
+  'war', 'missile', 'strike', 'attack', 'crisis', 'tension', 'military', 'conflict', 'defense', 'clash',
+  'nuclear', 'invasion', 'bomb', 'drone', 'weapon', 'sanctions', 'ceasefire', 'escalation', 'killed',
+  'destroyed', 'operation', 'casualty', 'frontline', 'threat', 'earthquake', 'tsunami', 'eruption', 'flood',
+];
 
 const KEYWORD_COORDS: Record<string, [number, number]> = {
   ukraine: [49.487, 31.272],
@@ -46,10 +43,34 @@ const KEYWORD_COORDS: Record<string, [number, number]> = {
   yemen: [15.552, 48.516],
   china: [35.861, 104.195],
   taiwan: [23.697, 120.96],
-  'united states': [38.907, -77.036],
+  japan: [36.2048, 138.2529],
+  turkey: [38.9637, 35.2433],
   europe: [48.8, 2.3],
+  africa: [1.6508, 17.6791],
   'middle east': [31.5, 34.8],
+  'united states': [38.907, -77.036],
 };
+
+function decodeEntities(text: string) {
+  return text
+    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&nbsp;/g, ' ')
+    .trim();
+}
+
+function stripHtml(text: string) {
+  return decodeEntities(text)
+    .replace(/<br\s*\/?>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
 function scoreRisk(text: string): number {
   const lower = text.toLowerCase();
@@ -68,35 +89,9 @@ function findCoords(text: string): [number, number] | null {
   return null;
 }
 
-function parseTelegramHTML(html: string, channel: string): FeedItem[] {
-  const items: FeedItem[] = [];
-  const messageBlockRegex = /<div class="tgme_widget_message_wrap js-widget_message_wrap"[\s\S]*?<\/div>\s*<\/div>\s*<\/div>/gi;
-  let blockMatch: RegExpExecArray | null;
-
-  while ((blockMatch = messageBlockRegex.exec(html)) !== null) {
-    const blockHtml = blockMatch[0];
-    const textRegex = /<div class="tgme_widget_message_text[^>]*>([\s\S]*?)<\/div>/i;
-    const textMatch = blockHtml.match(textRegex);
-    if (!textMatch) continue;
-
-    const text = textMatch[1]
-      .replace(/<br\s*\/?>/gi, '\n')
-      .replace(/<[^>]+>/g, '')
-      .replace(/&quot;/g, '"')
-      .replace(/&amp;/g, '&')
-      .trim();
-    if (!text || text.length < 10) continue;
-
-    const dateRegex = /<a class="tgme_widget_message_date" href="(https:\/\/t\.me\/[^"]+)".*?<time datetime="([^"]+)"/i;
-    const dateMatch = blockHtml.match(dateRegex);
-    const link = dateMatch ? dateMatch[1] : `https://t.me/${channel}`;
-    const pubDate = dateMatch ? dateMatch[2] : new Date().toISOString();
-    const title = text.split('\n')[0].substring(0, 100);
-
-    items.push({ title, description: text, link, pubDate, source: `t.me/${channel}` });
-  }
-
-  return items;
+function getTagValue(block: string, tag: string): string {
+  const match = block.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i'));
+  return match ? stripHtml(match[1]) : '';
 }
 
 function parseRSSItems(xml: string, sourceName: string): FeedItem[] {
@@ -106,19 +101,18 @@ function parseRSSItems(xml: string, sourceName: string): FeedItem[] {
 
   while ((match = itemRegex.exec(xml)) !== null) {
     const itemXml = match[1];
-    const getTag = (tag: string) => {
-      const found = itemXml.match(new RegExp(`<${tag}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]><\\/${tag}>|<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i'));
-      return (found?.[1] || found?.[2] || '').trim();
-    };
+    const title = getTagValue(itemXml, 'title');
+    const description = getTagValue(itemXml, 'description');
+    const link = getTagValue(itemXml, 'link');
+    const pubDate = getTagValue(itemXml, 'pubDate') || new Date().toISOString();
 
-    const title = getTag('title').replace(/<[^>]+>/g, '');
-    const desc = getTag('description').replace(/<[^>]+>/g, '').replace(/&quot;/g, '"');
+    if (!title && !description) continue;
 
     items.push({
-      title: title.length > 100 ? `${title.substring(0, 100)}...` : title,
-      description: desc,
-      link: getTag('link'),
-      pubDate: getTag('pubDate') || new Date().toISOString(),
+      title: title.length > 140 ? `${title.slice(0, 137)}...` : title,
+      description,
+      link,
+      pubDate,
       source: sourceName,
     });
   }
@@ -128,73 +122,71 @@ function parseRSSItems(xml: string, sourceName: string): FeedItem[] {
 
 export async function GET() {
   try {
-    const feedPromises = TELEGRAM_CHANNELS.map(async (channel): Promise<FeedItem[]> => {
-      try {
-        const res = await fetch(`https://t.me/s/${channel}`, {
-          signal: AbortSignal.timeout(8000),
-          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
-        });
-        if (!res.ok) return [];
-        const html = await res.text();
-        return parseTelegramHTML(html, channel).slice(-8);
-      } catch {
-        return [];
-      }
-    });
+    const feedResults = await Promise.allSettled(
+      RSS_FEEDS.map(async ({ source, url }): Promise<FeedItem[]> => {
+        try {
+          const res = await fetch(url, {
+            signal: AbortSignal.timeout(8000),
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              Accept: 'application/rss+xml, application/xml, text/xml;q=0.9, */*;q=0.8',
+            },
+            cache: 'no-store',
+          });
+          if (!res.ok) return [];
+          const xml = await res.text();
+          return parseRSSItems(xml, source).slice(0, 8);
+        } catch {
+          return [];
+        }
+      })
+    );
 
-    const feedResults = await Promise.allSettled(feedPromises);
     const allArticles: FeedItem[] = [];
-
     for (const result of feedResults) {
       if (result.status === 'fulfilled') allArticles.push(...result.value);
     }
 
-    if (allArticles.length === 0) {
-      const fallbackPromises = Object.entries(FALLBACK_FEEDS).map(async ([source, url]): Promise<FeedItem[]> => {
-        try {
-          const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
-          if (!res.ok) return [];
-          const xml = await res.text();
-          return parseRSSItems(xml, source).slice(0, 5);
-        } catch {
-          return [];
-        }
-      });
+    const deduped = Array.from(
+      new Map(
+        allArticles
+          .filter((article) => article.title || article.description)
+          .map((article) => [article.link || `${article.source}:${article.title}`, article])
+      ).values()
+    );
 
-      const fallbackResults = await Promise.allSettled(fallbackPromises);
-      for (const result of fallbackResults) {
-        if (result.status === 'fulfilled') allArticles.push(...result.value);
-      }
-    }
-
-    const newsItems: NewsItem[] = allArticles.map((article) => {
-      const summaryText = article.description || article.title;
+    const newsItems: NewsItem[] = deduped.map((article) => {
+      const summaryText = `${article.title} ${article.description}`.trim();
       const riskScore = scoreRisk(summaryText);
       const coords = findCoords(summaryText);
 
       return {
         ...article,
-        id: createHash('md5').update((article.link || '') + (article.pubDate || '')).digest('hex'),
+        id: createHash('md5').update((article.link || '') + (article.pubDate || '') + article.title).digest('hex'),
         published: article.pubDate,
         risk_score: riskScore,
         coords: coords ? [coords[0], coords[1]] : null,
         coords_default: !coords,
-        machine_assessment: riskScore >= 8 ? 'AI Analysis indicates elevated tactical priority based on OSINT stream patterns.' : null,
+        machine_assessment: riskScore >= 8 ? 'AI analysis indicates elevated priority based on real RSS coverage and keyword clustering.' : null,
       };
     });
 
     newsItems.sort((a, b) => new Date(b.published).getTime() - new Date(a.published).getTime());
 
-    return NextResponse.json({
-      news: newsItems,
-      total: newsItems.length,
-      timestamp: new Date().toISOString(),
-    }, {
-      headers: {
-        'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
+    return NextResponse.json(
+      {
+        news: newsItems.slice(0, 24),
+        total: newsItems.length,
+        sources: RSS_FEEDS.map((feed) => feed.source),
+        timestamp: new Date().toISOString(),
       },
-    });
+      {
+        headers: {
+          'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
+        },
+      }
+    );
   } catch {
-    return NextResponse.json({ news: [], error: 'Failed to fetch intel' }, { status: 500 });
+    return NextResponse.json({ news: [], error: 'Failed to fetch verified news feeds' }, { status: 500 });
   }
 }

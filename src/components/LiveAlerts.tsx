@@ -12,7 +12,6 @@ import {
   RadioTower,
   Maximize2,
   Minimize2,
-  Earth,
 } from 'lucide-react';
 
 interface NewsItem {
@@ -33,19 +32,8 @@ interface EarthquakeItem {
   time?: string;
 }
 
-interface FeedItem {
-  name: string;
-  city: string;
-  country: string;
-  lat: number;
-  lng: number;
-  url: string;
-  category: string;
-  region: string;
-}
-
 interface AlertItem {
-  type: 'news' | 'quake' | 'feed';
+  type: 'news' | 'quake';
   title: string;
   description?: string;
   source: string;
@@ -54,8 +42,6 @@ interface AlertItem {
   time?: string;
   severity: string;
   url?: string;
-  feedUrl?: string;
-  category?: string;
 }
 
 interface LiveAlertsData {
@@ -66,7 +52,6 @@ interface LiveAlertsData {
 interface LiveAlertsProps {
   data: LiveAlertsData;
   onLocate: (lat: number, lng: number) => void;
-  onWatchFeed?: (url: string, name: string) => void;
 }
 
 const RISK_COLORS: Record<string, string> = {
@@ -77,32 +62,6 @@ const RISK_COLORS: Record<string, string> = {
   LOW: '#34D399',
 };
 
-const BUILTIN_FEEDS: FeedItem[] = [
-  { name: 'NBC News NOW', city: 'New York', country: 'US', lat: 40.759, lng: -73.98, url: 'https://www.youtube.com/embed/live_stream?channel=UCeY0bbntWzzVIaj2z3QigXg&autoplay=1&mute=1', category: 'mainstream', region: 'americas' },
-  { name: 'CBS News 24/7', city: 'New York', country: 'US', lat: 40.764, lng: -73.973, url: 'https://www.youtube.com/embed/live_stream?channel=UC8p1vwvWtl6T73JiExfWs1g&autoplay=1&mute=1', category: 'mainstream', region: 'americas' },
-  { name: 'ABC News Live', city: 'New York', country: 'US', lat: 40.763, lng: -73.979, url: 'https://www.youtube.com/embed/live_stream?channel=UCBi2mrWuNuyYy4gbM6fU18Q&autoplay=1&mute=1', category: 'mainstream', region: 'americas' },
-  { name: 'Bloomberg TV', city: 'New York', country: 'US', lat: 40.756, lng: -73.988, url: 'https://www.youtube.com/embed/live_stream?channel=UC_vQ72b7v5n2938v9d5c80w&autoplay=1&mute=1', category: 'finance', region: 'americas' },
-  { name: 'C-SPAN', city: 'Washington DC', country: 'US', lat: 38.897, lng: -77.036, url: 'https://www.youtube.com/embed/live_stream?channel=UCb--64Gl51jIEVE-GLDAVTg&autoplay=1&mute=1', category: 'government', region: 'americas' },
-  { name: 'CBC News', city: 'Toronto', country: 'CA', lat: 43.644, lng: -79.387, url: 'https://www.youtube.com/embed/live_stream?channel=UCKy1dAqELon0zgzZPOz9SVw&autoplay=1&mute=1', category: 'mainstream', region: 'americas' },
-  { name: 'Sky News', city: 'London', country: 'GB', lat: 51.5, lng: -0.118, url: 'https://www.youtube.com/embed/live_stream?channel=UCoMdktPbSTixAyNGwb-UYkQ&autoplay=1&mute=1', category: 'mainstream', region: 'europe' },
-  { name: 'France 24 EN', city: 'Paris', country: 'FR', lat: 48.83, lng: 2.28, url: 'https://www.youtube.com/embed/live_stream?channel=UCQfwfsi5VrQ8yKZ-UWmAEFg&autoplay=1&mute=1', category: 'mainstream', region: 'europe' },
-  { name: 'DW News', city: 'Berlin', country: 'DE', lat: 52.508, lng: 13.376, url: 'https://www.youtube.com/embed/live_stream?channel=UCknLrEdhRCp1aegoMqRaCZg&autoplay=1&mute=1', category: 'mainstream', region: 'europe' },
-  { name: 'Euronews', city: 'Lyon', country: 'FR', lat: 45.764, lng: 4.836, url: 'https://www.youtube.com/embed/live_stream?channel=UCtUbOIRGKZkW7555n6x6q6g&autoplay=1&mute=1', category: 'mainstream', region: 'europe' },
-  { name: 'TRT World', city: 'Istanbul', country: 'TR', lat: 41.008, lng: 28.978, url: 'https://www.youtube.com/embed/live_stream?channel=UC7fWeaHZQg1p9-4v98L1D1A&autoplay=1&mute=1', category: 'mainstream', region: 'europe' },
-  { name: 'UKRINFORM', city: 'Kyiv', country: 'UA', lat: 50.45, lng: 30.523, url: 'https://www.youtube.com/embed/live_stream?channel=UCaDkCK6iFHPE0lmpaYL-WxQ&autoplay=1&mute=1', category: 'conflict', region: 'europe' },
-  { name: 'Al Jazeera EN', city: 'Doha', country: 'QA', lat: 25.286, lng: 51.534, url: 'https://www.youtube.com/embed/live_stream?channel=UCNye-wNBqNL5ZzHSJj3l8Bg&autoplay=1&mute=1', category: 'mainstream', region: 'middleeast' },
-  { name: 'Al Mayadeen', city: 'Beirut', country: 'LB', lat: 33.8886, lng: 35.4955, url: 'https://www.youtube.com/embed/live_stream?channel=UCZCFHCU-2eGF7V5ciMkoPHw&autoplay=1&mute=1', category: 'conflict', region: 'middleeast' },
-  { name: 'LBCI Lebanon', city: 'Beirut', country: 'LB', lat: 33.893, lng: 35.5018, url: 'https://www.youtube.com/embed/live_stream?channel=UCpE6gpKewomi17XDyPfpFjA&autoplay=1&mute=1', category: 'mainstream', region: 'middleeast' },
-  { name: 'NHK World', city: 'Tokyo', country: 'JP', lat: 35.69, lng: 139.692, url: 'https://www.youtube.com/embed/live_stream?channel=UCSPEjw8F2nQDtmUKPFNF7_A&autoplay=1&mute=1', category: 'mainstream', region: 'asia' },
-  { name: 'CNA 24/7', city: 'Singapore', country: 'SG', lat: 1.29, lng: 103.852, url: 'https://www.youtube.com/embed/live_stream?channel=UC83jt4dlz1Gjl58fzQrrKZg&autoplay=1&mute=1', category: 'mainstream', region: 'asia' },
-  { name: 'WION', city: 'New Delhi', country: 'IN', lat: 28.614, lng: 77.209, url: 'https://www.youtube.com/embed/live_stream?channel=UC_gUM8rL-Lrg6O3adPW9K1g&autoplay=1&mute=1', category: 'mainstream', region: 'asia' },
-  { name: 'Arirang', city: 'Seoul', country: 'KR', lat: 37.566, lng: 126.978, url: 'https://www.youtube.com/embed/live_stream?channel=UCw9-5Y1CjW7Qy1Yf5q1y2-Q&autoplay=1&mute=1', category: 'mainstream', region: 'asia' },
-  { name: 'ABC AU', city: 'Sydney', country: 'AU', lat: -33.868, lng: 151.209, url: 'https://www.youtube.com/embed/live_stream?channel=UC5iLnYoF4Ryb63YdGD9RfWQ&autoplay=1&mute=1', category: 'mainstream', region: 'asia' },
-  { name: 'Africanews', city: 'Pointe-Noire', country: 'CG', lat: -4.778, lng: 11.865, url: 'https://www.youtube.com/embed/live_stream?channel=UC5T2fB_W0Z31T0c8yN36a8A&autoplay=1&mute=1', category: 'mainstream', region: 'africa' },
-  { name: 'SABC News', city: 'Johannesburg', country: 'ZA', lat: -26.204, lng: 28.047, url: 'https://www.youtube.com/embed/live_stream?channel=UC8yH-uI81UUtEMDsowQyx1g&autoplay=1&mute=1', category: 'mainstream', region: 'africa' },
-  { name: 'teleSUR EN', city: 'Caracas', country: 'VE', lat: 10.491, lng: -66.902, url: 'https://www.youtube.com/embed/live_stream?channel=UCmuTmpLY35O3csvhyA6vrkg&autoplay=1&mute=1', category: 'mainstream', region: 'americas' },
-];
-
 function getTimeLabel(value?: string) {
   if (!value) return '';
   try {
@@ -112,27 +71,35 @@ function getTimeLabel(value?: string) {
   }
 }
 
-export default function LiveAlerts({ data, onLocate, onWatchFeed }: LiveAlertsProps) {
+function isBlockedSource(item: NewsItem) {
+  const source = String(item.source || '').toLowerCase();
+  const link = String(item.link || '').toLowerCase();
+  return source.includes('t.me') || source.includes('telegram') || link.includes('t.me/') || link.includes('telegram.');
+}
+
+export default function LiveAlerts({ data, onLocate }: LiveAlertsProps) {
   const [expanded, setExpanded] = useState(true);
   const [maximized, setMaximized] = useState(false);
-  const [filter, setFilter] = useState<'all' | 'news' | 'quakes' | 'feeds'>('all');
+  const [filter, setFilter] = useState<'all' | 'news' | 'quakes'>('all');
 
   const alerts = useMemo(() => {
     const unified: AlertItem[] = [];
 
-    data.news?.forEach((item) => {
-      unified.push({
-        type: 'news',
-        title: item.title || 'Untitled brief',
-        description: item.description,
-        source: item.source || 'News desk',
-        lat: item.coords?.[0],
-        lng: item.coords?.[1],
-        time: item.published,
-        severity: (item.risk_score ?? 1) >= 8 ? 'CRITICAL' : (item.risk_score ?? 1) >= 6 ? 'HIGH' : (item.risk_score ?? 1) >= 4 ? 'ELEVATED' : 'LOW',
-        url: item.link,
+    (data.news || [])
+      .filter((item) => !isBlockedSource(item))
+      .forEach((item) => {
+        unified.push({
+          type: 'news',
+          title: item.title || 'Untitled brief',
+          description: item.description,
+          source: item.source || 'News desk',
+          lat: item.coords?.[0],
+          lng: item.coords?.[1],
+          time: item.published,
+          severity: (item.risk_score ?? 1) >= 8 ? 'CRITICAL' : (item.risk_score ?? 1) >= 6 ? 'HIGH' : (item.risk_score ?? 1) >= 4 ? 'ELEVATED' : 'LOW',
+          url: item.link,
+        });
       });
-    });
 
     data.earthquakes?.slice(0, 5).forEach((quake) => {
       unified.push({
@@ -146,19 +113,6 @@ export default function LiveAlerts({ data, onLocate, onWatchFeed }: LiveAlertsPr
       });
     });
 
-    BUILTIN_FEEDS.forEach((feed) => {
-      unified.push({
-        type: 'feed',
-        title: feed.name,
-        source: `${feed.city}, ${feed.country}`,
-        lat: feed.lat,
-        lng: feed.lng,
-        feedUrl: feed.url,
-        severity: 'LOW',
-        category: feed.category,
-      });
-    });
-
     return unified;
   }, [data.earthquakes, data.news]);
 
@@ -166,12 +120,10 @@ export default function LiveAlerts({ data, onLocate, onWatchFeed }: LiveAlertsPr
     ? alerts
     : filter === 'news'
       ? alerts.filter((item) => item.type === 'news')
-      : filter === 'quakes'
-        ? alerts.filter((item) => item.type === 'quake')
-        : alerts.filter((item) => item.type === 'feed');
+      : alerts.filter((item) => item.type === 'quake');
 
   const criticalCount = alerts.filter((item) => item.severity === 'CRITICAL').length;
-  const liveFeedCount = alerts.filter((item) => item.type === 'feed').length;
+  const newsCount = alerts.filter((item) => item.type === 'news').length;
   const geolocatedCount = alerts.filter((item) => item.lat !== undefined && item.lng !== undefined).length;
 
   const getIcon = (type: AlertItem['type']) => {
@@ -180,8 +132,6 @@ export default function LiveAlerts({ data, onLocate, onWatchFeed }: LiveAlertsPr
         return Newspaper;
       case 'quake':
         return AlertTriangle;
-      case 'feed':
-        return Earth;
       default:
         return Newspaper;
     }
@@ -211,8 +161,8 @@ export default function LiveAlerts({ data, onLocate, onWatchFeed }: LiveAlertsPr
             <RadioTower className="h-4 w-4 text-[var(--cyan-primary)]" />
           </div>
           <div>
-            <div className="text-[8px] font-mono uppercase tracking-[0.3em] text-[var(--text-muted)]">Live desk</div>
-            <div className="mt-1 text-[13px] font-semibold tracking-[0.08em] text-[var(--text-primary)]">Pulsewire</div>
+            <div className="text-[8px] font-mono uppercase tracking-[0.3em] text-[var(--text-muted)]">Verified desk</div>
+            <div className="mt-1 text-[13px] font-semibold tracking-[0.08em] text-[var(--text-primary)]">Verified Newswire</div>
           </div>
         </div>
 
@@ -248,17 +198,21 @@ export default function LiveAlerts({ data, onLocate, onWatchFeed }: LiveAlertsPr
                 <div className="mt-1 text-[16px] font-semibold text-rose-300">{criticalCount}</div>
               </div>
               <div className="rounded-2xl border border-white/6 bg-white/[0.03] px-3 py-2.5">
-                <div className="text-[8px] font-mono uppercase tracking-[0.22em] text-[var(--text-muted)]">Feeds</div>
-                <div className="mt-1 text-[16px] font-semibold text-sky-300">{liveFeedCount}</div>
+                <div className="text-[8px] font-mono uppercase tracking-[0.22em] text-[var(--text-muted)]">News</div>
+                <div className="mt-1 text-[16px] font-semibold text-sky-300">{newsCount}</div>
               </div>
               <div className="rounded-2xl border border-white/6 bg-white/[0.03] px-3 py-2.5">
-                <div className="text-[8px] font-mono uppercase tracking-[0.22em] text-[var(--text-muted)]">Mapped</div>
+                <div className="text-[8px] font-mono uppercase tracking-[0.22em] text-[var(--text-muted)]">Geo-tagged</div>
                 <div className="mt-1 text-[16px] font-semibold text-emerald-300">{geolocatedCount}</div>
               </div>
             </div>
 
+            <div className="mb-2 text-[8px] font-mono uppercase tracking-[0.18em] text-[var(--text-muted)]">
+              Real-source incident desk · news + seismic activity
+            </div>
+
             <div className="mb-3 flex gap-1.5 overflow-x-auto">
-              {(['all', 'news', 'quakes', 'feeds'] as const).map((entry) => (
+              {(['all', 'news', 'quakes'] as const).map((entry) => (
                 <button
                   key={entry}
                   onClick={() => setFilter(entry)}
@@ -279,7 +233,6 @@ export default function LiveAlerts({ data, onLocate, onWatchFeed }: LiveAlertsPr
                     key={`${alert.type}-${alert.title}-${index}`}
                     onClick={() => {
                       if (alert.lat !== undefined && alert.lng !== undefined) onLocate(alert.lat, alert.lng);
-                      if (alert.feedUrl && onWatchFeed) onWatchFeed(alert.feedUrl, alert.title);
                     }}
                     className="rounded-2xl border border-white/6 bg-white/[0.03] px-3 py-3 transition-colors hover:bg-white/[0.05]"
                   >
@@ -309,7 +262,6 @@ export default function LiveAlerts({ data, onLocate, onWatchFeed }: LiveAlertsPr
                               {getTimeLabel(alert.time)}
                             </span>
                           )}
-                          {alert.category && <span>{alert.category}</span>}
                         </div>
 
                         <div className="mt-3 flex items-center gap-2">
@@ -327,7 +279,7 @@ export default function LiveAlerts({ data, onLocate, onWatchFeed }: LiveAlertsPr
                               className="inline-flex items-center gap-1 rounded-full border border-white/10 px-2 py-1 text-[8px] font-semibold uppercase tracking-[0.16em] text-[var(--cyan-primary)] hover:underline"
                               onClick={(e) => e.stopPropagation()}
                             >
-                              Source
+                              Read source
                             </a>
                           )}
                         </div>

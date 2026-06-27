@@ -85,7 +85,8 @@ function getYouTubeWatchUrl(url: string): string {
 }
 
 type Coordinate = { lat: number; lng: number };
-type FlyToLocation = Coordinate & { ts: number };
+type BoundingBox = [west: number, south: number, east: number, north: number];
+type FlyToLocation = Coordinate & { ts: number; zoom?: number; bbox?: BoundingBox | null; label?: string };
 type MapView = { zoom: number; latitude: number };
 type ActiveLayers = Record<string, boolean>;
 
@@ -793,129 +794,130 @@ export default function Dashboard() {
 
 
 
-            {/* ── Geometric tactical logo ── */}
-            <div className="relative w-40 h-40 mb-8 flex items-center justify-center z-[2]">
-              {/* Outer ring — slow clockwise */}
+            {/* ── AEGIS tactical identity block ── */}
+            <div className="relative w-[18rem] max-w-[82vw] mb-7 flex flex-col items-center z-[2]">
               <motion.div
-                initial={{ opacity: 0, scale: 0.6, rotate: 0 }}
-                animate={{ opacity: 1, scale: 1, rotate: 360 }}
-                transition={{ opacity: { duration: 0.6 }, scale: { duration: 0.8, ease: 'easeOut' }, rotate: { duration: 20, repeat: Infinity, ease: 'linear' } }}
-                className="absolute inset-0 rounded-full"
-                style={{ border: '1px solid rgba(212,175,55,0.2)' }}
+                initial={{ opacity: 0, y: 22, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ duration: 0.75, ease: 'easeOut' }}
+                className="w-full rounded-[24px] border border-[rgba(34,211,238,0.16)] bg-[linear-gradient(180deg,rgba(6,14,24,0.96)_0%,rgba(7,11,18,0.92)_100%)] p-3 shadow-[0_20px_60px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.03)]"
               >
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full" style={{ background: 'var(--gold-primary)', boxShadow: '0 0 12px var(--gold-primary), 0 0 24px rgba(212,175,55,0.3)' }} />
-                <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-1 h-1 rounded-full" style={{ background: 'rgba(212,175,55,0.5)', boxShadow: '0 0 6px rgba(212,175,55,0.3)' }} />
-              </motion.div>
+                <div className="mb-3 flex items-center justify-between text-[9px] font-mono tracking-[0.28em] text-[var(--text-muted)]">
+                  <span>AEGIS</span>
+                  <span className="text-[var(--cyan-primary)]">WORLD MODEL</span>
+                </div>
 
-              {/* Middle ring — faster counter-clockwise */}
-              <motion.div
-                initial={{ opacity: 0, scale: 0.4, rotate: 0 }}
-                animate={{ opacity: 1, scale: 1, rotate: -360 }}
-                transition={{ opacity: { duration: 0.6, delay: 0.15 }, scale: { duration: 0.8, delay: 0.15, ease: 'easeOut' }, rotate: { duration: 12, repeat: Infinity, ease: 'linear' } }}
-                className="absolute rounded-full"
-                style={{ inset: '18px', border: '1px solid rgba(0,229,255,0.15)' }}
+                <div className="relative h-[92px] overflow-hidden rounded-[16px] border border-[rgba(34,211,238,0.12)] bg-[linear-gradient(180deg,rgba(8,16,28,0.96)_0%,rgba(5,10,18,0.84)_100%)]">
+                  <div className="absolute inset-0 opacity-40" style={{ backgroundImage: 'linear-gradient(rgba(34,211,238,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(34,211,238,0.07) 1px, transparent 1px)', backgroundSize: '26px 26px' }} />
+                  <div className="absolute left-0 right-0 top-1/2 h-[1px] -translate-y-1/2 bg-gradient-to-r from-transparent via-[rgba(34,211,238,0.38)] to-transparent" />
+                  <div className="absolute bottom-0 left-[18%] top-0 w-[1px] bg-gradient-to-b from-transparent via-[rgba(212,175,55,0.2)] to-transparent" />
+                  <div className="absolute bottom-0 right-[22%] top-0 w-[1px] bg-gradient-to-b from-transparent via-[rgba(34,211,238,0.16)] to-transparent" />
+
+                  <motion.div
+                    initial={{ opacity: 0, x: -30 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.35, duration: 0.6 }}
+                    className="absolute left-3 top-3 rounded-full border border-[rgba(212,175,55,0.26)] bg-[rgba(212,175,55,0.08)] px-2 py-[3px] text-[8px] font-mono tracking-[0.2em] text-[var(--gold-primary)]"
+                  >
+                    GRID LOCK
+                  </motion.div>
+
+                  <motion.div
+                    initial={{ opacity: 0, scaleX: 0 }}
+                    animate={{ opacity: 1, scaleX: 1 }}
+                    transition={{ delay: 0.45, duration: 0.8, ease: 'easeOut' }}
+                    className="absolute left-4 right-4 top-1/2 h-[2px] origin-left rounded-full bg-gradient-to-r from-[rgba(34,211,238,0.12)] via-[rgba(191,219,254,0.92)] to-[rgba(212,175,55,0.4)] shadow-[0_0_16px_rgba(34,211,238,0.24)]"
+                  />
+
+                  {[
+                    { left: '22%', top: '50%', delay: 0.8, color: 'rgba(34,211,238,0.95)' },
+                    { left: '46%', top: '50%', delay: 1.0, color: 'rgba(191,219,254,0.95)' },
+                    { left: '71%', top: '50%', delay: 1.2, color: 'rgba(212,175,55,0.95)' },
+                  ].map((node, i) => (
+                    <motion.div
+                      key={i}
+                      initial={{ opacity: 0, scale: 0.7 }}
+                      animate={{ opacity: [0.55, 1, 0.55], scale: [0.9, 1.08, 0.9] }}
+                      transition={{ delay: node.delay, duration: 1.7, repeat: Infinity, ease: 'easeInOut' }}
+                      className="absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full"
+                      style={{ left: node.left, top: node.top, background: node.color, boxShadow: `0 0 14px ${node.color}` }}
+                    />
+                  ))}
+
+                  <motion.div
+                    initial={{ opacity: 0, x: 22 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.6, duration: 0.55 }}
+                    className="absolute right-3 top-3 text-right text-[8px] font-mono tracking-[0.22em] text-[var(--text-secondary)]"
+                  >
+                    <div>SYNC 3/3</div>
+                    <div className="mt-1 text-[var(--cyan-primary)]">VERIFIED FEEDS</div>
+                  </motion.div>
+
+                  <div className="absolute bottom-3 left-3 text-[8px] font-mono tracking-[0.22em] text-[rgba(212,175,55,0.72)]">COMMAND SURFACE</div>
+                  <div className="absolute right-3 bottom-3 text-[8px] font-mono tracking-[0.22em] text-[rgba(34,211,238,0.72)]">LIVE MODEL</div>
+                </div>
+              </motion.div>
+            </div>
+
+            {/* ── Title / identity ── */}
+            <div className="flex flex-col items-center mb-7 z-[2] px-4 text-center">
+              <motion.h1
+                initial={{ opacity: 0, y: 16, filter: 'blur(6px)' }}
+                animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                transition={{ delay: 0.55, duration: 0.65, ease: 'easeOut' }}
+                className="text-[2.15rem] md:text-[3.2rem] font-bold tracking-[0.36em] md:tracking-[0.42em] font-mono text-[var(--text-heading)]"
+                style={{ textShadow: '0 0 26px rgba(212,175,55,0.14)' }}
               >
-                <div className="absolute top-1/2 right-0 translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full" style={{ background: 'var(--cyan-primary)', boxShadow: '0 0 10px var(--cyan-primary), 0 0 20px rgba(0,229,255,0.2)' }} />
-                <div className="absolute bottom-0 left-1/4 translate-y-1/2 w-1 h-1 rounded-full" style={{ background: 'rgba(0,229,255,0.4)' }} />
-              </motion.div>
-
-              {/* Inner ring — fastest clockwise */}
-              <motion.div
-                initial={{ opacity: 0, scale: 0.2, rotate: 0 }}
-                animate={{ opacity: 1, scale: 1, rotate: 360 }}
-                transition={{ opacity: { duration: 0.6, delay: 0.3 }, scale: { duration: 0.8, delay: 0.3, ease: 'easeOut' }, rotate: { duration: 7, repeat: Infinity, ease: 'linear' } }}
-                className="absolute rounded-full"
-                style={{ inset: '40px', border: '1px solid rgba(212,175,55,0.25)' }}
-              >
-                <div className="absolute top-0 left-1/4 -translate-y-1/2 w-1.5 h-1.5 rounded-full" style={{ background: 'var(--gold-primary)', boxShadow: '0 0 8px var(--gold-primary)' }} />
-              </motion.div>
-
-              {/* Core circle + crosshair */}
-              <motion.div
-                initial={{ opacity: 0, scale: 0 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.4, duration: 0.6, ease: [0.34, 1.56, 0.64, 1] }}
-                className="relative w-12 h-12 rounded-full flex items-center justify-center"
-                style={{ border: '2px solid var(--gold-primary)', boxShadow: '0 0 20px rgba(212,175,55,0.15), inset 0 0 20px rgba(212,175,55,0.05)' }}
-              >
-                <motion.div
-                  animate={{ opacity: [0.3, 0.8, 0.3] }}
-                  transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-                  className="w-5 h-5 rounded-full"
-                  style={{ background: 'radial-gradient(circle, rgba(212,175,55,0.4) 0%, rgba(212,175,55,0.05) 70%)' }}
-                />
-                {/* Crosshair lines */}
-                <div className="absolute w-[1px] h-full" style={{ background: 'linear-gradient(to bottom, transparent, rgba(212,175,55,0.3), transparent)' }} />
-                <div className="absolute w-full h-[1px]" style={{ background: 'linear-gradient(to right, transparent, rgba(212,175,55,0.3), transparent)' }} />
-              </motion.div>
-
-              {/* Faint pulsing radar sweep */}
-              <motion.div
+                AEGIS
+              </motion.h1>
+              <motion.p
                 initial={{ opacity: 0 }}
-                animate={{ opacity: [0, 0.15, 0], rotate: [0, 360] }}
-                transition={{ opacity: { duration: 3, repeat: Infinity }, rotate: { duration: 3, repeat: Infinity, ease: 'linear' }, delay: 0.6 }}
-                className="absolute inset-[10px] rounded-full"
-                style={{ background: 'conic-gradient(from 0deg, transparent 0deg, rgba(212,175,55,0.15) 40deg, transparent 80deg)' }}
-              />
-            </div>
-
-            {/* ── AEGIS title — letter-by-letter stagger ── */}
-            <div className="flex items-center gap-[2px] mb-3 z-[2]">
-              {'WORLDWATCH'.split('').map((letter, i) => (
-                <motion.span
-                  key={i}
-                  initial={{ opacity: 0, y: 20, filter: 'blur(8px)' }}
-                  animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                  transition={{ delay: 0.5 + i * 0.08, duration: 0.5, ease: 'easeOut' }}
-                  className="text-4xl md:text-5xl font-bold tracking-[0.5em] font-mono"
-                  style={{ color: 'var(--text-heading)', textShadow: '0 0 30px rgba(212,175,55,0.2)' }}
-                >
-                  {letter}
-                </motion.span>
-              ))}
-            </div>
-
-            {/* ── Subtitle — typewriter reveal ── */}
-            <div className="overflow-hidden mb-8 z-[2]">
-              <motion.div
-                initial={{ width: 0 }}
-                animate={{ width: '100%' }}
-                transition={{ delay: 1.2, duration: 0.8, ease: 'easeInOut' }}
-                className="overflow-hidden whitespace-nowrap"
+                animate={{ opacity: 0.92 }}
+                transition={{ delay: 0.95, duration: 0.5 }}
+                className="mt-2 text-[10px] md:text-[11px] font-mono tracking-[0.44em] text-[var(--gold-primary)]"
               >
-                <p className="text-[10px] md:text-[11px] font-mono tracking-[0.5em] text-[var(--gold-primary)]" style={{ opacity: 0.8 }}>
-                  GLOBAL INTELLIGENCE PLATFORM
-                </p>
-              </motion.div>
+                LIVE WORLD MODEL
+              </motion.p>
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 0.72 }}
+                transition={{ delay: 1.1, duration: 0.5 }}
+                className="mt-2 max-w-[24rem] text-[8px] md:text-[9px] font-mono uppercase tracking-[0.22em] text-[var(--text-secondary)]"
+              >
+                VERIFIED GLOBAL INTELLIGENCE • COMMAND SURFACE ONLINE
+              </motion.p>
             </div>
 
-            {/* ── Multi-stage progress bar ── */}
+            {/* ── Progress / status ── */}
             <div className="w-64 md:w-80 z-[2]">
-              {/* Thin progress track */}
-              <div className="relative w-full h-[2px] rounded-full overflow-hidden" style={{ background: 'rgba(212,175,55,0.1)' }}>
+              <div className="mb-2 flex items-center justify-between text-[8px] font-mono tracking-[0.22em] text-[var(--text-muted)]">
+                <span>BOOTSTRAP</span>
+                <span className="text-[var(--gold-primary)]">V4.2</span>
+              </div>
+              <div className="relative w-full h-[3px] rounded-full overflow-hidden" style={{ background: 'rgba(148,163,184,0.12)' }}>
                 <motion.div
                   initial={{ width: '0%' }}
-                  animate={{ width: ['0%', '25%', '50%', '78%', '100%'] }}
-                  transition={{ duration: 2.2, delay: 0.5, times: [0, 0.25, 0.5, 0.75, 1], ease: 'easeInOut' }}
+                  animate={{ width: ['0%', '22%', '48%', '74%', '100%'] }}
+                  transition={{ duration: 2.2, delay: 0.45, times: [0, 0.22, 0.5, 0.78, 1], ease: 'easeInOut' }}
                   className="absolute inset-y-0 left-0 rounded-full"
-                  style={{ background: 'linear-gradient(90deg, var(--gold-primary), var(--cyan-primary), var(--gold-primary))', boxShadow: '0 0 12px rgba(212,175,55,0.4)' }}
+                  style={{ background: 'linear-gradient(90deg, rgba(34,211,238,0.88), rgba(191,219,254,0.95), rgba(212,175,55,0.9))', boxShadow: '0 0 12px rgba(34,211,238,0.32)' }}
                 />
               </div>
 
-              {/* Status messages — cycling */}
               <div className="mt-3 h-4 flex items-center justify-center">
                 {[
-                  { text: 'ESTABLISHING SECURE CONNECTION...', delay: 0.5 },
-                  { text: 'INITIALIZING FEEDS...', delay: 1.1 },
-                  { text: 'CALIBRATING SENSORS...', delay: 1.7 },
-                  { text: 'SYSTEM READY', delay: 2.2 },
+                  { text: 'LOCKING WORLD GRID...', delay: 0.5 },
+                  { text: 'SYNCING VERIFIED FEEDS...', delay: 1.1 },
+                  { text: 'ALIGNING COMMAND SURFACE...', delay: 1.7 },
+                  { text: 'AEGIS READY', delay: 2.2 },
                 ].map((stage, i) => (
                   <motion.span
                     key={i}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: [0, 1, 1, 0] }}
-                    transition={{ delay: stage.delay, duration: 0.6, times: [0, 0.1, 0.7, 1] }}
-                    className="absolute text-[9px] font-mono tracking-[0.25em]"
+                    transition={{ delay: stage.delay, duration: 0.62, times: [0, 0.1, 0.72, 1] }}
+                    className="absolute text-[9px] font-mono tracking-[0.24em]"
                     style={{ color: i === 3 ? 'var(--cyan-primary)' : 'var(--text-muted)' }}
                   >
                     {stage.text}
@@ -1215,7 +1217,7 @@ export default function Dashboard() {
           </div>
           <div className="space-y-2.5 p-3">
             <div className="flex gap-2 items-start">
-              <div className="flex-1"><SearchBar onLocate={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })} /></div>
+              <div className="flex-1"><SearchBar onLocate={(result) => setFlyToLocation({ lat: result.lat, lng: result.lng, zoom: result.zoom, bbox: result.bbox, label: result.label, ts: Date.now() })} /></div>
               <div className="relative"><SharePanel mapView={mapView} activeLayers={activeLayers} mouseCoords={null} /></div>
             </div>
             <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2 text-[7px] font-mono tracking-[0.16em] text-[var(--text-muted)]">
@@ -1408,7 +1410,7 @@ export default function Dashboard() {
                   {mobilePanel === 'intel' && <IntelFeed data={data} onLocate={(lat, lng) => { setFlyToLocation({ lat, lng, ts: Date.now() }); setMobilePanel(null); }} />}
                   {mobilePanel === 'search' && (
                     <div className="space-y-2">
-                      <SearchBar onLocate={(lat, lng) => { setFlyToLocation({ lat, lng, ts: Date.now() }); setMobilePanel(null); }} />
+                      <SearchBar onLocate={(result) => { setFlyToLocation({ lat: result.lat, lng: result.lng, zoom: result.zoom, bbox: result.bbox, label: result.label, ts: Date.now() }); setMobilePanel(null); }} />
                       <div className="flex justify-end">
                         <SharePanel mapView={mapView} activeLayers={activeLayers} mouseCoords={null} />
                       </div>

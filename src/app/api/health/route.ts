@@ -1,21 +1,20 @@
+import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
-export async function GET() {
-  return NextResponse.json({
-    status: 'operational',
-    platform: 'AEGIS',
-    version: '1.0.0',
-    uptime: process.uptime ? Math.round(process.uptime()) : 0,
-    timestamp: new Date().toISOString(),
-    endpoints: [
-      '/api/flights',
-      '/api/satellites',
-      '/api/earthquakes',
-      '/api/news',
-      '/api/gdelt',
-      '/api/markets',
-      '/api/frontlines',
-      '/api/region-dossier',
-    ],
+import { collectHealthSnapshot } from '@/lib/health';
+
+export const dynamic = 'force-dynamic';
+
+export async function GET(request: NextRequest) {
+  const origin = request.nextUrl.origin || 'http://127.0.0.1:3000';
+  const payload = await collectHealthSnapshot(origin);
+
+  const statusCode = payload.status === 'ok' ? 200 : payload.status === 'degraded' ? 200 : 503;
+
+  return NextResponse.json(payload, {
+    status: statusCode,
+    headers: {
+      'Cache-Control': 'no-store',
+    },
   });
 }

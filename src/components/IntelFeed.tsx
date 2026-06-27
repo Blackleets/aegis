@@ -21,6 +21,7 @@ interface IntelFeedProps {
     news?: IntelFeedItem[];
   };
   onLocate?: (lat: number, lng: number) => void;
+  feedFreshness?: number;
 }
 
 function getRiskTone(score: number) {
@@ -35,6 +36,7 @@ function timeAgo(dateStr: string): string {
     const date = new Date(dateStr);
     const diff = Date.now() - date.getTime();
     const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'now';
     if (mins < 60) return `${mins}m ago`;
     const hrs = Math.floor(mins / 60);
     if (hrs < 24) return `${hrs}h ago`;
@@ -44,7 +46,18 @@ function timeAgo(dateStr: string): string {
   }
 }
 
-export default function IntelFeed({ data, onLocate }: IntelFeedProps) {
+function feedTimeAgo(timestamp?: number): string {
+  if (!timestamp) return 'awaiting';
+  const diff = Math.max(0, Date.now() - timestamp);
+  const secs = Math.floor(diff / 1000);
+  if (secs < 60) return `${secs}s ago`;
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  return `${hrs}h ago`;
+}
+
+export default function IntelFeed({ data, onLocate, feedFreshness }: IntelFeedProps) {
   const [expanded, setExpanded] = useState(true);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const news = useMemo(() => data.news || [], [data.news]);
@@ -54,6 +67,17 @@ export default function IntelFeed({ data, onLocate }: IntelFeedProps) {
     const watch = news.filter((item) => item.risk_score >= 6 && item.risk_score < 8).length;
     return { priority, watch };
   }, [news]);
+
+  const latestPublished = useMemo(
+    () => news.reduce<number | null>((latest, item) => {
+      const ts = new Date(item.published).getTime();
+      if (!Number.isFinite(ts)) return latest;
+      return latest == null || ts > latest ? ts : latest;
+    }, null),
+    [news],
+  );
+
+  const liveStatus = feedTimeAgo(feedFreshness ?? latestPublished ?? undefined);
 
   return (
     <motion.div
@@ -79,6 +103,9 @@ export default function IntelFeed({ data, onLocate }: IntelFeedProps) {
           </span>
         </div>
         <div className="flex items-center gap-2 text-[var(--text-muted)]">
+          <span className="rounded-full border border-[var(--gold-primary)]/18 bg-[var(--gold-primary)]/10 px-2 py-1 text-[8px] font-mono uppercase tracking-[0.16em] text-[var(--gold-primary)]">
+            live {liveStatus}
+          </span>
           <div className="h-2 w-2 rounded-full bg-[var(--gold-primary)] shadow-[0_0_10px_rgba(126,169,201,0.6)]" />
           {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
         </div>
@@ -89,7 +116,7 @@ export default function IntelFeed({ data, onLocate }: IntelFeedProps) {
           <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="overflow-hidden">
             <div className="grid grid-cols-2 gap-2 px-4 pb-3">
               <div className="rounded-2xl border border-white/6 bg-white/[0.03] px-3 py-2.5">
-                <div className="text-[8px] font-mono uppercase tracking-[0.22em] text-[var(--text-muted)]">Priority briefs</div>
+                <div className="text-[8px] font-mono uppercase tracking-[0.22em] text-[var(--text-muted)]">Priority signals</div>
                 <div className="mt-1 text-[16px] font-semibold text-rose-300">{summary.priority}</div>
               </div>
               <div className="rounded-2xl border border-white/6 bg-white/[0.03] px-3 py-2.5">

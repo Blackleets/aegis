@@ -2,10 +2,10 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import ErrorBoundary from '@/components/ErrorBoundary';
 
-const SITE_URL = "https://worldwatch.blackleets.dev";
-const SITE_NAME = "WorldWatch";
-const SITE_TITLE = "WorldWatch — Global Monitoring Platform | Live Tracking, Recon & Intelligence";
-const SITE_DESCRIPTION = "Global monitoring and recon platform for live flight, satellite, CCTV, seismic and cyber signals. Correlate public telemetry, generate operator-ready briefings, and let each user bring their own AI key or run in zero-cost local mode.";
+const SITE_URL = "https://aegis.blackleets.dev";
+const SITE_NAME = "AEGIS";
+const SITE_TITLE = "AEGIS — Verified Global Intelligence Surface";
+const SITE_DESCRIPTION = "Original intelligence surface for live flights, satellites, CCTV, seismic, markets and cyber telemetry. Correlate public signals, generate operator-ready briefings, and run in local mode or with your own AI key.";
 
 export const viewport: Viewport = {
   themeColor: "#D4AF37",
@@ -19,18 +19,18 @@ export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
     default: SITE_TITLE,
-    template: "%s | WorldWatch",
+    template: "%s | AEGIS",
   },
   description: SITE_DESCRIPTION,
   keywords: [
     "OSINT tools", "global monitoring", "live tracking", "recon platform", "threat intelligence",
     "flight tracker", "satellite tracking", "CCTV monitoring", "earthquake monitor", "cyber threats dashboard",
     "open source intelligence", "geospatial intelligence", "intelligence dashboard", "operator dashboard",
-    "WorldWatch", "worldwatch", "worldwatch blackleets"
+    "AEGIS", "aegis", "aegis blackleets"
   ],
-  authors: [{ name: "WorldWatch Project", url: SITE_URL }],
-  creator: "WorldWatch Project",
-  publisher: "WorldWatch Project",
+  authors: [{ name: "AEGIS Project", url: SITE_URL }],
+  creator: "AEGIS Project",
+  publisher: "AEGIS Project",
   robots: {
     index: true,
     follow: true,
@@ -44,22 +44,18 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: "/favicon-32x32.png", type: "image/png", sizes: "32x32" },
-      { url: "/favicon-16x16.png", type: "image/png", sizes: "16x16" },
-      { url: "/android-chrome-192x192.png", type: "image/png", sizes: "192x192" },
-      { url: "/android-chrome-512x512.png", type: "image/png", sizes: "512x512" },
+      { url: "/favicon.svg", type: "image/svg+xml", sizes: "any" },
     ],
-    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
-    shortcut: "/favicon.ico",
-    other: [{ rel: "apple-touch-icon-precomposed", url: "/apple-touch-icon.png" }],
+    apple: [{ url: "/favicon.svg" }],
+    shortcut: "/favicon.svg",
   },
   manifest: "/site.webmanifest",
   alternates: {
     canonical: SITE_URL,
   },
   openGraph: {
-    title: "WorldWatch — Live Global Monitoring, Recon & Intelligence",
-    description: "Track flights, satellites, CCTV, seismic events, markets and cyber signals in one operator-grade interface. Run free in local mode or let users attach their own AI key.",
+    title: "AEGIS — Verified Global Intelligence Surface",
+    description: "Track flights, satellites, CCTV, seismic events, markets and cyber signals in one operator-grade interface with a distinct AEGIS identity.",
     type: "website",
     siteName: SITE_NAME,
     locale: "en_US",
@@ -69,15 +65,15 @@ export const metadata: Metadata = {
         url: `${SITE_URL}/og-image.png`,
         width: 1200,
         height: 630,
-        alt: "WorldWatch global monitoring platform",
+        alt: "AEGIS verified global intelligence surface",
         type: "image/png",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "🛰️ WorldWatch — Global Monitoring + Recon Platform",
-    description: "Watch the world live across flights, satellites, CCTV, seismic and cyber signals. Zero-cost local mode plus optional BYOK AI.",
+    title: "AEGIS — Verified Global Intelligence Surface",
+    description: "Monitor the world live across flights, satellites, CCTV, seismic, markets and cyber signals with an original AEGIS shell.",
     images: [`${SITE_URL}/og-image.png`],
   },
   category: "technology",
@@ -85,7 +81,7 @@ export const metadata: Metadata = {
   other: {
     "apple-mobile-web-app-capable": "yes",
     "apple-mobile-web-app-status-bar-style": "black-translucent",
-    "apple-mobile-web-app-title": "WorldWatch",
+    "apple-mobile-web-app-title": "AEGIS",
     "mobile-web-app-capable": "yes",
     "msapplication-TileColor": "#06060C",
     "msapplication-config": "none",
@@ -95,8 +91,8 @@ export const metadata: Metadata = {
 const jsonLd = {
   "@context": "https://schema.org",
   "@type": "WebApplication",
-  name: "WorldWatch — Global Monitoring & Recon Platform",
-  alternateName: ["WorldWatch", "WorldWatch OSINT", "WorldWatch Recon"],
+  name: "AEGIS — Verified Global Intelligence Surface",
+  alternateName: ["AEGIS", "AEGIS Intel Surface", "AEGIS Command Surface"],
   url: SITE_URL,
   description: SITE_DESCRIPTION,
   applicationCategory: "SecurityApplication",
@@ -120,7 +116,7 @@ const jsonLd = {
   screenshot: `${SITE_URL}/og-image.png`,
   author: {
     "@type": "Organization",
-    name: "WorldWatch Project",
+    name: "AEGIS Project",
     url: SITE_URL,
   },
 };
@@ -135,10 +131,8 @@ export default function RootLayout({
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link rel="icon" href="/favicon.ico" sizes="any" />
-        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
-        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+        <link rel="icon" href="/favicon.svg" sizes="any" type="image/svg+xml" />
+        <link rel="apple-touch-icon" href="/favicon.svg" />
         <link rel="canonical" href={SITE_URL} />
         <script
           type="application/ld+json"
@@ -146,7 +140,7 @@ export default function RootLayout({
         />
       </head>
       <body className="antialiased">
-        <ErrorBoundary name="WorldWatch Core">
+        <ErrorBoundary name="AEGIS Core">
           {children}
         </ErrorBoundary>
       </body>

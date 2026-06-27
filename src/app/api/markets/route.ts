@@ -6,10 +6,10 @@ import { NextResponse } from 'next/server';
  * Multiple source fallback: Yahoo Finance → Google Finance scraping → static estimates
  */
 
-const DEFENSE_STOCKS = ['RTX', 'LMT', 'NOC', 'GD', 'BA', 'PLTR'];
+const DEFENSE_STOCKS = ['RTX', 'LMT', 'NOC', 'GD', 'BA'];
 const OIL_TICKERS = ['CL=F', 'BZ=F'];
 const COMMODITY_TICKERS = ['GC=F', 'SI=F', 'HG=F', 'NG=F', 'ZW=F', 'ZC=F'];
-const CRYPTO_TICKERS = ['BTC-USD', 'ETH-USD'];
+const CRYPTO_TICKERS = ['BTC-USD', 'ETH-USD', 'SOL-USD'];
 const INDEX_TICKERS = ['ES=F', 'NQ=F'];
 
 interface QuoteData {
@@ -51,6 +51,7 @@ interface CoinGeckoAsset {
 interface CoinGeckoResponse {
   bitcoin?: CoinGeckoAsset;
   ethereum?: CoinGeckoAsset;
+  solana?: CoinGeckoAsset;
 }
 
 interface TickerResult {
@@ -76,7 +77,7 @@ const COMMODITY_NAMES: Record<string, string> = {
   'ZC=F': 'Corn',
 };
 const OIL_NAMES: Record<string, string> = { 'CL=F': 'WTI Crude', 'BZ=F': 'Brent Crude' };
-const CRYPTO_NAMES: Record<string, string> = { 'BTC-USD': 'Bitcoin', 'ETH-USD': 'Ethereum' };
+const CRYPTO_NAMES: Record<string, string> = { 'BTC-USD': 'Bitcoin', 'ETH-USD': 'Ethereum', 'SOL-USD': 'Solana' };
 const INDEX_NAMES: Record<string, string> = { 'ES=F': 'S&P 500', 'NQ=F': 'Nasdaq 100' };
 
 async function fetchYahoo(symbol: string): Promise<QuoteData | null> {
@@ -138,7 +139,7 @@ async function fetchYahooV6(symbol: string): Promise<QuoteData | null> {
 
 async function fetchCoinGecko(): Promise<Record<string, QuoteData>> {
   try {
-    const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd&include_24hr_change=true', {
+    const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana&vs_currencies=usd&include_24hr_change=true', {
       signal: AbortSignal.timeout(8000),
     });
     if (!res.ok) return {};
@@ -157,6 +158,13 @@ async function fetchCoinGecko(): Promise<Record<string, QuoteData>> {
         price: Math.round(data.ethereum.usd * 100) / 100,
         change_percent: Math.round((data.ethereum.usd_24h_change || 0) * 100) / 100,
         up: (data.ethereum.usd_24h_change || 0) >= 0,
+      };
+    }
+    if (data.solana) {
+      result.Solana = {
+        price: Math.round(data.solana.usd * 100) / 100,
+        change_percent: Math.round((data.solana.usd_24h_change || 0) * 100) / 100,
+        up: (data.solana.usd_24h_change || 0) >= 0,
       };
     }
     return result;
