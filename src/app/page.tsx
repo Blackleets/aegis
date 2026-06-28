@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Layers, BarChart3, Newspaper, Search, X, Globe, MapPinned, Radar, Satellite, Moon, ExternalLink, AlertTriangle, Activity, Database, Wifi } from 'lucide-react';
+import { Layers, BarChart3, Newspaper, Search, X, Globe, MapPinned, Satellite, Moon, ExternalLink, AlertTriangle, Activity, Database, Wifi } from 'lucide-react';
 import IntelFeed from '@/components/IntelFeed';
 import MarketsPanel from '@/components/MarketsPanel';
 import ScmPanel from '@/components/ScmPanel';
@@ -18,11 +18,15 @@ import GlobalStatusBar from '@/components/GlobalStatusBar';
 import LiveAlerts from '@/components/LiveAlerts';
 import AiAnalyst from '@/components/AiAnalyst';
 import SolarSystemMode, { type CelestialBodyId } from '@/components/SolarSystemMode';
+import ModeDock from '@/components/dashboard/ModeDock';
+import FocusModeOverlay from '@/components/dashboard/FocusModeOverlay';
 
 const AegisMap = dynamic(() => import('@/components/AegisMap'), { ssr: false });
 const LayerPanel = dynamic(() => import('@/components/LayerPanel'));
 const CameraViewer = dynamic(() => import('@/components/CameraViewer'));
 const OsintPanel = dynamic(() => import('@/components/OsintPanel'));
+
+type DashboardMode = 'earth' | 'solar' | 'focus';
 
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(false);
@@ -255,6 +259,7 @@ export default function Dashboard() {
   const [leftRailFocus, setLeftRailFocus] = useState<'markets' | 'flow' | 'intel'>('markets');
   const [rightRailFocus, setRightRailFocus] = useState<'alerts' | 'recon'>('alerts');
   const [mobilePanel, setMobilePanel] = useState<'layers'|'markets'|'intel'|'search'|'recon'|null>(null);
+  const [dashboardMode, setDashboardMode] = useState<DashboardMode>('earth');
   const [mapProjection, setMapProjection] = useState<'globe'|'mercator'>('globe');
   const [selectedCelestialBody, setSelectedCelestialBody] = useState<CelestialBodyId>('earth');
 
@@ -751,23 +756,35 @@ export default function Dashboard() {
     return congestedPorts + riskyChokepoints;
   }, [data.maritime_ports, data.maritime_chokepoints]);
 
-  const operationalModeLabel = backendStatus === 'connected'
-    ? activeIntelAlerts > 0 || maritimePressure > 0
-      ? 'HEIGHTENED WATCH'
-      : 'STEADY TRACKING'
-    : backendStatus === 'error'
-      ? 'DEGRADED FEED STATE'
-      : 'LINKING DATA MESH';
+  const isEarthOps = dashboardMode === 'earth';
+  const isSolarView = dashboardMode === 'solar';
+  const isFocusView = dashboardMode === 'focus';
+  const showEarthOperationalShell = selectedCelestialBody === 'earth' && !isSolarView;
+  const showDesktopRails = !isMobile && isEarthOps && selectedCelestialBody === 'earth';
+  const showDesktopBottomBar = !isMobile && isEarthOps && selectedCelestialBody === 'earth';
+  const showAuxiliaryHud = isEarthOps && selectedCelestialBody === 'earth';
 
-  const commandRailFocus = backendStatus === 'connected'
-    ? activeIntelAlerts > 0
-      ? 'PRIORITY SIGNALS'
-      : maritimePressure > 0
-        ? 'SUPPLY-CHAIN WATCH'
-        : 'ROUTINE RECON'
-    : backendStatus === 'error'
-      ? 'DEGRADED COVERAGE'
-      : 'SYNCING SOURCES';
+  const operationalModeLabel = selectedCelestialBody !== 'earth'
+    ? `${selectedCelestialBody.toUpperCase()} VISUAL MODE`
+    : backendStatus === 'connected'
+      ? activeIntelAlerts > 0 || maritimePressure > 0
+        ? 'HEIGHTENED WATCH'
+        : 'STEADY TRACKING'
+      : backendStatus === 'error'
+        ? 'DEGRADED FEED STATE'
+        : 'LINKING DATA MESH';
+
+  const commandRailFocus = selectedCelestialBody !== 'earth'
+    ? 'EARTH DATA STANDBY'
+    : backendStatus === 'connected'
+      ? activeIntelAlerts > 0
+        ? 'PRIORITY SIGNALS'
+        : maritimePressure > 0
+          ? 'SUPPLY-CHAIN WATCH'
+          : 'ROUTINE RECON'
+      : backendStatus === 'error'
+        ? 'DEGRADED COVERAGE'
+        : 'SYNCING SOURCES';
 
   return (
     <main className="fixed inset-0 w-full h-full bg-[var(--bg-void)] overflow-hidden">
@@ -983,44 +1000,99 @@ export default function Dashboard() {
         />
       </ErrorBoundary>
 
-      <SolarSystemMode selected={selectedCelestialBody} onSelect={setSelectedCelestialBody} />
+      <SolarSystemMode
+        selected={selectedCelestialBody}
+        onSelect={setSelectedCelestialBody}
+        onReturnEarth={() => {
+          setDashboardMode('earth');
+          setSelectedCelestialBody('earth');
+        }}
+        isMobile={isMobile}
+        enabled={isSolarView}
+      />
 
-      {/* ── MAP VIEW CONTROLS (3D/2D + SATELLITE TOGGLE) ── */}
+      <ModeDock
+        mode={dashboardMode}
+        onEarthOps={() => {
+          setDashboardMode('earth');
+          setSelectedCelestialBody('earth');
+        }}
+        onSolarView={() => {
+          setDashboardMode('solar');
+          setSelectedCelestialBody(prev => prev === 'earth' ? 'mars' : prev);
+        }}
+        onFocus={() => {
+          setDashboardMode('focus');
+          setSelectedCelestialBody('earth');
+        }}
+      />
+
+      {isFocusView && (
+        <FocusModeOverlay
+          backendStatus={backendStatus}
+          trackedEntityCount={trackedEntityCount}
+          activeIntelAlerts={activeIntelAlerts}
+          postureLabel={operationalModeLabel}
+        />
+      )}
+
+      {/* ── MAP VIEW CONTROLS (Earth ops) / return control (planet vista) ── */}
       <motion.div
         initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 3.5 }}
-        className="absolute bottom-[75px] md:bottom-6 left-3 md:left-[19rem] xl:left-[20rem] z-[200] flex items-center gap-2 pointer-events-none"
+        className={`absolute z-[200] flex items-center gap-2 pointer-events-none ${isEarthOps ? 'bottom-[75px] md:bottom-6 left-3 md:left-[19rem] xl:left-[20rem]' : 'bottom-[88px] md:bottom-8 left-1/2 -translate-x-1/2'}`}
       >
-        {/* 3D/2D Toggle */}
-        <button
-          onClick={() => setMapProjection(p => p === 'globe' ? 'mercator' : 'globe')}
-          className="glass-panel p-2.5 pointer-events-auto hover:border-[var(--gold-primary)]/40 transition-colors group relative"
-          title={mapProjection === 'globe' ? 'Switch to 2D Map' : 'Switch to 3D Globe'}
-        >
-          {mapProjection === 'globe' ? (
-            <MapPinned className="w-4 h-4 text-[var(--gold-primary)] group-hover:scale-110 transition-transform" />
-          ) : (
-            <Globe className="w-4 h-4 text-[var(--cyan-primary)] group-hover:scale-110 transition-transform" />
-          )}
-          <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 text-[9px] font-mono text-[var(--text-muted)] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity glass-panel px-2 py-1 z-[300]">
-            {mapProjection === 'globe' ? '2D MAP' : '3D GLOBE'}
-          </span>
-        </button>
+        {(showEarthOperationalShell || isFocusView) ? (
+          <>
+            <button
+              onClick={() => setMapProjection(p => p === 'globe' ? 'mercator' : 'globe')}
+              className="glass-panel p-2.5 pointer-events-auto hover:border-[var(--gold-primary)]/40 transition-colors group relative"
+              title={mapProjection === 'globe' ? 'Switch to 2D Map' : 'Switch to 3D Globe'}
+            >
+              {mapProjection === 'globe' ? (
+                <MapPinned className="w-4 h-4 text-[var(--gold-primary)] group-hover:scale-110 transition-transform" />
+              ) : (
+                <Globe className="w-4 h-4 text-[var(--cyan-primary)] group-hover:scale-110 transition-transform" />
+              )}
+              <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 text-[9px] font-mono text-[var(--text-muted)] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity glass-panel px-2 py-1 z-[300]">
+                {mapProjection === 'globe' ? '2D MAP' : '3D GLOBE'}
+              </span>
+            </button>
 
-        {/* Map Style Toggle */}
-        <button
-          onClick={() => setMapStyle(s => s === 'dark' ? 'satellite' : 'dark')}
-          className="glass-panel p-2.5 pointer-events-auto hover:border-[var(--gold-primary)]/40 transition-colors group relative"
-          title={mapStyle === 'dark' ? 'Satellite View' : 'Night View'}
-        >
-          {mapStyle === 'dark' ? (
-            <Satellite className="w-4 h-4 text-[var(--alert-green)] group-hover:scale-110 transition-transform" />
-          ) : (
-            <Moon className="w-4 h-4 text-[var(--cyan-primary)] group-hover:scale-110 transition-transform" />
-          )}
-          <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 text-[9px] font-mono text-[var(--text-muted)] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity glass-panel px-2 py-1 z-[300]">
-            {mapStyle === 'dark' ? 'SATELLITE' : 'NIGHT MODE'}
-          </span>
-        </button>
+            <button
+              onClick={() => setMapStyle(s => s === 'dark' ? 'satellite' : 'dark')}
+              className="glass-panel p-2.5 pointer-events-auto hover:border-[var(--gold-primary)]/40 transition-colors group relative"
+              title={mapStyle === 'dark' ? 'Satellite View' : 'Night View'}
+            >
+              {mapStyle === 'dark' ? (
+                <Satellite className="w-4 h-4 text-[var(--alert-green)] group-hover:scale-110 transition-transform" />
+              ) : (
+                <Moon className="w-4 h-4 text-[var(--cyan-primary)] group-hover:scale-110 transition-transform" />
+              )}
+              <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 text-[9px] font-mono text-[var(--text-muted)] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity glass-panel px-2 py-1 z-[300]">
+                {mapStyle === 'dark' ? 'SATELLITE' : 'NIGHT MODE'}
+              </span>
+            </button>
+          </>
+        ) : isSolarView ? (
+          <button
+            onClick={() => {
+              setSelectedCelestialBody('earth');
+              setDashboardMode('earth');
+            }}
+            className="glass-panel px-3 py-2 pointer-events-auto hover:border-[var(--cyan-primary)]/40 transition-colors group relative text-[8px] font-mono tracking-[0.2em] text-[var(--cyan-primary)]"
+            title="Return to Earth Operations"
+          >
+            RETURN TO EARTH OPS
+          </button>
+        ) : (
+          <button
+            onClick={() => setDashboardMode('earth')}
+            className="glass-panel px-3 py-2 pointer-events-auto hover:border-[var(--gold-primary)]/40 transition-colors group relative text-[8px] font-mono tracking-[0.2em] text-[var(--gold-primary)]"
+            title="Exit Focus Mode"
+          >
+            EXIT FOCUS
+          </button>
+        )}
       </motion.div>
 
       {/* ── HEADER ── */}
@@ -1043,18 +1115,19 @@ export default function Dashboard() {
         <div className="hidden md:block absolute top-1/2 left-[52px] w-[200px] h-[1px] bg-gradient-to-r from-[var(--gold-primary)]/40 via-[var(--gold-primary)]/15 to-transparent" />
         <div className="flex flex-col">
           <div className="flex items-center gap-2">
-            <h1 className="text-base md:text-xl font-bold tracking-[0.4em] md:tracking-[0.5em] text-[var(--text-heading)] font-mono">WORLDWATCH</h1>
+            <h1 className="text-base md:text-xl font-bold tracking-[0.4em] md:tracking-[0.5em] text-[var(--text-heading)] font-mono">AEGIS</h1>
             <span className="hidden md:inline-flex items-center gap-1 px-1.5 py-[1px] rounded-sm border border-[var(--cyan-primary)]/40 bg-[var(--cyan-primary)]/10 text-[7px] font-mono font-bold tracking-[0.15em] text-[var(--cyan-primary)] uppercase" style={{ lineHeight: '1.4' }}>
               <Globe className="w-2.5 h-2.5" />
               OPEN SOURCE
             </span>
           </div>
-          <span className="text-[8px] md:text-[9px] text-[var(--gold-primary)] font-mono tracking-[0.2em] md:tracking-[0.3em] opacity-80">GLOBAL INTELLIGENCE COMMAND</span>
+          <span className="text-[8px] md:text-[9px] text-[var(--gold-primary)] font-mono tracking-[0.2em] md:tracking-[0.3em] opacity-80">ORBITAL INTELLIGENCE COMMAND</span>
         </div>
       </motion.div>
 
+
       {/* ── TOP-RIGHT STATUS (desktop) — C2 DISPLAY ── */}
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 3 }} className="status-bar-desktop absolute top-3 right-3 md:top-4 md:right-5 z-[200] pointer-events-none flex items-center gap-1.5 xl:gap-2.5 2xl:gap-3 text-[8px] xl:text-[9px] 2xl:text-[10px] font-mono tracking-[0.16em] xl:tracking-[0.2em] text-[var(--text-muted)]">
+      {showAuxiliaryHud && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 3 }} className="status-bar-desktop absolute top-3 right-3 md:top-4 md:right-5 z-[200] pointer-events-none flex items-center gap-1.5 xl:gap-2.5 2xl:gap-3 text-[8px] xl:text-[9px] 2xl:text-[10px] font-mono tracking-[0.16em] xl:tracking-[0.2em] text-[var(--text-muted)]">
 
         {/* Zulu Clock */}
         <span className="hidden lg:inline-flex items-center gap-1.5 rounded-full border border-[var(--border-primary)]/70 bg-[rgba(15,23,32,0.82)] px-2.5 py-1 shadow-[0_10px_30px_rgba(0,0,0,0.16)]">
@@ -1091,9 +1164,9 @@ export default function Dashboard() {
         <a href='https://ko-fi.com/M8D41ZYW4Z' target='_blank' className="pointer-events-auto hover:opacity-80 transition-opacity ml-1 hidden 2xl:flex items-center">
           <span className="rounded-full border border-[var(--border-primary)]/80 bg-[rgba(15,23,32,0.9)] px-2.5 xl:px-3 py-1 text-[9px] xl:text-[10px] 2xl:text-[11px] font-semibold tracking-[0.14em] xl:tracking-[0.16em] text-[var(--text-primary)]">SUPPORT PROJECT</span>
         </a>
-      </motion.div>
+      </motion.div>}
 
-      <motion.div
+      {showAuxiliaryHud && <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 3.15, duration: 0.5 }}
@@ -1130,10 +1203,10 @@ export default function Dashboard() {
             })}
           </div>
         </div>
-      </motion.div>
+      </motion.div>}
 
       {/* ── MOBILE: Compact top status ── */}
-      {isMobile && (
+      {isMobile && showAuxiliaryHud && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 2.5 }} className="absolute top-3 right-3 z-[200] pointer-events-auto flex flex-col items-end gap-1.5">
           <div className="flex items-center gap-1.5 rounded-2xl border border-[var(--border-primary)]/70 bg-[rgba(15,23,32,0.92)] px-2.5 py-1.5 shadow-[0_10px_30px_rgba(0,0,0,0.18)] backdrop-blur-md">
             <span className={`h-1.5 w-1.5 rounded-full ${backendStatus === 'connected' ? 'bg-[var(--alert-green)]' : backendStatus === 'error' ? 'bg-[var(--alert-red)]' : 'bg-[var(--gold-primary)]'} animate-aegis-pulse`} />
@@ -1152,7 +1225,7 @@ export default function Dashboard() {
 
 
       {/* ── LEFT HUD (desktop): Layers + Stats + focused desk ── */}
-      <div className="desktop-panel absolute left-4 xl:left-5 top-20 bottom-24 xl:bottom-24 w-[15.75rem] xl:w-[16.5rem] 2xl:w-[17.25rem] flex flex-col gap-2.5 z-[200] min-h-0 pointer-events-none overflow-y-auto styled-scrollbar pr-1">
+      {showDesktopRails && <div className="desktop-panel absolute left-4 xl:left-5 top-20 bottom-24 xl:bottom-24 w-[15.75rem] xl:w-[16.5rem] 2xl:w-[17.25rem] flex flex-col gap-2.5 z-[200] min-h-0 pointer-events-none overflow-y-auto styled-scrollbar pr-1">
         {showLayers && (
           <>
             <LayerPanel data={dataWithSdk} activeLayers={activeLayers} setActiveLayers={setActiveLayers} />
@@ -1195,10 +1268,10 @@ export default function Dashboard() {
         {leftRailFocus === 'flow' && showScmPanel && <ScmPanel data={dataWithSdk} />}
         {leftRailFocus === 'markets' && showMarkets && <MarketsPanel data={dataWithSdk} spaceWeather={spaceWeather} />}
         {leftRailFocus === 'intel' && showIntel && <IntelFeed data={dataWithSdk} onLocate={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })} />}
-      </div>
+      </div>}
 
       {/* ── RIGHT HUD (desktop): Search + focused desk ── */}
-      <div className="desktop-panel absolute right-4 xl:right-5 top-20 bottom-24 xl:bottom-24 w-[16rem] xl:w-[17rem] 2xl:w-[18rem] flex flex-col gap-2.5 z-[200] min-h-0 pointer-events-auto overflow-y-auto styled-scrollbar pr-1">
+      {showDesktopRails && <div className="desktop-panel absolute right-4 xl:right-5 top-20 bottom-24 xl:bottom-24 w-[16rem] xl:w-[17rem] 2xl:w-[18rem] flex flex-col gap-2.5 z-[200] min-h-0 pointer-events-auto overflow-y-auto styled-scrollbar pr-1">
         <div className="glass-panel overflow-hidden border border-[var(--border-primary)]/80 bg-[linear-gradient(180deg,rgba(14,24,34,0.96),rgba(18,29,42,0.9))] shadow-[0_16px_42px_rgba(0,0,0,0.18)]">
           <div className="flex items-center justify-between border-b border-[var(--border-primary)]/45 px-3.5 py-2.5">
             <div>
@@ -1267,9 +1340,9 @@ export default function Dashboard() {
           setFlyToLocation({ lat: payload.lat, lng: payload.lng, ts: Date.now() });
         }} />}
         {rightRailFocus === 'alerts' && <LiveAlerts data={dataWithSdk} onLocate={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })} onWatchFeed={(url, name) => { setLiveFeedUrl(url); setLiveFeedName(name); }} />}
-      </div>
+      </div>}
 
-      <AiAnalyst data={dataWithSdk} />
+      {showAuxiliaryHud && <AiAnalyst data={dataWithSdk} />}
 
       {/* ── LIVE FEED VIEWER OVERLAY ── */}
       <AnimatePresence>
@@ -1361,7 +1434,7 @@ export default function Dashboard() {
       </AnimatePresence>
 
       {/* ═══ MOBILE UI ═══ */}
-      {isMobile && (
+      {isMobile && isEarthOps && (
         <>
           {/* Mobile Bottom Navigation */}
           <div className="mobile-nav">
@@ -1398,7 +1471,7 @@ export default function Dashboard() {
                       <div>
                         <div className="text-[7px] font-mono tracking-[0.22em] text-[var(--text-secondary)]">MOBILE COMMAND PANEL</div>
                         <span className="hud-text mt-1 block text-[9px] text-[var(--text-primary)]">
-                          {mobilePanel === 'layers' ? 'LAYERS & STATS' : mobilePanel === 'markets' ? 'MACRO ATLAS' : mobilePanel === 'intel' ? 'SIGNAL LEDGER' : mobilePanel === 'recon' ? 'WORLDWATCH RECON' : 'SEARCH'}
+                          {mobilePanel === 'layers' ? 'LAYERS & STATS' : mobilePanel === 'markets' ? 'MACRO ATLAS' : mobilePanel === 'intel' ? 'SIGNAL LEDGER' : mobilePanel === 'recon' ? 'AEGIS RECON' : 'SEARCH'}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
@@ -1463,7 +1536,7 @@ export default function Dashboard() {
       )}
 
       {/* ── BOTTOM CENTER (desktop) ── */}
-      {!isMobile && (
+      {showDesktopBottomBar && (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 3, duration: 0.8 }} className="desktop-only absolute bottom-5 left-1/2 -translate-x-1/2 z-[200] pointer-events-auto">
           <div className="glass-panel px-5 py-2.5 flex items-center gap-0 aegis-glow relative overflow-hidden" style={{ borderImage: 'linear-gradient(90deg, rgba(212,175,55,0.05), rgba(212,175,55,0.2), rgba(212,175,55,0.05)) 1', borderImageSlice: 1, borderWidth: '1px', borderStyle: 'solid' }}>
 
@@ -1532,9 +1605,9 @@ export default function Dashboard() {
       )}
 
       {/* ── Scale Bar (desktop) ── */}
-      <div className="desktop-only absolute bottom-[4.5rem] left-[18.5rem] xl:left-[20rem] z-[201] pointer-events-none">
+      {showDesktopBottomBar && <div className="desktop-only absolute bottom-[4.5rem] left-[18.5rem] xl:left-[20rem] z-[201] pointer-events-none">
         <ScaleBar zoom={mapView.zoom} latitude={mapView.latitude} />
-      </div>
+      </div>}
 
       {/* ── Region Dossier ── */}
       {(regionDossier || dossierLoading) && (
@@ -1598,7 +1671,7 @@ export default function Dashboard() {
       <KeyboardShortcuts />
 
       {/* ── GLOBAL STATUS TICKER (bottom) ── */}
-      <GlobalStatusBar />
+      {showAuxiliaryHud && <GlobalStatusBar />}
 
       {/* Shortcut hint */}
       <div className="desktop-only absolute bottom-[26px] right-5 z-[200] pointer-events-none text-[6px] font-mono text-[var(--text-muted)]/40 tracking-widest">
