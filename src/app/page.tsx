@@ -1211,19 +1211,6 @@ export default function Dashboard() {
         </a>
       </motion.div>}
 
-      {showAuxiliaryHud && (
-        <IncidentFusionStrip
-          backendStatus={backendStatus}
-          trackedEntityCount={trackedEntityCount}
-          activeIntelAlerts={activeIntelAlerts}
-          maritimePressure={maritimePressure}
-          newsCount={data.news?.length || 0}
-          earthquakeCount={data.earthquakes?.length || 0}
-          gdeltCount={data.gdelt?.length || 0}
-          operationalModeLabel={operationalModeLabel}
-        />
-      )}
-
       {/* ── MOBILE: Compact top status ── */}
       {isMobile && showAuxiliaryHud && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 2.5 }} className="absolute top-3 right-3 z-[200] pointer-events-auto flex flex-col items-end gap-1.5">
@@ -1290,7 +1277,7 @@ export default function Dashboard() {
       </div>}
 
       {/* ── RIGHT HUD (desktop): Search + focused desk ── */}
-      {showDesktopRails && <div className="desktop-panel absolute right-4 xl:right-5 top-[13.25rem] bottom-24 xl:bottom-24 w-[16rem] xl:w-[17rem] 2xl:w-[18rem] flex flex-col gap-2.5 z-[200] min-h-0 pointer-events-auto overflow-y-auto styled-scrollbar pr-1">
+      {showDesktopRails && <div className="desktop-panel absolute right-4 xl:right-5 top-20 bottom-24 xl:bottom-24 w-[16rem] xl:w-[17rem] 2xl:w-[18rem] flex flex-col gap-2.5 z-[200] min-h-0 pointer-events-auto overflow-y-auto styled-scrollbar pr-1">
         <div className="glass-panel overflow-hidden border border-[var(--border-primary)]/80 bg-[linear-gradient(180deg,rgba(14,24,34,0.96),rgba(18,29,42,0.9))] shadow-[0_16px_42px_rgba(0,0,0,0.18)]">
           <div className="flex items-center justify-between border-b border-[var(--border-primary)]/45 px-3.5 py-2.5">
             <div>
@@ -1317,6 +1304,18 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+
+        <IncidentFusionStrip
+          backendStatus={backendStatus}
+          trackedEntityCount={trackedEntityCount}
+          activeIntelAlerts={activeIntelAlerts}
+          maritimePressure={maritimePressure}
+          newsCount={data.news?.length || 0}
+          earthquakeCount={data.earthquakes?.length || 0}
+          gdeltCount={data.gdelt?.length || 0}
+          operationalModeLabel={operationalModeLabel}
+          variant="rail"
+        />
 
         <NasaMissionStrip
           locale={locale}

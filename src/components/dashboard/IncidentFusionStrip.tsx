@@ -14,6 +14,7 @@ type IncidentFusionStripProps = {
   earthquakeCount: number;
   gdeltCount: number;
   operationalModeLabel: string;
+  variant?: 'overlay' | 'rail';
 };
 
 function pressureLabel(score: number, backendStatus: BackendStatus) {
@@ -52,6 +53,7 @@ export default function IncidentFusionStrip({
   earthquakeCount,
   gdeltCount,
   operationalModeLabel,
+  variant = 'overlay',
 }: IncidentFusionStripProps) {
   const pressureScore = activeIntelAlerts + maritimePressure + Math.min(Math.floor(gdeltCount / 10), 3);
   const label = pressureLabel(pressureScore, backendStatus);
@@ -69,7 +71,9 @@ export default function IncidentFusionStrip({
       initial={{ opacity: 0, y: -10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 3.22, duration: 0.45 }}
-      className="absolute left-1/2 top-[5.25rem] z-[198] hidden w-[min(40rem,calc(100vw-44rem))] min-w-[28rem] -translate-x-1/2 pointer-events-none xl:block"
+      className={variant === 'rail'
+        ? 'shrink-0 pointer-events-auto'
+        : 'absolute left-1/2 top-[5.25rem] z-[198] hidden w-[min(40rem,calc(100vw-44rem))] min-w-[28rem] -translate-x-1/2 pointer-events-none xl:block'}
     >
       <div className="sovereign-panel px-3.5 py-3 backdrop-blur-xl">
         <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[rgba(183,200,177,0.28)] to-transparent" />
@@ -89,7 +93,7 @@ export default function IncidentFusionStrip({
           </div>
         </div>
 
-        <div className="mt-3 grid grid-cols-4 gap-2">
+        <div className={`mt-3 grid gap-2 ${variant === 'rail' ? 'grid-cols-2' : 'grid-cols-4'}`}>
           <div className="rounded-2xl border border-white/8 bg-white/[0.035] px-3 py-2">
             <div className="flex items-center gap-1.5 text-[7px] font-mono tracking-[0.18em] text-[var(--text-muted)]"><AlertTriangle className="h-3 w-3" /> ALERTS</div>
             <div className="mt-1 text-[11px] font-bold tabular-nums" style={{ color }}>{activeIntelAlerts + maritimePressure}</div>
