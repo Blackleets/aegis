@@ -225,10 +225,10 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       fogApi.setFog?.(
         isGlobe
           ? {
-              color: isDark ? 'rgba(16, 34, 52, 0.24)' : 'rgba(16, 24, 34, 0.16)',
-              'high-color': isDark ? 'rgba(54, 110, 168, 0.12)' : 'rgba(20, 30, 42, 0.08)',
-              'space-color': isDark ? 'rgba(3, 8, 16, 0.78)' : 'rgba(8, 12, 18, 0.66)',
-              'horizon-blend': 0.085,
+              color: isDark ? 'rgba(16, 24, 34, 0.08)' : 'rgba(16, 24, 34, 0.12)',
+              'high-color': isDark ? 'rgba(40, 80, 120, 0.05)' : 'rgba(20, 30, 42, 0.06)',
+              'space-color': isDark ? 'rgba(3, 8, 16, 0.45)' : 'rgba(8, 12, 18, 0.52)',
+              'horizon-blend': 0.04,
               'star-intensity': 0,
             }
           : {
@@ -247,11 +247,11 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
         isGlobe
           ? {
               'sky-color': isDark ? '#07111d' : '#101923',
-              'sky-horizon-blend': isDark ? 0.2 : 0.03,
-              'horizon-color': isDark ? '#21507a' : '#223244',
-              'horizon-fog-blend': isDark ? 0.18 : 0.04,
+              'sky-horizon-blend': isDark ? 0.12 : 0.03,
+              'horizon-color': isDark ? '#1a4264' : '#223244',
+              'horizon-fog-blend': isDark ? 0.08 : 0.04,
               'fog-color': isDark ? '#0a1625' : '#182433',
-              'fog-ground-blend': isDark ? 0.24 : 0.18,
+              'fog-ground-blend': isDark ? 0.12 : 0.18,
             }
           : {
               'sky-color': isDark ? '#07101a' : '#121d28',
@@ -264,18 +264,18 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
 
     if (map.getLayer('satellite-layer')) {
       try {
-        map.setPaintProperty('satellite-layer', 'raster-opacity', isGlobe ? 0.5 : 0.82);
-        map.setPaintProperty('satellite-layer', 'raster-saturation', isGlobe ? 0.2 : 0);
-        map.setPaintProperty('satellite-layer', 'raster-contrast', isGlobe ? 0.12 : 0);
-        map.setPaintProperty('satellite-layer', 'raster-brightness-min', isGlobe ? 0.1 : 0);
-        map.setPaintProperty('satellite-layer', 'raster-brightness-max', isGlobe ? 0.92 : 1);
+        map.setPaintProperty('satellite-layer', 'raster-opacity', isGlobe ? 1 : 0.82);
+        map.setPaintProperty('satellite-layer', 'raster-saturation', isGlobe ? 0.15 : 0);
+        map.setPaintProperty('satellite-layer', 'raster-contrast', isGlobe ? 0.1 : 0);
+        map.setPaintProperty('satellite-layer', 'raster-brightness-min', isGlobe ? 0.2 : 0);
+        map.setPaintProperty('satellite-layer', 'raster-brightness-max', isGlobe ? 1 : 1);
       } catch {}
     }
 
     if (map.getLayer('day-night-fill')) {
       try {
         map.setPaintProperty('day-night-fill', 'fill-color', '#05101f');
-        map.setPaintProperty('day-night-fill', 'fill-opacity', isGlobe ? 0.05 : 0.16);
+        map.setPaintProperty('day-night-fill', 'fill-opacity', isGlobe ? 0 : 0.16);
       } catch {}
     }
   }, []);
@@ -292,7 +292,6 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       maxZoom: 18,
       pitch: projection === 'globe' ? 14 : 0,
       attributionControl: false,
-
     });
 
     map.on('load', () => {
@@ -1815,17 +1814,17 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
               type: 'raster',
               source: 'satellite-tiles',
               paint: {
-                'raster-opacity': projection === 'globe' ? 0.5 : 0.85,
-                'raster-saturation': projection === 'globe' ? 0.2 : 0,
-                'raster-contrast': projection === 'globe' ? 0.12 : 0,
-                'raster-brightness-min': projection === 'globe' ? 0.1 : 0,
-                'raster-brightness-max': projection === 'globe' ? 0.92 : 1,
+                'raster-opacity': projection === 'globe' ? 1 : 0.85,
+                'raster-saturation': projection === 'globe' ? 0.15 : 0,
+                'raster-contrast': projection === 'globe' ? 0.1 : 0,
+                'raster-brightness-min': projection === 'globe' ? 0.2 : 0,
+                'raster-brightness-max': projection === 'globe' ? 1 : 1,
               },
             },
             'day-night-fill',
           );
         } else {
-
+          map.setLayoutProperty('satellite-layer', 'visibility', 'visible');
         }
       } else if (map.getLayer('satellite-layer')) {
         map.setLayoutProperty('satellite-layer', 'visibility', 'none');

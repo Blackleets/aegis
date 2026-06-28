@@ -20,6 +20,7 @@ import AiAnalyst from '@/components/AiAnalyst';
 import SolarSystemMode, { type CelestialBodyId } from '@/components/SolarSystemMode';
 import ModeDock from '@/components/dashboard/ModeDock';
 import FocusModeOverlay from '@/components/dashboard/FocusModeOverlay';
+import IncidentFusionStrip from '@/components/dashboard/IncidentFusionStrip';
 
 const AegisMap = dynamic(() => import('@/components/AegisMap'), { ssr: false });
 const LayerPanel = dynamic(() => import('@/components/LayerPanel'));
@@ -1165,6 +1166,19 @@ export default function Dashboard() {
           <span className="rounded-full border border-[var(--border-primary)]/80 bg-[rgba(15,23,32,0.9)] px-2.5 xl:px-3 py-1 text-[9px] xl:text-[10px] 2xl:text-[11px] font-semibold tracking-[0.14em] xl:tracking-[0.16em] text-[var(--text-primary)]">SUPPORT PROJECT</span>
         </a>
       </motion.div>}
+
+      {showAuxiliaryHud && (
+        <IncidentFusionStrip
+          backendStatus={backendStatus}
+          trackedEntityCount={trackedEntityCount}
+          activeIntelAlerts={activeIntelAlerts}
+          maritimePressure={maritimePressure}
+          newsCount={data.news?.length || 0}
+          earthquakeCount={data.earthquakes?.length || 0}
+          gdeltCount={data.gdelt?.length || 0}
+          operationalModeLabel={operationalModeLabel}
+        />
+      )}
 
       {showAuxiliaryHud && <motion.div
         initial={{ opacity: 0, y: -10 }}
