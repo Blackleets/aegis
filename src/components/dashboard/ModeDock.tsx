@@ -36,14 +36,14 @@ function modeButtonClass(active: boolean, tone: DashboardMode) {
   }
 
   if (tone === 'earth') {
-    return 'border-[rgba(212,175,55,0.42)] bg-[rgba(212,175,55,0.12)] text-[var(--gold-primary)] shadow-[0_0_24px_rgba(212,175,55,0.08)]';
+    return 'border-[rgba(183,200,177,0.42)] bg-[rgba(183,200,177,0.12)] text-[var(--gold-primary)] shadow-[0_0_24px_rgba(183,200,177,0.10)]';
   }
 
   if (tone === 'solar') {
-    return 'border-[rgba(34,211,238,0.42)] bg-[rgba(34,211,238,0.12)] text-[var(--cyan-primary)] shadow-[0_0_24px_rgba(34,211,238,0.08)]';
+    return 'border-[rgba(118,228,234,0.42)] bg-[rgba(118,228,234,0.12)] text-[var(--cyan-primary)] shadow-[0_0_24px_rgba(118,228,234,0.10)]';
   }
 
-  return 'border-[rgba(16,185,129,0.42)] bg-[rgba(16,185,129,0.12)] text-[var(--alert-green)] shadow-[0_0_24px_rgba(16,185,129,0.08)]';
+  return 'border-[rgba(77,255,154,0.38)] bg-[rgba(77,255,154,0.10)] text-[var(--alert-green)] shadow-[0_0_24px_rgba(77,255,154,0.08)]';
 }
 
 export default function ModeDock({ mode, onEarthOps, onSolarView, onFocus }: ModeDockProps) {
@@ -56,7 +56,7 @@ export default function ModeDock({ mode, onEarthOps, onSolarView, onFocus }: Mod
       transition={{ delay: 3.05, duration: 0.45 }}
       className="absolute top-4 left-1/2 z-[220] w-[min(41rem,calc(100vw-1rem))] -translate-x-1/2 pointer-events-auto"
     >
-      <div className="relative overflow-hidden rounded-[1.55rem] border border-white/10 bg-[linear-gradient(135deg,rgba(7,12,18,0.82),rgba(10,18,28,0.68))] px-2 py-2 shadow-[0_18px_54px_rgba(0,0,0,0.30)] backdrop-blur-xl">
+      <div className="sovereign-panel px-2 py-2 backdrop-blur-xl">
         <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/22 to-transparent" />
         <div className="mb-2 flex items-center justify-between gap-3 px-2">
           <div className="text-[7px] font-mono tracking-[0.32em] text-[var(--text-secondary)]">AEGIS MODE CORE</div>

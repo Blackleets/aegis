@@ -1,0 +1,44 @@
+{
+  "theme": {
+    "extend": {
+      "colors": {
+        "aegis": {
+          "void": "#05080D",
+          "neutral": "#101923",
+          "surface": "#0A121B",
+          "surfaceElevated": "#111E2A",
+          "glass": "#101A24",
+          "borderSubtle": "#26394A",
+          "brass": "#B7C8B1",
+          "brassDim": "#6F806E",
+          "cyan": "#76E4EA",
+          "blue": "#78A8FF",
+          "danger": "#FF4B55",
+          "warning": "#F0A83A",
+          "success": "#4DFF9A",
+          "textPrimary": "#F5F9FC",
+          "textSecondary": "#B7C7D4",
+          "textMuted": "#73889A"
+        }
+      },
+      "fontFamily": {
+        "sans": ["Inter", "-apple-system", "sans-serif"],
+        "mono": ["JetBrains Mono", "Courier New", "monospace"]
+      },
+      "borderRadius": {
+        "aegis-sm": "6px",
+        "aegis-md": "14px",
+        "aegis-lg": "22px",
+        "aegis-xl": "30px"
+      },
+      "spacing": {
+        "aegis-xs": "4px",
+        "aegis-sm": "8px",
+        "aegis-md": "14px",
+        "aegis-lg": "22px",
+        "aegis-xl": "34px",
+        "aegis-2xl": "56px"
+      }
+    }
+  }
+}
