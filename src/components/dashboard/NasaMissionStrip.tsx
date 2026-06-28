@@ -46,7 +46,7 @@ export default function NasaMissionStrip({ locale, events, source, updatedAt, to
       initial={{ opacity: 0, x: 16 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: 3.05, duration: 0.45 }}
-      className="absolute right-3 top-[4.6rem] z-[205] w-[min(24rem,calc(100vw-1.5rem))] pointer-events-none md:right-5 md:top-[5.4rem]"
+      className="shrink-0 pointer-events-auto"
     >
       <div className="glass-panel pointer-events-auto overflow-hidden border border-[var(--border-primary)]/80 bg-[linear-gradient(145deg,rgba(10,18,28,0.96),rgba(17,29,44,0.92))] shadow-[0_18px_56px_rgba(0,0,0,0.22)]">
         <div className="flex items-center justify-between border-b border-white/8 px-3.5 py-2.5">

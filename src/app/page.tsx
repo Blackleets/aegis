@@ -261,7 +261,11 @@ export default function Dashboard() {
   const [regionDossier, setRegionDossier] = useState<RegionDossier | null>(null);
   const [dossierLoading, setDossierLoading] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
-  const [locale, setLocale] = useState<Locale>(DEFAULT_LOCALE);
+  const [locale, setLocale] = useState<Locale>(() => {
+    if (typeof window === 'undefined') return DEFAULT_LOCALE;
+    const stored = window.localStorage.getItem('aegis-locale');
+    return isLocale(stored) ? stored : DEFAULT_LOCALE;
+  });
   const [activeCamera, setActiveCamera] = useState<ActiveCamera | null>(null);
   const [spaceWeather, setSpaceWeather] = useState<SpaceWeather | null>(null);
   const [nasaEventMesh, setNasaEventMesh] = useState<NasaEventMesh | null>(null);
@@ -298,14 +302,6 @@ export default function Dashboard() {
   useEffect(() => {
     const splashTimer = setTimeout(() => setShowSplash(false), 2500);
     return () => clearTimeout(splashTimer);
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const stored = window.localStorage.getItem('aegis-locale');
-    if (isLocale(stored)) {
-      setLocale(stored);
-    }
   }, []);
 
   useEffect(() => {
@@ -1075,16 +1071,6 @@ export default function Dashboard() {
         }}
       />
 
-      {showAuxiliaryHud && (
-        <NasaMissionStrip
-          locale={locale}
-          events={nasaEventMesh?.events || []}
-          source={nasaEventMesh?.source}
-          updatedAt={nasaEventMesh?.fetched_at}
-          totalOpen={nasaEventMesh?.total_open}
-        />
-      )}
-
       {isFocusView && (
         <FocusModeOverlay
           backendStatus={backendStatus}
@@ -1238,46 +1224,6 @@ export default function Dashboard() {
         />
       )}
 
-      {showAuxiliaryHud && <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 3.15, duration: 0.5 }}
-        className="hidden 2xl:block absolute top-20 right-5 z-[200] w-[380px] pointer-events-none"
-      >
-        <div className="glass-panel pointer-events-auto overflow-hidden border border-[var(--border-primary)]/80 bg-[linear-gradient(135deg,rgba(13,22,31,0.96),rgba(19,31,44,0.9))] shadow-[0_18px_60px_rgba(0,0,0,0.2)]">
-          <div className="flex items-center justify-between border-b border-[var(--border-primary)]/45 px-4 py-3">
-            <div>
-              <div className="text-[9px] font-mono tracking-[0.32em] text-[var(--text-secondary)]">{copy.status.liveBrief}</div>
-              <div className="mt-1 text-[11px] font-semibold tracking-[0.18em] text-[var(--text-primary)]">{operationalModeLabel}</div>
-            </div>
-            <div className="flex items-center gap-2 rounded-full border border-[var(--border-primary)]/50 bg-white/[0.03] px-2.5 py-1 text-[9px] font-mono text-[var(--text-secondary)]">
-              <div className={`h-1.5 w-1.5 rounded-full ${backendStatus === 'connected' ? 'bg-[var(--alert-green)]' : backendStatus === 'error' ? 'bg-[var(--alert-red)]' : 'bg-[var(--gold-primary)]'} animate-aegis-pulse`} />
-              <span>{backendStatus === 'connected' ? copy.focus.live : backendStatus === 'error' ? copy.focus.degraded : copy.focus.syncing}</span>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-2.5 p-3.5">
-            {[
-              { label: copy.status.trackedEntities, value: trackedEntityCount.toLocaleString(), accent: 'var(--gold-primary)', icon: Database },
-              { label: copy.status.highSignalAlerts, value: activeIntelAlerts.toString(), accent: activeIntelAlerts > 0 ? '#F59E0B' : 'var(--alert-green)', icon: AlertTriangle },
-              { label: copy.status.liveUsers, value: usageMetrics ? usageMetrics.onlineUsers.toString() : '0', accent: usageMetrics && usageMetrics.onlineUsers > 0 ? 'var(--alert-green)' : 'var(--text-secondary)', icon: Activity },
-              { label: copy.status.totalVisits, value: usageMetrics ? usageMetrics.totalUsers.toLocaleString() : '0', accent: 'var(--cyan-primary)', icon: BarChart3 },
-            ].map((item) => {
-              const Icon = item.icon;
-
-              return (
-                <div key={item.label} className="rounded-2xl border border-white/8 bg-white/[0.035] px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[8px] font-mono tracking-[0.18em] text-[var(--text-muted)]">{item.label}</span>
-                    <Icon className="h-3.5 w-3.5" style={{ color: item.accent }} />
-                  </div>
-                  <div className="mt-2 text-[18px] font-bold tabular-nums" style={{ color: item.accent }}>{item.value}</div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </motion.div>}
-
       {/* ── MOBILE: Compact top status ── */}
       {isMobile && showAuxiliaryHud && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 2.5 }} className="absolute top-3 right-3 z-[200] pointer-events-auto flex flex-col items-end gap-1.5">
@@ -1344,7 +1290,7 @@ export default function Dashboard() {
       </div>}
 
       {/* ── RIGHT HUD (desktop): Search + focused desk ── */}
-      {showDesktopRails && <div className="desktop-panel absolute right-4 xl:right-5 top-20 bottom-24 xl:bottom-24 w-[16rem] xl:w-[17rem] 2xl:w-[18rem] flex flex-col gap-2.5 z-[200] min-h-0 pointer-events-auto overflow-y-auto styled-scrollbar pr-1">
+      {showDesktopRails && <div className="desktop-panel absolute right-4 xl:right-5 top-[13.25rem] bottom-24 xl:bottom-24 w-[16rem] xl:w-[17rem] 2xl:w-[18rem] flex flex-col gap-2.5 z-[200] min-h-0 pointer-events-auto overflow-y-auto styled-scrollbar pr-1">
         <div className="glass-panel overflow-hidden border border-[var(--border-primary)]/80 bg-[linear-gradient(180deg,rgba(14,24,34,0.96),rgba(18,29,42,0.9))] shadow-[0_16px_42px_rgba(0,0,0,0.18)]">
           <div className="flex items-center justify-between border-b border-[var(--border-primary)]/45 px-3.5 py-2.5">
             <div>
@@ -1371,6 +1317,14 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+
+        <NasaMissionStrip
+          locale={locale}
+          events={nasaEventMesh?.events || []}
+          source={nasaEventMesh?.source}
+          updatedAt={nasaEventMesh?.fetched_at}
+          totalOpen={nasaEventMesh?.total_open}
+        />
 
         <div className="glass-panel overflow-hidden border border-[var(--border-primary)]/80 bg-[linear-gradient(180deg,rgba(14,24,34,0.94),rgba(16,27,39,0.88))] shadow-[0_16px_40px_rgba(0,0,0,0.16)]">
           <div className="flex items-center justify-between border-b border-[var(--border-primary)]/45 px-3.5 py-2.5">

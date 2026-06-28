@@ -982,7 +982,6 @@ export default function SolarSystemMode({
   locale?: Locale;
 }) {
   const activeBody = bodyById[selected];
-  const copy = getDashboardCopy(locale);
   const isEarth = selected === 'earth';
   const [rotationOffsets, setRotationOffsets] = useState<Partial<Record<CelestialBodyId, number>>>({});
   const [planetZoom, setPlanetZoom] = useState(1);
@@ -1227,12 +1226,13 @@ export default function SolarSystemMode({
         )}
       </AnimatePresence>
 
-      {enabled && <DesktopPlanetSlider selected={selected} activeBody={activeBody} onSelect={onSelect} onReturnEarth={onReturnEarth} />}
+      {enabled && <DesktopPlanetSlider selected={selected} activeBody={activeBody} onSelect={onSelect} onReturnEarth={onReturnEarth} locale={locale} />}
       {enabled && <MobilePlanetRail
         selected={selected}
         activeBody={activeBody}
         zoom={planetZoom}
         autoRotate={autoRotate}
+        locale={locale}
         onSelect={onSelect}
         onReturnEarth={onReturnEarth}
         onZoomIn={() => setPlanetZoom((current) => Math.min(current + 0.12, 1.36))}

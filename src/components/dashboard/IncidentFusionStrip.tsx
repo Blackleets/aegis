@@ -69,7 +69,7 @@ export default function IncidentFusionStrip({
       initial={{ opacity: 0, y: -10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 3.22, duration: 0.45 }}
-      className="absolute left-1/2 top-[5.75rem] z-[198] hidden w-[min(44rem,calc(100vw-38rem))] min-w-[30rem] -translate-x-1/2 pointer-events-none xl:block"
+      className="absolute left-1/2 top-[5.25rem] z-[198] hidden w-[min(40rem,calc(100vw-44rem))] min-w-[28rem] -translate-x-1/2 pointer-events-none xl:block"
     >
       <div className="sovereign-panel px-3.5 py-3 backdrop-blur-xl">
         <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[rgba(183,200,177,0.28)] to-transparent" />

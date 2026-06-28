@@ -65,7 +65,7 @@ export default function ModeDock({ mode, locale, onLocaleChange, onEarthOps, onS
       initial={{ opacity: 0, y: -12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 3.05, duration: 0.45 }}
-      className="absolute top-4 left-1/2 z-[220] w-[min(41rem,calc(100vw-1rem))] -translate-x-1/2 pointer-events-auto"
+      className="absolute top-3 left-1/2 z-[220] w-[min(36rem,calc(100vw-1rem))] -translate-x-1/2 pointer-events-auto"
     >
       <div className="sovereign-panel px-2 py-2 backdrop-blur-xl">
         <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/22 to-transparent" />
