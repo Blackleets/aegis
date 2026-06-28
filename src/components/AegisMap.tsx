@@ -133,6 +133,10 @@ const OVERVIEW_SECONDARY_DOT_LAYERS = [
 ] as const;
 
 const OVERVIEW_SECONDARY_SYMBOL_LAYERS = [
+  'trail-commercial',
+  'trail-private',
+  'trail-jets',
+  'trail-military',
   'fl-commercial',
   'fl-private',
   'fl-jets',
@@ -170,6 +174,33 @@ function getHotspotLabel(entity: MapEntity): string {
   const base = String(entity.title || entity.name || entity.theme || 'Unclassified hotspot').trim();
   const words = base.split(/\s+/).slice(0, 4).join(' ');
   return words.length > 34 ? `${words.slice(0, 31)}…` : words;
+}
+
+function normalizeLongitude(lng: number): number {
+  if (lng > 180) return lng - 360;
+  if (lng < -180) return lng + 360;
+  return lng;
+}
+
+function getFlightTrailCoordinates(f: MapEntity): Coordinates[] | null {
+  if (typeof f.lat !== 'number' || typeof f.lng !== 'number') return null;
+
+  const heading = typeof f.heading === 'number' ? f.heading : Number(f.heading || 0);
+  const speed = typeof f.speed_knots === 'number' ? f.speed_knots : Number(f.speed_knots || 0);
+  const altitude = typeof f.alt === 'number' ? f.alt : Number(f.alt || 0);
+
+  if (!Number.isFinite(heading)) return null;
+
+  const latRad = Math.max(0.2, Math.cos((f.lat * Math.PI) / 180));
+  const headingRad = (heading * Math.PI) / 180;
+  const trailDegrees = Math.min(1.45, Math.max(0.22, (Number.isFinite(speed) ? speed : 0) / 520 + (Number.isFinite(altitude) ? altitude : 0) / 52000));
+  const dLat = Math.cos(headingRad) * trailDegrees;
+  const dLng = (Math.sin(headingRad) * trailDegrees) / latRad;
+
+  return [
+    [normalizeLongitude(f.lng - dLng), Math.max(-85, Math.min(85, f.lat - dLat))],
+    [f.lng, f.lat],
+  ];
 }
 
 function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightClick, onViewStateChange, flyToLocation, projection = 'globe', mapStyle = 'dark', sweepData, scanTargets = [] }: AegisMapProps) {
@@ -315,7 +346,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       createDot(map, 'dot-cctv', '#39FF14', 10);
 
       // Sources
-      const sources = ['flights','military','jets','private-fl','satellites','earthquakes','gdelt','gdelt-hotspots','gps-jamming','day-night','cctv','fires','weather','infrastructure','maritime','maritime-choke','maritime-ships','live-news','sigint-news','conflict-zones', 'war-alerts-targets', 'war-alerts-lines', 'balloons', 'radiation', 'ip-sweep-devices', 'ip-sweep-pulse', 'ip-sweep-connections', 'scan-targets', 'sdk-entities', 'sdk-links'];
+      const sources = ['flights','military','jets','private-fl','flight-trails','military-trails','jet-trails','private-trails','satellites','earthquakes','gdelt','gdelt-hotspots','gps-jamming','day-night','cctv','fires','weather','infrastructure','maritime','maritime-choke','maritime-ships','live-news','sigint-news','conflict-zones', 'war-alerts-targets', 'war-alerts-lines', 'balloons', 'radiation', 'ip-sweep-devices', 'ip-sweep-pulse', 'ip-sweep-connections', 'scan-targets', 'sdk-entities', 'sdk-links'];
       sources.forEach(s => map.addSource(s, { type: 'geojson', data: EMPTY_FC }));
 
       // Warning icon generator (parameterized — eliminates 3x copy-paste)
@@ -584,6 +615,22 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
         'text-field': ['get', 'id'], 'text-size': 11, 'text-font': ['Open Sans Bold'],
         'text-offset': [0, 2], 'text-max-width': 14, 'text-allow-overlap': false,
       }, paint: { 'text-color': '#FF3D3D', 'text-halo-color': '#000', 'text-halo-width': 1.5, 'text-opacity': 0.9 }});
+
+      // Flight trails — short, heading-derived wake lines (not historical routes)
+      const flightTrailLayers = [
+        { id: 'trail-commercial', src: 'flight-trails', color: '#00E5FF' },
+        { id: 'trail-private', src: 'private-trails', color: '#00E676' },
+        { id: 'trail-jets', src: 'jet-trails', color: '#FF69B4' },
+        { id: 'trail-military', src: 'military-trails', color: '#FF3D3D' },
+      ];
+      flightTrailLayers.forEach(l => {
+        map.addLayer({ id: l.id, type: 'line', source: l.src, paint: {
+          'line-color': l.color,
+          'line-width': ['interpolate',['linear'],['zoom'], 2.6,0.35, 5,0.75, 9,1.3],
+          'line-opacity': ['interpolate',['linear'],['zoom'], 2.6,0.12, 5,0.26, 9,0.42],
+          'line-blur': ['interpolate',['linear'],['zoom'], 2.6,0.2, 9,0.8],
+        }});
+      });
 
       // Flight layers (WebGL symbol — GPU rendered, handles 50K+ smooth)
       const flightLayers = [
@@ -1194,14 +1241,31 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
   // Flight data → GeoJSON (GPU rendered)
   useEffect(() => {
     if (!mapReady) return;
-    const toFeatures = (arr: MapEntity[] = []) => arr.map((f) => ({
-      type: 'Feature' as const, geometry: { type: 'Point' as const, coordinates: [f.lng, f.lat] },
+
+    const validFlights = (arr: MapEntity[] = []) => arr.filter((f) => typeof f.lat === 'number' && typeof f.lng === 'number');
+    const toFeatures = (arr: MapEntity[] = []) => validFlights(arr).map((f) => ({
+      type: 'Feature' as const,
+      geometry: { type: 'Point' as const, coordinates: [f.lng as number, f.lat as number] },
       properties: { callsign: f.callsign, heading: f.heading || 0, alt: f.alt, model: f.model, speed_knots: f.speed_knots, registration: f.registration, icao24: f.icao24 },
     }));
-    setGeo('flights', activeLayers.flights ? toFeatures(data.commercial_flights) : []);
-    setGeo('private-fl', activeLayers.private ? toFeatures(data.private_flights) : []);
+    const toTrailFeatures = (arr: MapEntity[] = []) => validFlights(arr).map((f) => {
+      const coordinates = getFlightTrailCoordinates(f);
+      if (!coordinates) return null;
+      return {
+        type: 'Feature' as const,
+        geometry: { type: 'LineString' as const, coordinates },
+        properties: { callsign: f.callsign, heading: f.heading || 0, speed_knots: f.speed_knots, alt: f.alt },
+      };
+    }).filter((feature): feature is GeoJsonFeature => feature !== null);
 
+    setGeo('flights', activeLayers.flights ? toFeatures(data.commercial_flights) : []);
+    setGeo('flight-trails', activeLayers.flights ? toTrailFeatures(data.commercial_flights) : []);
+    setGeo('private-fl', activeLayers.private ? toFeatures(data.private_flights) : []);
+    setGeo('private-trails', activeLayers.private ? toTrailFeatures(data.private_flights) : []);
+    setGeo('jets', activeLayers.jets ? toFeatures(data.private_jets) : []);
+    setGeo('jet-trails', activeLayers.jets ? toTrailFeatures(data.private_jets) : []);
     setGeo('military', activeLayers.military ? toFeatures(data.military_flights) : []);
+    setGeo('military-trails', activeLayers.military ? toTrailFeatures(data.military_flights) : []);
   }, [mapReady, data.commercial_flights, data.private_flights, data.private_jets, data.military_flights, activeLayers.flights, activeLayers.private, activeLayers.jets, activeLayers.military, setGeo]);
 
   // ── DECOUPLED LAYER RENDERERS (Performance Optimized) ──
