@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion, type PanInfo } from 'framer-motion';
 import { useEffect, useState } from 'react';
+import { getDashboardCopy, type Locale } from '@/lib/i18n';
 
 export type CelestialBodyId = 'earth' | 'moon' | 'mars' | 'venus' | 'jupiter' | 'saturn' | 'neptune';
 
@@ -601,7 +602,9 @@ function PlanetChip({ body, active, onClick, compact = false }: { body: Celestia
   );
 }
 
-function DesktopPlanetSlider({ selected, activeBody, onSelect, onReturnEarth }: { selected: CelestialBodyId; activeBody: CelestialBody; onSelect: (body: CelestialBodyId) => void; onReturnEarth?: () => void }) {
+function DesktopPlanetSlider({ selected, activeBody, onSelect, onReturnEarth, locale }: { selected: CelestialBodyId; activeBody: CelestialBody; onSelect: (body: CelestialBodyId) => void; onReturnEarth?: () => void; locale: Locale }) {
+  const copy = getDashboardCopy(locale);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 18 }}
@@ -616,7 +619,7 @@ function DesktopPlanetSlider({ selected, activeBody, onSelect, onReturnEarth }: 
             onClick={() => onSelect(getAdjacentBody(selected, -1))}
             className="rounded-full border border-white/10 bg-white/[0.035] px-3 py-1.5 text-[8px] font-mono tracking-[0.2em] text-[var(--text-secondary)] transition-colors hover:border-white/20 hover:text-[var(--text-primary)]"
           >
-            PREV
+            {copy.solar.prev}
           </button>
           <div className="text-center">
             <div className="text-[8px] font-mono tracking-[0.34em] text-[var(--text-secondary)]">PLANETARY SLIDER</div>
@@ -628,7 +631,7 @@ function DesktopPlanetSlider({ selected, activeBody, onSelect, onReturnEarth }: 
             onClick={() => onSelect(getAdjacentBody(selected, 1))}
             className="rounded-full border border-white/10 bg-white/[0.035] px-3 py-1.5 text-[8px] font-mono tracking-[0.2em] text-[var(--text-secondary)] transition-colors hover:border-white/20 hover:text-[var(--text-primary)]"
           >
-            NEXT
+            {copy.solar.next}
           </button>
         </div>
 
@@ -660,6 +663,7 @@ function MobilePlanetRail({
   onZoomOut,
   onReset,
   onToggleAutoRotate,
+  locale,
 }: {
   selected: CelestialBodyId;
   activeBody: CelestialBody;
@@ -671,7 +675,10 @@ function MobilePlanetRail({
   onZoomOut: () => void;
   onReset: () => void;
   onToggleAutoRotate: () => void;
+  locale: Locale;
 }) {
+  const copy = getDashboardCopy(locale);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 14 }}
@@ -682,7 +689,7 @@ function MobilePlanetRail({
       <div className="overflow-hidden rounded-[1.5rem] border border-white/10 bg-[#050b14]/80 px-3 py-2.5 shadow-[0_16px_54px_rgba(0,0,0,0.32)] backdrop-blur-xl">
         <div className="mb-2 flex items-center justify-between gap-2">
           <div>
-            <div className="text-[7px] font-mono tracking-[0.28em] text-[var(--text-secondary)]">SOLAR MODE</div>
+            <div className="text-[7px] font-mono tracking-[0.28em] text-[var(--text-secondary)]">{copy.solar.mode}</div>
             <div className="mt-1 text-[9px] font-semibold tracking-[0.16em] text-[var(--text-primary)]">
               {selected === 'earth' ? 'EARTH OPS' : `${activeBody.name.toUpperCase()} VISTA`}
             </div>
@@ -694,7 +701,7 @@ function MobilePlanetRail({
             }}
             className={`rounded-full border px-2.5 py-1 text-[7px] font-mono tracking-[0.18em] transition-colors ${selected === 'earth' ? 'border-[rgba(34,211,238,0.42)] bg-[rgba(34,211,238,0.12)] text-[var(--cyan-primary)]' : 'border-white/10 bg-white/[0.035] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
           >
-            EARTH OPS
+            {copy.solar.returnEarth}
           </button>
         </div>
         <div className="flex snap-x snap-mandatory gap-2 overflow-x-auto pb-1 styled-scrollbar">
@@ -713,17 +720,17 @@ function MobilePlanetRail({
         {selected !== 'earth' && (
           <div className="mt-2 rounded-[1.1rem] border border-white/8 bg-black/20 p-2">
             <div className="mb-1.5 flex items-center justify-between gap-2">
-              <span className="text-[6px] font-mono tracking-[0.24em] text-[var(--text-secondary)]">PLANET CONTROL</span>
+              <span className="text-[6px] font-mono tracking-[0.24em] text-[var(--text-secondary)]">{copy.solar.planetControl}</span>
               <span className="rounded-full border border-white/10 px-2 py-0.5 text-[6px] font-mono tracking-[0.16em]" style={{ color: autoRotate ? activeBody.accent : 'var(--text-secondary)' }}>
-                {autoRotate ? 'AUTO' : 'MANUAL'} · {(zoom * 100).toFixed(0)}%
+                {autoRotate ? copy.solar.auto : copy.solar.manual} · {(zoom * 100).toFixed(0)}%
               </span>
             </div>
             <div className="grid grid-cols-4 gap-1.5">
-              <button onClick={onZoomOut} className="rounded-full border border-white/10 bg-white/[0.035] px-2 py-1 text-[6px] font-mono tracking-[0.12em] text-[var(--text-secondary)]">ZOOM -</button>
-              <button onClick={onReset} className="rounded-full border border-white/10 bg-white/[0.035] px-2 py-1 text-[6px] font-mono tracking-[0.12em] text-[var(--text-secondary)]">RESET</button>
-              <button onClick={onZoomIn} className="rounded-full border border-white/10 bg-white/[0.035] px-2 py-1 text-[6px] font-mono tracking-[0.12em] text-[var(--text-secondary)]">ZOOM +</button>
+              <button onClick={onZoomOut} className="rounded-full border border-white/10 bg-white/[0.035] px-2 py-1 text-[6px] font-mono tracking-[0.12em] text-[var(--text-secondary)]">{copy.solar.zoomOut}</button>
+              <button onClick={onReset} className="rounded-full border border-white/10 bg-white/[0.035] px-2 py-1 text-[6px] font-mono tracking-[0.12em] text-[var(--text-secondary)]">{copy.solar.reset}</button>
+              <button onClick={onZoomIn} className="rounded-full border border-white/10 bg-white/[0.035] px-2 py-1 text-[6px] font-mono tracking-[0.12em] text-[var(--text-secondary)]">{copy.solar.zoomIn}</button>
               <button onClick={onToggleAutoRotate} className="rounded-full border border-white/10 bg-white/[0.035] px-2 py-1 text-[6px] font-mono tracking-[0.12em] text-[var(--text-secondary)]">
-                {autoRotate ? 'PAUSE' : 'AUTO'}
+                {autoRotate ? copy.solar.pauseRotate.split(' ')[0] : copy.solar.auto}
               </button>
             </div>
           </div>
@@ -735,6 +742,7 @@ function MobilePlanetRail({
 
 function PlanetControlDock({
   body,
+  locale,
   zoom,
   autoRotate,
   onZoomIn,
@@ -744,6 +752,7 @@ function PlanetControlDock({
   onReturnEarth,
 }: {
   body: CelestialBody;
+  locale: Locale;
   zoom: number;
   autoRotate: boolean;
   onZoomIn: () => void;
@@ -752,6 +761,7 @@ function PlanetControlDock({
   onToggleAutoRotate: () => void;
   onReturnEarth: () => void;
 }) {
+  const copy = getDashboardCopy(locale);
   const buttonClass = 'rounded-full border border-white/10 bg-white/[0.035] px-2.5 py-1.5 text-[7px] font-mono tracking-[0.16em] text-[var(--text-secondary)] transition-colors hover:border-white/20 hover:text-[var(--text-primary)]';
 
   return (
@@ -764,24 +774,24 @@ function PlanetControlDock({
       <div className="overflow-hidden rounded-[1.55rem] border border-white/10 bg-[rgba(7,12,18,0.56)] px-3.5 py-3 shadow-[0_16px_48px_rgba(0,0,0,0.24)] backdrop-blur-xl">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <div className="text-[7px] font-mono tracking-[0.28em] text-[var(--text-secondary)]">PLANET CONTROL</div>
+            <div className="text-[7px] font-mono tracking-[0.28em] text-[var(--text-secondary)]">{copy.solar.planetControl}</div>
             <div className="mt-1 text-[10px] font-semibold tracking-[0.18em] text-[var(--text-primary)]">{body.name.toUpperCase()} · {(zoom * 100).toFixed(0)}%</div>
           </div>
           <div className="rounded-full border border-white/10 bg-black/20 px-2 py-1 text-[7px] font-mono tracking-[0.16em]" style={{ color: autoRotate ? body.accent : 'var(--text-secondary)' }}>
-            {autoRotate ? 'AUTO' : 'MANUAL'}
+            {autoRotate ? copy.solar.auto : copy.solar.manual}
           </div>
         </div>
 
         <div className="mt-3 grid grid-cols-3 gap-1.5">
-          <button onClick={onZoomOut} className={buttonClass}>ZOOM -</button>
-          <button onClick={onReset} className={buttonClass}>RESET</button>
-          <button onClick={onZoomIn} className={buttonClass}>ZOOM +</button>
+          <button onClick={onZoomOut} className={buttonClass}>{copy.solar.zoomOut}</button>
+          <button onClick={onReset} className={buttonClass}>{copy.solar.reset}</button>
+          <button onClick={onZoomIn} className={buttonClass}>{copy.solar.zoomIn}</button>
         </div>
 
         <div className="mt-2 grid grid-cols-2 gap-1.5">
-          <button onClick={onToggleAutoRotate} className={buttonClass}>{autoRotate ? 'PAUSE ROTATE' : 'AUTO ROTATE'}</button>
+          <button onClick={onToggleAutoRotate} className={buttonClass}>{autoRotate ? copy.solar.pauseRotate : copy.solar.autoRotate}</button>
           <button onClick={onReturnEarth} className="rounded-full border border-[rgba(212,175,55,0.28)] bg-[rgba(212,175,55,0.08)] px-2.5 py-1.5 text-[7px] font-mono tracking-[0.16em] text-[var(--gold-primary)] transition-colors hover:border-[rgba(212,175,55,0.48)]">
-            EARTH OPS
+            {copy.solar.returnEarth}
           </button>
         </div>
       </div>
@@ -962,14 +972,17 @@ export default function SolarSystemMode({
   onReturnEarth,
   isMobile = false,
   enabled = true,
+  locale = 'en',
 }: {
   selected: CelestialBodyId;
   onSelect: (body: CelestialBodyId) => void;
   onReturnEarth?: () => void;
   isMobile?: boolean;
   enabled?: boolean;
+  locale?: Locale;
 }) {
   const activeBody = bodyById[selected];
+  const copy = getDashboardCopy(locale);
   const isEarth = selected === 'earth';
   const [rotationOffsets, setRotationOffsets] = useState<Partial<Record<CelestialBodyId, number>>>({});
   const [planetZoom, setPlanetZoom] = useState(1);

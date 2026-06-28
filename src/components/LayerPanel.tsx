@@ -23,20 +23,24 @@ import {
   ToggleRight,
   Network,
 } from 'lucide-react';
+import type { Locale } from '@/lib/i18n';
 
 type LayerDataMap = Record<string, unknown>;
 type ActiveLayers = Record<string, boolean>;
 
+type Translated = { en: string; es: string };
+
 interface LayerConfig {
   key: string;
-  label: string;
+  label: Translated;
   icon: typeof Network;
   color: string;
   dataKey: string;
 }
 
 interface LayerGroup {
-  label: string;
+  key: string;
+  label: Translated;
   icon: typeof Network;
   color: string;
   layers: LayerConfig[];
@@ -46,84 +50,98 @@ interface LayerPanelProps {
   data: LayerDataMap;
   activeLayers: ActiveLayers;
   setActiveLayers: React.Dispatch<React.SetStateAction<ActiveLayers>>;
+  locale: Locale;
 }
+
+const panelCopy = {
+  en: { title: 'DATA LAYERS', entities: 'ENT', enableAll: 'Enable all', disableAll: 'Disable all' },
+  es: { title: 'CAPAS DE DATOS', entities: 'ENT', enableAll: 'Activar todo', disableAll: 'Desactivar todo' },
+} as const;
 
 const LAYER_GROUPS: LayerGroup[] = [
   {
-    label: 'AEGIS SDK',
+    key: 'sdk',
+    label: { en: 'AEGIS SDK', es: 'AEGIS SDK' },
     icon: Network,
     color: '#1565C0',
     layers: [
-      { key: 'sdk_stream', label: 'Intelligence Stream', icon: Network, color: '#1565C0', dataKey: 'sdk_entities' },
+      { key: 'sdk_stream', label: { en: 'Intelligence Stream', es: 'Flujo de inteligencia' }, icon: Network, color: '#1565C0', dataKey: 'sdk_entities' },
     ],
   },
   {
-    label: 'AVIATION',
+    key: 'aviation',
+    label: { en: 'AVIATION', es: 'AVIACIÓN' },
     icon: Plane,
     color: '#00E5FF',
     layers: [
-      { key: 'flights', label: 'Commercial', icon: Plane, color: '#00E5FF', dataKey: 'commercial_flights' },
-      { key: 'private', label: 'Private', icon: Plane, color: '#00E676', dataKey: 'private_flights' },
-      { key: 'jets', label: 'Private Jets', icon: Plane, color: '#FF69B4', dataKey: 'private_jets' },
-      { key: 'military', label: 'Military', icon: Shield, color: '#FF3D3D', dataKey: 'military_flights' },
+      { key: 'flights', label: { en: 'Commercial', es: 'Comercial' }, icon: Plane, color: '#00E5FF', dataKey: 'commercial_flights' },
+      { key: 'private', label: { en: 'Private', es: 'Privado' }, icon: Plane, color: '#00E676', dataKey: 'private_flights' },
+      { key: 'jets', label: { en: 'Private Jets', es: 'Jets privados' }, icon: Plane, color: '#FF69B4', dataKey: 'private_jets' },
+      { key: 'military', label: { en: 'Military', es: 'Militar' }, icon: Shield, color: '#FF3D3D', dataKey: 'military_flights' },
     ],
   },
   {
-    label: 'MARITIME & SPACE',
+    key: 'maritime-space',
+    label: { en: 'MARITIME & SPACE', es: 'MARÍTIMO Y ESPACIAL' },
     icon: Ship,
     color: '#00BCD4',
     layers: [
-      { key: 'maritime', label: 'Maritime / Naval', icon: Ship, color: '#00BCD4', dataKey: 'maritime_ships,maritime_ports,maritime_chokepoints' },
-      { key: 'satellites', label: 'Satellites', icon: Satellite, color: '#D4AF37', dataKey: 'satellites' },
+      { key: 'maritime', label: { en: 'Maritime / Naval', es: 'Marítimo / naval' }, icon: Ship, color: '#00BCD4', dataKey: 'maritime_ships,maritime_ports,maritime_chokepoints' },
+      { key: 'satellites', label: { en: 'Satellites', es: 'Satélites' }, icon: Satellite, color: '#D4AF37', dataKey: 'satellites' },
     ],
   },
   {
-    label: 'SURVEILLANCE',
+    key: 'surveillance',
+    label: { en: 'SURVEILLANCE', es: 'VIGILANCIA' },
     icon: Camera,
     color: '#39FF14',
     layers: [
-      { key: 'cctv', label: 'CCTV Cameras', icon: Camera, color: '#39FF14', dataKey: 'cameras' },
-      { key: 'live_news', label: 'Live News Feeds', icon: Tv, color: '#FF4081', dataKey: 'live_feeds' },
+      { key: 'cctv', label: { en: 'CCTV Cameras', es: 'Cámaras CCTV' }, icon: Camera, color: '#39FF14', dataKey: 'cameras' },
+      { key: 'live_news', label: { en: 'Live News Feeds', es: 'Feeds de noticias en vivo' }, icon: Tv, color: '#FF4081', dataKey: 'live_feeds' },
     ],
   },
   {
-    label: 'NATURAL HAZARDS',
+    key: 'natural-hazards',
+    label: { en: 'NATURAL HAZARDS', es: 'PELIGROS NATURALES' },
     icon: Activity,
     color: '#FF9500',
     layers: [
-      { key: 'earthquakes', label: 'Earthquakes (24h)', icon: Activity, color: '#FF9500', dataKey: 'earthquakes' },
-      { key: 'fires', label: 'Active Fires', icon: Flame, color: '#FF6B00', dataKey: 'fires' },
-      { key: 'weather', label: 'Severe Weather', icon: CloudLightning, color: '#E040FB', dataKey: 'weather_events' },
+      { key: 'earthquakes', label: { en: 'Earthquakes (24h)', es: 'Terremotos (24h)' }, icon: Activity, color: '#FF9500', dataKey: 'earthquakes' },
+      { key: 'fires', label: { en: 'Active Fires', es: 'Incendios activos' }, icon: Flame, color: '#FF6B00', dataKey: 'fires' },
+      { key: 'weather', label: { en: 'Severe Weather', es: 'Clima severo' }, icon: CloudLightning, color: '#E040FB', dataKey: 'weather_events' },
     ],
   },
   {
-    label: 'THREATS & INFRA',
+    key: 'threats-infra',
+    label: { en: 'THREATS & INFRA', es: 'AMENAZAS E INFRA' },
     icon: AlertTriangle,
     color: '#FF3D3D',
     layers: [
-      { key: 'infrastructure', label: 'Nuclear Facilities', icon: Radiation, color: '#76FF03', dataKey: 'infrastructure' },
-      { key: 'global_incidents', label: 'Global Incidents', icon: AlertTriangle, color: '#FF3D3D', dataKey: 'gdelt' },
-      { key: 'gps_jamming', label: 'GPS Jamming', icon: Radio, color: '#FF4444', dataKey: 'gps_jamming' },
+      { key: 'infrastructure', label: { en: 'Nuclear Facilities', es: 'Instalaciones nucleares' }, icon: Radiation, color: '#76FF03', dataKey: 'infrastructure' },
+      { key: 'global_incidents', label: { en: 'Global Incidents', es: 'Incidentes globales' }, icon: AlertTriangle, color: '#FF3D3D', dataKey: 'gdelt' },
+      { key: 'gps_jamming', label: { en: 'GPS Jamming', es: 'Interferencia GPS' }, icon: Radio, color: '#FF4444', dataKey: 'gps_jamming' },
     ],
   },
   {
-    label: 'DISPLAY',
+    key: 'display',
+    label: { en: 'DISPLAY', es: 'DISPLAY' },
     icon: Sun,
     color: '#448AFF',
     layers: [
-      { key: 'day_night', label: 'Day / Night Cycle', icon: Sun, color: '#448AFF', dataKey: '' },
+      { key: 'day_night', label: { en: 'Day / Night Cycle', es: 'Ciclo día / noche' }, icon: Sun, color: '#448AFF', dataKey: '' },
     ],
   },
 ];
 
 const ALL_LAYERS = LAYER_GROUPS.flatMap((g) => g.layers);
-const DEFAULT_EXPANDED = new Set(['AEGIS SDK', 'SURVEILLANCE']);
+const DEFAULT_EXPANDED = new Set(['sdk', 'surveillance']);
 
-function LayerPanel({ data, activeLayers, setActiveLayers }: LayerPanelProps) {
+function LayerPanel({ data, activeLayers, setActiveLayers, locale }: LayerPanelProps) {
+  const t = panelCopy[locale] ?? panelCopy.en;
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
     LAYER_GROUPS.forEach((group) => {
-      initial[group.label] = DEFAULT_EXPANDED.has(group.label);
+      initial[group.key] = DEFAULT_EXPANDED.has(group.key);
     });
     return initial;
   });
@@ -149,8 +167,8 @@ function LayerPanel({ data, activeLayers, setActiveLayers }: LayerPanelProps) {
   const totalEntities = ALL_LAYERS.reduce((sum, layer) => sum + (getCount(layer.dataKey) || 0), 0);
   const activeCount = Object.values(activeLayers).filter(Boolean).length;
 
-  const toggleGroup = (groupLabel: string) => {
-    setExpandedGroups((prev) => ({ ...prev, [groupLabel]: !prev[groupLabel] }));
+  const toggleGroup = (groupKey: string) => {
+    setExpandedGroups((prev) => ({ ...prev, [groupKey]: !prev[groupKey] }));
   };
 
   const toggleAllInGroup = (group: LayerGroup) => {
@@ -177,7 +195,7 @@ function LayerPanel({ data, activeLayers, setActiveLayers }: LayerPanelProps) {
             <Eye className="h-3.5 w-3.5 stroke-[1.5] text-[var(--gold-primary)]" />
             <div className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-[var(--alert-green)] animate-aegis-pulse" />
           </div>
-          <span className="hud-text text-[12px] tracking-widest text-[var(--text-primary)]">DATA LAYERS</span>
+          <span className="hud-text text-[12px] tracking-widest text-[var(--text-primary)]">{t.title}</span>
         </div>
         <div className="flex items-center gap-1.5">
           <span
@@ -187,28 +205,28 @@ function LayerPanel({ data, activeLayers, setActiveLayers }: LayerPanelProps) {
             {activeCount}/{ALL_LAYERS.length}
           </span>
           <span className="gotham-tag gotham-tag--info" style={{ fontSize: '7px', padding: '1px 5px' }}>
-            {totalEntities.toLocaleString()} ENT
+            {totalEntities.toLocaleString()} {t.entities}
           </span>
         </div>
       </div>
 
       <div className="space-y-1 max-h-[16rem] overflow-y-auto pr-1 styled-scrollbar">
         {LAYER_GROUPS.map((group) => {
-          const isExpanded = expandedGroups[group.label];
+          const isExpanded = expandedGroups[group.key];
           const groupActiveCount = group.layers.filter((layer) => activeLayers[layer.key]).length;
           const allActive = groupActiveCount === group.layers.length;
           const GroupIcon = group.icon;
 
           return (
-            <div key={group.label}>
+            <div key={group.key}>
               <div className="flex items-center gap-1.5">
                 <button
-                  onClick={() => toggleGroup(group.label)}
+                  onClick={() => toggleGroup(group.key)}
                   className="flex flex-1 items-center gap-2 rounded-md px-2 py-1 transition-colors hover:bg-white/[0.03]"
                 >
                   <GroupIcon className="h-3 w-3 flex-shrink-0 stroke-[1.5]" style={{ color: group.color }} />
                   <span className="flex-1 text-left text-[9px] font-bold font-mono tracking-[0.15em] text-[var(--text-secondary)]">
-                    {group.label}
+                    {group.label[locale] ?? group.label.en}
                   </span>
                   <span className="text-[8px] font-mono tabular-nums" style={{ color: groupActiveCount > 0 ? group.color : 'var(--text-muted)' }}>
                     {groupActiveCount}/{group.layers.length}
@@ -222,7 +240,7 @@ function LayerPanel({ data, activeLayers, setActiveLayers }: LayerPanelProps) {
                 <button
                   onClick={() => toggleAllInGroup(group)}
                   className="rounded p-1 transition-colors hover:bg-white/[0.05]"
-                  title={allActive ? 'Disable all' : 'Enable all'}
+                  title={allActive ? t.disableAll : t.enableAll}
                 >
                   {allActive ? (
                     <ToggleRight className="h-3.5 w-3.5 stroke-[1.5]" style={{ color: group.color }} />
@@ -273,7 +291,7 @@ function LayerPanel({ data, activeLayers, setActiveLayers }: LayerPanelProps) {
                                 isActive ? 'text-[var(--text-primary)]' : 'text-[var(--text-muted)] group-hover:text-[var(--text-secondary)]'
                               }`}
                             >
-                              {layer.label}
+                              {layer.label[locale] ?? layer.label.en}
                             </span>
                             {count !== null && (
                               <span

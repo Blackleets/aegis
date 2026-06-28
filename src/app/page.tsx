@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Layers, BarChart3, Newspaper, Search, X, Globe, MapPinned, Satellite, Moon, ExternalLink, AlertTriangle, Activity, Database, Wifi } from 'lucide-react';
+import { Layers, BarChart3, Newspaper, Search, X, Globe, MapPinned, Satellite, Moon, ExternalLink, AlertTriangle, Activity, Database, Wifi, Radar } from 'lucide-react';
 import IntelFeed from '@/components/IntelFeed';
 import MarketsPanel from '@/components/MarketsPanel';
 import ScmPanel from '@/components/ScmPanel';
@@ -21,6 +21,8 @@ import SolarSystemMode, { type CelestialBodyId } from '@/components/SolarSystemM
 import ModeDock from '@/components/dashboard/ModeDock';
 import FocusModeOverlay from '@/components/dashboard/FocusModeOverlay';
 import IncidentFusionStrip from '@/components/dashboard/IncidentFusionStrip';
+import NasaMissionStrip, { type NasaEventItem } from '@/components/dashboard/NasaMissionStrip';
+import { DEFAULT_LOCALE, getDashboardCopy, isLocale, type Locale } from '@/lib/i18n';
 
 const AegisMap = dynamic(() => import('@/components/AegisMap'), { ssr: false });
 const LayerPanel = dynamic(() => import('@/components/LayerPanel'));
@@ -165,6 +167,14 @@ interface SpaceWeather {
   [key: string]: unknown;
 }
 
+interface NasaEventMesh {
+  source?: string;
+  status?: 'ok' | 'error';
+  total_open?: number;
+  fetched_at?: string;
+  events?: NasaEventItem[];
+}
+
 interface ActiveCamera {
   type?: string;
   url?: string;
@@ -251,8 +261,10 @@ export default function Dashboard() {
   const [regionDossier, setRegionDossier] = useState<RegionDossier | null>(null);
   const [dossierLoading, setDossierLoading] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
+  const [locale, setLocale] = useState<Locale>(DEFAULT_LOCALE);
   const [activeCamera, setActiveCamera] = useState<ActiveCamera | null>(null);
   const [spaceWeather, setSpaceWeather] = useState<SpaceWeather | null>(null);
+  const [nasaEventMesh, setNasaEventMesh] = useState<NasaEventMesh | null>(null);
   const [showLayers, setShowLayers] = useState(true);
   const [showMarkets, setShowMarkets] = useState(true);
   const [showScmPanel, setShowScmPanel] = useState(true);
@@ -287,6 +299,19 @@ export default function Dashboard() {
     const splashTimer = setTimeout(() => setShowSplash(false), 2500);
     return () => clearTimeout(splashTimer);
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const stored = window.localStorage.getItem('aegis-locale');
+    if (isLocale(stored)) {
+      setLocale(stored);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem('aegis-locale', locale);
+  }, [locale]);
 
   // URL state: update URL on view change (debounced)
   const urlTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -491,6 +516,15 @@ export default function Dashboard() {
       await fetchEndpoint('/api/news');
     };
 
+    const loadNasaEvents = async () => {
+      try {
+        const r = await fetch('/api/nasa/eonet');
+        if (r.ok) setNasaEventMesh(await r.json());
+      } catch (e) {
+        console.warn('[AEGIS] Suppressed error:', e instanceof Error ? e.message : e);
+      }
+    };
+
     // Priority 1: Core feeds (always needed for panels)
     void loadCoreFeeds();
     const marketTimer = setTimeout(() => fetchEndpoint('/api/markets', d => ({ markets: d })), 800);
@@ -503,15 +537,24 @@ export default function Dashboard() {
       } catch (e) { console.warn('[AEGIS] Suppressed error:', e instanceof Error ? e.message : e); }
     }, 5000);
 
+    // Priority 3: NASA event mesh
+    const nasaTimer = setTimeout(() => {
+      void loadNasaEvents();
+    }, 2500);
+
     // Polling — OPTIMIZED intervals to minimize edge requests
     const intervals = [
       setInterval(() => fetchEndpoint('/api/earthquakes'), 900000),  // 15 min (was 5)
       setInterval(() => fetchEndpoint('/api/news'), 1800000),        // 30 min (was 10)
       setInterval(() => fetchEndpoint('/api/markets', d => ({ markets: d })), 900000), // 15 min (was 5)
+      setInterval(() => {
+        void loadNasaEvents();
+      }, 1800000),
     ];
     return () => {
       clearTimeout(marketTimer);
       clearTimeout(spaceTimer);
+      clearTimeout(nasaTimer);
       intervals.forEach(clearInterval);
     };
   }, [fetchEndpoint]);
@@ -764,28 +807,29 @@ export default function Dashboard() {
   const showDesktopRails = !isMobile && isEarthOps && selectedCelestialBody === 'earth';
   const showDesktopBottomBar = !isMobile && isEarthOps && selectedCelestialBody === 'earth';
   const showAuxiliaryHud = isEarthOps && selectedCelestialBody === 'earth';
+  const copy = getDashboardCopy(locale);
 
   const operationalModeLabel = selectedCelestialBody !== 'earth'
-    ? `${selectedCelestialBody.toUpperCase()} VISUAL MODE`
+    ? locale === 'es' ? `MODO VISUAL ${selectedCelestialBody.toUpperCase()}` : `${selectedCelestialBody.toUpperCase()} VISUAL MODE`
     : backendStatus === 'connected'
       ? activeIntelAlerts > 0 || maritimePressure > 0
-        ? 'HEIGHTENED WATCH'
-        : 'STEADY TRACKING'
+        ? locale === 'es' ? 'VIGILIA ELEVADA' : 'HEIGHTENED WATCH'
+        : locale === 'es' ? 'SEGUIMIENTO ESTABLE' : 'STEADY TRACKING'
       : backendStatus === 'error'
-        ? 'DEGRADED FEED STATE'
-        : 'LINKING DATA MESH';
+        ? locale === 'es' ? 'ESTADO DE FEEDS DEGRADADO' : 'DEGRADED FEED STATE'
+        : locale === 'es' ? 'ENLAZANDO MALLA DE DATOS' : 'LINKING DATA MESH';
 
   const commandRailFocus = selectedCelestialBody !== 'earth'
-    ? 'EARTH DATA STANDBY'
+    ? locale === 'es' ? 'DATOS DE TIERRA EN ESPERA' : 'EARTH DATA STANDBY'
     : backendStatus === 'connected'
       ? activeIntelAlerts > 0
-        ? 'PRIORITY SIGNALS'
+        ? locale === 'es' ? 'SEÑALES PRIORITARIAS' : 'PRIORITY SIGNALS'
         : maritimePressure > 0
-          ? 'SUPPLY-CHAIN WATCH'
-          : 'ROUTINE RECON'
+          ? locale === 'es' ? 'VIGILIA DE CADENA DE SUMINISTRO' : 'SUPPLY-CHAIN WATCH'
+          : locale === 'es' ? 'RECON RUTINARIO' : 'ROUTINE RECON'
       : backendStatus === 'error'
-        ? 'DEGRADED COVERAGE'
-        : 'SYNCING SOURCES';
+        ? locale === 'es' ? 'COBERTURA DEGRADADA' : 'DEGRADED COVERAGE'
+        : locale === 'es' ? 'SINCRONIZANDO FUENTES' : 'SYNCING SOURCES';
 
   return (
     <main className="fixed inset-0 w-full h-full bg-[var(--bg-void)] overflow-hidden">
@@ -1010,10 +1054,13 @@ export default function Dashboard() {
         }}
         isMobile={isMobile}
         enabled={isSolarView}
+        locale={locale}
       />
 
       <ModeDock
         mode={dashboardMode}
+        locale={locale}
+        onLocaleChange={setLocale}
         onEarthOps={() => {
           setDashboardMode('earth');
           setSelectedCelestialBody('earth');
@@ -1028,12 +1075,23 @@ export default function Dashboard() {
         }}
       />
 
+      {showAuxiliaryHud && (
+        <NasaMissionStrip
+          locale={locale}
+          events={nasaEventMesh?.events || []}
+          source={nasaEventMesh?.source}
+          updatedAt={nasaEventMesh?.fetched_at}
+          totalOpen={nasaEventMesh?.total_open}
+        />
+      )}
+
       {isFocusView && (
         <FocusModeOverlay
           backendStatus={backendStatus}
           trackedEntityCount={trackedEntityCount}
           activeIntelAlerts={activeIntelAlerts}
           postureLabel={operationalModeLabel}
+          locale={locale}
         />
       )}
 
@@ -1047,7 +1105,7 @@ export default function Dashboard() {
             <button
               onClick={() => setMapProjection(p => p === 'globe' ? 'mercator' : 'globe')}
               className="glass-panel p-2.5 pointer-events-auto hover:border-[var(--gold-primary)]/40 transition-colors group relative"
-              title={mapProjection === 'globe' ? 'Switch to 2D Map' : 'Switch to 3D Globe'}
+              title={mapProjection === 'globe' ? copy.controls.switch2d : copy.controls.switch3d}
             >
               {mapProjection === 'globe' ? (
                 <MapPinned className="w-4 h-4 text-[var(--gold-primary)] group-hover:scale-110 transition-transform" />
@@ -1055,14 +1113,14 @@ export default function Dashboard() {
                 <Globe className="w-4 h-4 text-[var(--cyan-primary)] group-hover:scale-110 transition-transform" />
               )}
               <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 text-[9px] font-mono text-[var(--text-muted)] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity glass-panel px-2 py-1 z-[300]">
-                {mapProjection === 'globe' ? '2D MAP' : '3D GLOBE'}
+                {mapProjection === 'globe' ? copy.controls.map2d : copy.controls.globe3d}
               </span>
             </button>
 
             <button
               onClick={() => setMapStyle(s => s === 'dark' ? 'satellite' : 'dark')}
               className="glass-panel p-2.5 pointer-events-auto hover:border-[var(--gold-primary)]/40 transition-colors group relative"
-              title={mapStyle === 'dark' ? 'Satellite View' : 'Night View'}
+              title={mapStyle === 'dark' ? copy.controls.satelliteView : copy.controls.nightView}
             >
               {mapStyle === 'dark' ? (
                 <Satellite className="w-4 h-4 text-[var(--alert-green)] group-hover:scale-110 transition-transform" />
@@ -1070,7 +1128,7 @@ export default function Dashboard() {
                 <Moon className="w-4 h-4 text-[var(--cyan-primary)] group-hover:scale-110 transition-transform" />
               )}
               <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 text-[9px] font-mono text-[var(--text-muted)] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity glass-panel px-2 py-1 z-[300]">
-                {mapStyle === 'dark' ? 'SATELLITE' : 'NIGHT MODE'}
+                {mapStyle === 'dark' ? copy.controls.satellite : copy.controls.nightMode}
               </span>
             </button>
           </>
@@ -1081,17 +1139,17 @@ export default function Dashboard() {
               setDashboardMode('earth');
             }}
             className="glass-panel px-3 py-2 pointer-events-auto hover:border-[var(--cyan-primary)]/40 transition-colors group relative text-[8px] font-mono tracking-[0.2em] text-[var(--cyan-primary)]"
-            title="Return to Earth Operations"
+            title={copy.controls.returnEarth}
           >
-            RETURN TO EARTH OPS
+            {copy.controls.returnEarth}
           </button>
         ) : (
           <button
             onClick={() => setDashboardMode('earth')}
             className="glass-panel px-3 py-2 pointer-events-auto hover:border-[var(--gold-primary)]/40 transition-colors group relative text-[8px] font-mono tracking-[0.2em] text-[var(--gold-primary)]"
-            title="Exit Focus Mode"
+            title={copy.controls.exitFocus}
           >
-            EXIT FOCUS
+            {copy.controls.exitFocus}
           </button>
         )}
       </motion.div>
@@ -1119,10 +1177,10 @@ export default function Dashboard() {
             <h1 className="text-base md:text-xl font-bold tracking-[0.4em] md:tracking-[0.5em] text-[var(--text-heading)] font-mono">AEGIS</h1>
             <span className="hidden md:inline-flex items-center gap-1 px-1.5 py-[1px] rounded-sm border border-[var(--cyan-primary)]/40 bg-[var(--cyan-primary)]/10 text-[7px] font-mono font-bold tracking-[0.15em] text-[var(--cyan-primary)] uppercase" style={{ lineHeight: '1.4' }}>
               <Globe className="w-2.5 h-2.5" />
-              OPEN SOURCE
+              {copy.header.badge}
             </span>
           </div>
-          <span className="text-[8px] md:text-[9px] text-[var(--gold-primary)] font-mono tracking-[0.2em] md:tracking-[0.3em] opacity-80">ORBITAL INTELLIGENCE COMMAND</span>
+          <span className="text-[8px] md:text-[9px] text-[var(--gold-primary)] font-mono tracking-[0.2em] md:tracking-[0.3em] opacity-80">{copy.header.subtitle}</span>
         </div>
       </motion.div>
 
@@ -1137,7 +1195,7 @@ export default function Dashboard() {
 
         <span className="hidden lg:inline text-[var(--border-primary)]">│</span>
 
-        <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-primary)]/70 bg-[rgba(15,23,32,0.82)] px-2 py-1 shadow-[0_10px_30px_rgba(0,0,0,0.16)]">SYS <span className={backendStatus === 'connected' ? 'text-[var(--alert-green)]' : 'text-[var(--alert-red)]'}>{backendStatus.toUpperCase()}</span></span>
+        <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-primary)]/70 bg-[rgba(15,23,32,0.82)] px-2 py-1 shadow-[0_10px_30px_rgba(0,0,0,0.16)]">{copy.status.sys} <span className={backendStatus === 'connected' ? 'text-[var(--alert-green)]' : 'text-[var(--alert-red)]'}>{backendStatus.toUpperCase()}</span></span>
 
         {spaceWeather && <span className="hidden xl:inline">SOLAR: <span style={{ color: spaceWeather.storm_color, fontWeight: 700 }}>Kp{spaceWeather.kp_index}</span></span>}
 
@@ -1145,17 +1203,17 @@ export default function Dashboard() {
         <span className="hidden xl:inline-flex items-center gap-1">
           <Wifi className="w-3 h-3 text-[var(--cyan-primary)]" />
           <span className="text-[var(--cyan-primary)] font-bold">{Object.values(activeLayers).filter(Boolean).length}</span>
-          <span className="text-[var(--text-muted)]/60">FEEDS</span>
+          <span className="text-[var(--text-muted)]/60">{copy.status.feeds}</span>
         </span>
 
         {usageMetrics && (
           <span className="hidden 2xl:inline-flex items-center gap-2 rounded-full border border-[var(--border-primary)]/70 bg-[rgba(15,23,32,0.82)] px-2.5 py-1 shadow-[0_10px_30px_rgba(0,0,0,0.16)]">
             <Activity className="h-3 w-3 text-[var(--alert-green)]" />
-            <span className="text-[var(--text-secondary)]">LIVE</span>
+            <span className="text-[var(--text-secondary)]">{copy.status.live}</span>
             <span className="font-bold text-[var(--text-primary)]">{usageMetrics.onlineUsers}</span>
             <span className="text-[var(--border-primary)]">/</span>
             <BarChart3 className="h-3 w-3 text-[var(--gold-primary)]" />
-            <span className="text-[var(--text-secondary)]">VISITS</span>
+            <span className="text-[var(--text-secondary)]">{copy.status.visits}</span>
             <span className="font-bold text-[var(--text-primary)]">{usageMetrics.totalUsers.toLocaleString()}</span>
           </span>
         )}
@@ -1163,7 +1221,7 @@ export default function Dashboard() {
         <span className="hidden xl:inline-flex"><UptimeClock /></span>
         
         <a href='https://ko-fi.com/M8D41ZYW4Z' target='_blank' className="pointer-events-auto hover:opacity-80 transition-opacity ml-1 hidden 2xl:flex items-center">
-          <span className="rounded-full border border-[var(--border-primary)]/80 bg-[rgba(15,23,32,0.9)] px-2.5 xl:px-3 py-1 text-[9px] xl:text-[10px] 2xl:text-[11px] font-semibold tracking-[0.14em] xl:tracking-[0.16em] text-[var(--text-primary)]">SUPPORT PROJECT</span>
+          <span className="rounded-full border border-[var(--border-primary)]/80 bg-[rgba(15,23,32,0.9)] px-2.5 xl:px-3 py-1 text-[9px] xl:text-[10px] 2xl:text-[11px] font-semibold tracking-[0.14em] xl:tracking-[0.16em] text-[var(--text-primary)]">{copy.status.supportProject}</span>
         </a>
       </motion.div>}
 
@@ -1189,22 +1247,23 @@ export default function Dashboard() {
         <div className="glass-panel pointer-events-auto overflow-hidden border border-[var(--border-primary)]/80 bg-[linear-gradient(135deg,rgba(13,22,31,0.96),rgba(19,31,44,0.9))] shadow-[0_18px_60px_rgba(0,0,0,0.2)]">
           <div className="flex items-center justify-between border-b border-[var(--border-primary)]/45 px-4 py-3">
             <div>
-              <div className="text-[9px] font-mono tracking-[0.32em] text-[var(--text-secondary)]">LIVE BRIEF</div>
+              <div className="text-[9px] font-mono tracking-[0.32em] text-[var(--text-secondary)]">{copy.status.liveBrief}</div>
               <div className="mt-1 text-[11px] font-semibold tracking-[0.18em] text-[var(--text-primary)]">{operationalModeLabel}</div>
             </div>
             <div className="flex items-center gap-2 rounded-full border border-[var(--border-primary)]/50 bg-white/[0.03] px-2.5 py-1 text-[9px] font-mono text-[var(--text-secondary)]">
               <div className={`h-1.5 w-1.5 rounded-full ${backendStatus === 'connected' ? 'bg-[var(--alert-green)]' : backendStatus === 'error' ? 'bg-[var(--alert-red)]' : 'bg-[var(--gold-primary)]'} animate-aegis-pulse`} />
-              <span>{backendStatus === 'connected' ? 'LIVE' : backendStatus === 'error' ? 'DEGRADED' : 'SYNCING'}</span>
+              <span>{backendStatus === 'connected' ? copy.focus.live : backendStatus === 'error' ? copy.focus.degraded : copy.focus.syncing}</span>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-2.5 p-3.5">
             {[
-              { label: 'TRACKED ENTITIES', value: trackedEntityCount.toLocaleString(), accent: 'var(--gold-primary)', icon: Database },
-              { label: 'HIGH-SIGNAL ALERTS', value: activeIntelAlerts.toString(), accent: activeIntelAlerts > 0 ? '#F59E0B' : 'var(--alert-green)', icon: AlertTriangle },
-              { label: 'LIVE USERS', value: usageMetrics ? usageMetrics.onlineUsers.toString() : '0', accent: usageMetrics && usageMetrics.onlineUsers > 0 ? 'var(--alert-green)' : 'var(--text-secondary)', icon: Activity },
-              { label: 'TOTAL VISITS', value: usageMetrics ? usageMetrics.totalUsers.toLocaleString() : '0', accent: 'var(--cyan-primary)', icon: BarChart3 },
+              { label: copy.status.trackedEntities, value: trackedEntityCount.toLocaleString(), accent: 'var(--gold-primary)', icon: Database },
+              { label: copy.status.highSignalAlerts, value: activeIntelAlerts.toString(), accent: activeIntelAlerts > 0 ? '#F59E0B' : 'var(--alert-green)', icon: AlertTriangle },
+              { label: copy.status.liveUsers, value: usageMetrics ? usageMetrics.onlineUsers.toString() : '0', accent: usageMetrics && usageMetrics.onlineUsers > 0 ? 'var(--alert-green)' : 'var(--text-secondary)', icon: Activity },
+              { label: copy.status.totalVisits, value: usageMetrics ? usageMetrics.totalUsers.toLocaleString() : '0', accent: 'var(--cyan-primary)', icon: BarChart3 },
             ].map((item) => {
               const Icon = item.icon;
+
               return (
                 <div key={item.label} className="rounded-2xl border border-white/8 bg-white/[0.035] px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
                   <div className="flex items-center justify-between">
@@ -1224,14 +1283,14 @@ export default function Dashboard() {
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 2.5 }} className="absolute top-3 right-3 z-[200] pointer-events-auto flex flex-col items-end gap-1.5">
           <div className="flex items-center gap-1.5 rounded-2xl border border-[var(--border-primary)]/70 bg-[rgba(15,23,32,0.92)] px-2.5 py-1.5 shadow-[0_10px_30px_rgba(0,0,0,0.18)] backdrop-blur-md">
             <span className={`h-1.5 w-1.5 rounded-full ${backendStatus === 'connected' ? 'bg-[var(--alert-green)]' : backendStatus === 'error' ? 'bg-[var(--alert-red)]' : 'bg-[var(--gold-primary)]'} animate-aegis-pulse`} />
-            <span className="text-[7px] font-mono font-bold tracking-[0.18em] text-[var(--text-primary)]">{backendStatus === 'connected' ? 'LIVE' : backendStatus === 'error' ? 'DEGRADED' : 'SYNCING'}</span>
+            <span className="text-[7px] font-mono font-bold tracking-[0.18em] text-[var(--text-primary)]">{backendStatus === 'connected' ? copy.focus.live : backendStatus === 'error' ? copy.focus.degraded : copy.focus.syncing}</span>
             <span className="text-[var(--border-primary)]/70">•</span>
-            <span className="text-[7px] font-mono tracking-[0.18em] text-[var(--text-muted)]">ALERTS</span>
+            <span className="text-[7px] font-mono tracking-[0.18em] text-[var(--text-muted)]">{copy.status.alerts}</span>
             <span className="text-[9px] font-bold tabular-nums" style={{ color: activeIntelAlerts > 0 ? '#FF9500' : 'var(--alert-green)' }}>{activeIntelAlerts}</span>
           </div>
           <a href='https://ko-fi.com/M8D41ZYW4Z' target='_blank' className="glass-panel px-2.5 py-1.5 flex items-center gap-1.5 text-[7px] font-mono tracking-[0.18em] hover:opacity-80 transition-opacity border-[var(--border-primary)]/80 bg-[rgba(15,23,32,0.92)]">
             <div className="w-1.5 h-1.5 rounded-full bg-[var(--gold-primary)] animate-aegis-pulse" />
-            <span className="text-[var(--text-primary)] font-bold">SUPPORT PROJECT</span>
+            <span className="text-[var(--text-primary)] font-bold">{copy.status.supportProjectCompact}</span>
           </a>
         </motion.div>
       )}
@@ -1242,35 +1301,35 @@ export default function Dashboard() {
       {showDesktopRails && <div className="desktop-panel absolute left-4 xl:left-5 top-20 bottom-24 xl:bottom-24 w-[15.75rem] xl:w-[16.5rem] 2xl:w-[17.25rem] flex flex-col gap-2.5 z-[200] min-h-0 pointer-events-none overflow-y-auto styled-scrollbar pr-1">
         {showLayers && (
           <>
-            <LayerPanel data={dataWithSdk} activeLayers={activeLayers} setActiveLayers={setActiveLayers} />
+            <LayerPanel data={dataWithSdk} activeLayers={activeLayers} setActiveLayers={setActiveLayers} locale={locale} />
             <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.5 }} className="glass-panel px-3.5 py-3 pointer-events-auto overflow-hidden border border-[var(--border-primary)]/80 bg-[linear-gradient(180deg,rgba(14,24,34,0.96),rgba(18,29,42,0.9))]">
               <div className="mb-2.5 flex items-center justify-between rounded-2xl border border-[var(--border-primary)]/45 bg-white/[0.035] px-3 py-2.5">
                 <div>
-                  <div className="text-[8px] font-mono tracking-[0.26em] text-[var(--text-secondary)]">OPERATIONS SUMMARY</div>
+                  <div className="text-[8px] font-mono tracking-[0.26em] text-[var(--text-secondary)]">{copy.status.operationsSummary}</div>
                   <div className="mt-1 text-[10px] font-semibold tracking-[0.16em] text-[var(--text-primary)]">{operationalModeLabel}</div>
                 </div>
                 <div className="text-right">
-                  <div className="text-[8px] font-mono tracking-[0.16em] text-[var(--text-muted)]">LIVE NOW</div>
+                  <div className="text-[8px] font-mono tracking-[0.16em] text-[var(--text-muted)]">{copy.status.liveNow}</div>
                   <div className="mt-1 text-[13px] font-bold tabular-nums" style={{ color: usageMetrics && usageMetrics.onlineUsers > 0 ? 'var(--alert-green)' : 'var(--text-secondary)' }}>{usageMetrics ? usageMetrics.onlineUsers : 0}</div>
                 </div>
               </div>
               <div className="grid grid-cols-5 gap-2 text-center">
-                <div><div className="hud-label">AIRCRAFT</div><div className="hud-value text-[10px] animate-data-pulse">{globalStats ? globalStats.flights.toLocaleString() : '0'}</div></div>
-                <div><div className="hud-label">SATS</div><div className="hud-value text-[10px]">{globalStats ? globalStats.sats.toLocaleString() : '0'}</div></div>
-                <div><div className="hud-label">CCTV</div><div className="hud-value text-[10px]">{globalStats ? globalStats.cctv.toLocaleString() : '0'}</div></div>
-                <div><div className="hud-label">WEATHER</div><div className="hud-value text-[10px]" style={{ color: 'var(--accent-weather)' }}>{globalStats ? globalStats.weather.toLocaleString() : '0'}</div></div>
-                <div><div className="hud-label">NUCLEAR</div><div className="hud-value text-[10px]" style={{ color: 'var(--accent-nuclear)' }}>{globalStats ? globalStats.nuclear.toLocaleString() : '0'}</div></div>
+                <div><div className="hud-label">{copy.status.aircraft}</div><div className="hud-value text-[10px] animate-data-pulse">{globalStats ? globalStats.flights.toLocaleString() : '0'}</div></div>
+                <div><div className="hud-label">{copy.status.sats}</div><div className="hud-value text-[10px]">{globalStats ? globalStats.sats.toLocaleString() : '0'}</div></div>
+                <div><div className="hud-label">{copy.status.cctv}</div><div className="hud-value text-[10px]">{globalStats ? globalStats.cctv.toLocaleString() : '0'}</div></div>
+                <div><div className="hud-label">{copy.status.weather}</div><div className="hud-value text-[10px]" style={{ color: 'var(--accent-weather)' }}>{globalStats ? globalStats.weather.toLocaleString() : '0'}</div></div>
+                <div><div className="hud-label">{copy.status.nuclear}</div><div className="hud-value text-[10px]" style={{ color: 'var(--accent-nuclear)' }}>{globalStats ? globalStats.nuclear.toLocaleString() : '0'}</div></div>
               </div>
             </motion.div>
-            <ViewPresets onNavigate={(lat, lng, zoom) => { setFlyToLocation({ lat, lng, ts: Date.now() }); setMapView(v => ({ ...v, zoom })); }} />
+            <ViewPresets locale={locale} onNavigate={(lat, lng, zoom) => { setFlyToLocation({ lat, lng, ts: Date.now() }); setMapView(v => ({ ...v, zoom })); }} />
           </>
         )}
 
         <div className="glass-panel pointer-events-auto overflow-hidden border border-[var(--border-primary)]/70 bg-[linear-gradient(180deg,rgba(12,21,30,0.94),rgba(15,25,36,0.9))]">
           <div className="flex items-center justify-between border-b border-[var(--border-primary)]/40 px-3 py-2">
             <div>
-              <div className="text-[8px] font-mono tracking-[0.22em] text-[var(--text-secondary)]">FOCUSED DESK</div>
-              <div className="mt-1 text-[10px] font-semibold tracking-[0.14em] text-[var(--text-primary)]">One active block for clean operator focus</div>
+              <div className="text-[8px] font-mono tracking-[0.22em] text-[var(--text-secondary)]">{copy.status.focusedDesk}</div>
+              <div className="mt-1 text-[10px] font-semibold tracking-[0.14em] text-[var(--text-primary)]">{copy.status.focusedDeskHint}</div>
             </div>
           </div>
           <div className="flex gap-1.5 p-2">
@@ -1289,25 +1348,25 @@ export default function Dashboard() {
         <div className="glass-panel overflow-hidden border border-[var(--border-primary)]/80 bg-[linear-gradient(180deg,rgba(14,24,34,0.96),rgba(18,29,42,0.9))] shadow-[0_16px_42px_rgba(0,0,0,0.18)]">
           <div className="flex items-center justify-between border-b border-[var(--border-primary)]/45 px-3.5 py-2.5">
             <div>
-              <div className="text-[8px] font-mono tracking-[0.26em] text-[var(--text-secondary)]">COMMAND POSTURE</div>
+              <div className="text-[8px] font-mono tracking-[0.26em] text-[var(--text-secondary)]">{copy.status.commandPosture}</div>
               <div className="mt-1 text-[10px] font-semibold tracking-[0.16em] text-[var(--text-primary)]">{operationalModeLabel}</div>
             </div>
             <div className="flex items-center gap-2 rounded-full border border-[var(--border-primary)]/45 bg-white/[0.035] px-2 py-1 text-[8px] font-mono text-[var(--text-secondary)]">
               <div className={`h-1.5 w-1.5 rounded-full ${backendStatus === 'connected' ? 'bg-[var(--alert-green)]' : backendStatus === 'error' ? 'bg-[var(--alert-red)]' : 'bg-[var(--gold-primary)]'} animate-aegis-pulse`} />
-              <span>{backendStatus === 'connected' ? 'LIVE' : backendStatus === 'error' ? 'DEGRADED' : 'SYNCING'}</span>
+              <span>{backendStatus === 'connected' ? copy.focus.live : backendStatus === 'error' ? copy.focus.degraded : copy.focus.syncing}</span>
             </div>
           </div>
           <div className="grid grid-cols-3 gap-2 p-3">
             <div className="rounded-2xl border border-white/8 bg-white/[0.035] px-3 py-2.5 text-center">
-              <div className="text-[7px] font-mono tracking-[0.18em] text-[var(--text-muted)]">ALERTS</div>
+              <div className="text-[7px] font-mono tracking-[0.18em] text-[var(--text-muted)]">{copy.status.alerts}</div>
               <div className="mt-1 text-[13px] font-bold tabular-nums" style={{ color: activeIntelAlerts > 0 ? '#F59E0B' : 'var(--alert-green)' }}>{activeIntelAlerts}</div>
             </div>
             <div className="rounded-2xl border border-white/8 bg-white/[0.035] px-3 py-2.5 text-center">
-              <div className="text-[7px] font-mono tracking-[0.18em] text-[var(--text-muted)]">TRACKED</div>
+              <div className="text-[7px] font-mono tracking-[0.18em] text-[var(--text-muted)]">{copy.status.tracked}</div>
               <div className="mt-1 text-[13px] font-bold tabular-nums text-[var(--gold-primary)]">{trackedEntityCount.toLocaleString()}</div>
             </div>
             <div className="rounded-2xl border border-white/8 bg-white/[0.035] px-3 py-2.5 text-center">
-              <div className="text-[7px] font-mono tracking-[0.18em] text-[var(--text-muted)]">LIVE NOW</div>
+              <div className="text-[7px] font-mono tracking-[0.18em] text-[var(--text-muted)]">{copy.status.liveNow}</div>
               <div className="mt-1 text-[13px] font-bold tabular-nums" style={{ color: usageMetrics && usageMetrics.onlineUsers > 0 ? 'var(--alert-green)' : 'var(--text-secondary)' }}>{usageMetrics ? usageMetrics.onlineUsers : 0}</div>
             </div>
           </div>
@@ -1316,11 +1375,11 @@ export default function Dashboard() {
         <div className="glass-panel overflow-hidden border border-[var(--border-primary)]/80 bg-[linear-gradient(180deg,rgba(14,24,34,0.94),rgba(16,27,39,0.88))] shadow-[0_16px_40px_rgba(0,0,0,0.16)]">
           <div className="flex items-center justify-between border-b border-[var(--border-primary)]/45 px-3.5 py-2.5">
             <div>
-              <div className="text-[8px] font-mono tracking-[0.26em] text-[var(--text-secondary)]">COMMAND RAIL</div>
+              <div className="text-[8px] font-mono tracking-[0.26em] text-[var(--text-secondary)]">{copy.status.commandRail}</div>
               <div className="mt-1 text-[10px] font-semibold tracking-[0.16em] text-[var(--text-primary)]">{commandRailFocus}</div>
             </div>
             <div className="rounded-full border border-white/8 bg-white/[0.035] px-2 py-1 text-[7px] font-mono tracking-[0.16em] text-[var(--cyan-primary)]">
-              SEARCH • SHARE • RECON
+              {copy.status.searchShareRecon}
             </div>
           </div>
           <div className="space-y-2.5 p-3">
@@ -1329,7 +1388,7 @@ export default function Dashboard() {
               <div className="relative"><SharePanel mapView={mapView} activeLayers={activeLayers} mouseCoords={null} /></div>
             </div>
             <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2 text-[7px] font-mono tracking-[0.16em] text-[var(--text-muted)]">
-              Search, share, or pivot directly into recon overlays from one rail.
+              {copy.status.searchRailHint}
             </div>
           </div>
         </div>
@@ -1337,13 +1396,13 @@ export default function Dashboard() {
         <div className="glass-panel overflow-hidden border border-[var(--border-primary)]/70 bg-[linear-gradient(180deg,rgba(12,21,30,0.94),rgba(15,25,36,0.9))] shadow-[0_16px_40px_rgba(0,0,0,0.16)]">
           <div className="flex items-center justify-between border-b border-[var(--border-primary)]/40 px-3 py-2">
             <div>
-              <div className="text-[8px] font-mono tracking-[0.22em] text-[var(--text-secondary)]">DESK STACK</div>
-              <div className="mt-1 text-[10px] font-semibold tracking-[0.14em] text-[var(--text-primary)]">Reduce clutter • keep one active mission rail</div>
+              <div className="text-[8px] font-mono tracking-[0.22em] text-[var(--text-secondary)]">{copy.status.deskStack}</div>
+              <div className="mt-1 text-[10px] font-semibold tracking-[0.14em] text-[var(--text-primary)]">{copy.status.deskStackHint}</div>
             </div>
           </div>
           <div className="flex gap-1.5 p-2">
-            <button onClick={() => setRightRailFocus('alerts')} className={`flex-1 rounded-xl border px-2 py-1.5 text-[7px] font-mono tracking-[0.16em] transition-colors ${rightRailFocus === 'alerts' ? 'border-[rgba(16,185,129,0.45)] bg-[rgba(16,185,129,0.12)] text-[var(--alert-green)]' : 'border-white/8 bg-white/[0.03] text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>NEWSWIRE</button>
-            <button onClick={() => setRightRailFocus('recon')} className={`flex-1 rounded-xl border px-2 py-1.5 text-[7px] font-mono tracking-[0.16em] transition-colors ${rightRailFocus === 'recon' ? 'border-[rgba(34,211,238,0.45)] bg-[rgba(34,211,238,0.12)] text-[var(--cyan-primary)]' : 'border-white/8 bg-white/[0.03] text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>RECON</button>
+            <button onClick={() => setRightRailFocus('alerts')} className={`flex-1 rounded-xl border px-2 py-1.5 text-[7px] font-mono tracking-[0.16em] transition-colors ${rightRailFocus === 'alerts' ? 'border-[rgba(16,185,129,0.45)] bg-[rgba(16,185,129,0.12)] text-[var(--alert-green)]' : 'border-white/8 bg-white/[0.03] text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>{copy.status.newswire}</button>
+            <button onClick={() => setRightRailFocus('recon')} className={`flex-1 rounded-xl border px-2 py-1.5 text-[7px] font-mono tracking-[0.16em] transition-colors ${rightRailFocus === 'recon' ? 'border-[rgba(34,211,238,0.45)] bg-[rgba(34,211,238,0.12)] text-[var(--cyan-primary)]' : 'border-white/8 bg-white/[0.03] text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>{copy.status.recon}</button>
           </div>
         </div>
         {rightRailFocus === 'recon' && <OsintPanel onSweepVisualize={setSweepData} onScanGeolocate={(target: string, payload: OsintGeolocatePayload) => {
@@ -1379,9 +1438,9 @@ export default function Dashboard() {
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-[#FF4081] animate-aegis-pulse" />
                   <span className="text-[12px] font-mono font-bold text-white tracking-wider">{liveFeedName}</span>
-                  <span className="px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 font-mono text-[9px] font-bold">LIVE STREAM</span>
+                  <span className="px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 font-mono text-[9px] font-bold">{copy.status.liveStream}</span>
                   {!liveFeedEmbedAllowed && (
-                    <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 font-mono text-[9px]">EXTERNAL ONLY</span>
+                    <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 font-mono text-[9px]">{copy.status.externalOnly}</span>
                   )}
                 </div>
                 <div className="flex items-center gap-3">
@@ -1391,7 +1450,7 @@ export default function Dashboard() {
                     rel="noopener noreferrer"
                     className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[var(--border-primary)] hover:bg-[var(--gold-primary)] hover:text-black text-white transition-colors text-[11px] font-mono"
                   >
-                    <span>Open in YouTube</span>
+                    <span>{copy.status.openInYouTube}</span>
                     <ExternalLink className="w-3 h-3" />
                   </a>
                   <button onClick={() => setLiveFeedUrl(null)} className="text-white/70 hover:text-white transition-colors p-1">
@@ -1427,7 +1486,7 @@ export default function Dashboard() {
                       className="inline-flex items-center gap-2 px-6 py-2.5 rounded border border-[#39FF14]/40 text-[#39FF14] font-mono text-[12px] hover:bg-[#39FF14]/10 transition-colors tracking-wider"
                     >
                       <ExternalLink className="w-4 h-4" />
-                      OPEN LIVE STREAM
+                      OPEN {copy.status.liveStream}
                     </a>
                   </div>
                 </div>
@@ -1438,7 +1497,7 @@ export default function Dashboard() {
                 <div className="bg-[#111]/90 px-4 py-2.5 border-t border-[var(--border-primary)] flex items-center gap-2.5">
                   <AlertTriangle className="w-4 h-4 text-[var(--gold-primary)] shrink-0" />
                   <span className="text-[11px] font-mono text-white/70 leading-relaxed">
-                    If you see &ldquo;Video unavailable&rdquo;, use <strong className="text-[var(--gold-primary)]">Open in YouTube</strong> above.
+                    If you see &ldquo;Video unavailable&rdquo;, use <strong className="text-[var(--gold-primary)]">{copy.status.openInYouTube}</strong> above.
                   </span>
                 </div>
               )}
@@ -1454,11 +1513,11 @@ export default function Dashboard() {
           <div className="mobile-nav">
             <div className="glass-panel mobile-nav-inner">
               {[
-                { id: 'layers' as const, icon: Layers, label: 'LAYERS' },
-                { id: 'markets' as const, icon: BarChart3, label: 'MARKETS' },
-                { id: 'intel' as const, icon: Newspaper, label: 'INTEL' },
-                { id: 'recon' as const, icon: Radar, label: 'RECON' },
-                { id: 'search' as const, icon: Search, label: 'SEARCH' },
+                { id: 'layers' as const, icon: Layers, label: locale === 'es' ? 'CAPAS' : 'LAYERS' },
+                { id: 'markets' as const, icon: BarChart3, label: copy.status.markets },
+                { id: 'intel' as const, icon: Newspaper, label: copy.status.intel },
+                { id: 'recon' as const, icon: Radar, label: copy.status.recon },
+                { id: 'search' as const, icon: Search, label: copy.status.search },
               ].map(tab => (
                 <button key={tab.id} onClick={() => setMobilePanel(mobilePanel === tab.id ? null : tab.id)}
                   className={`mobile-nav-btn ${mobilePanel === tab.id ? 'active' : ''}`}>
@@ -1483,14 +1542,14 @@ export default function Dashboard() {
                   <div className="sticky top-0 z-10 -mx-3 mb-2 border-b border-[var(--border-primary)]/35 bg-[linear-gradient(180deg,rgba(10,18,25,0.96),rgba(10,18,25,0.82))] px-3 pb-2 pt-1 backdrop-blur-md">
                     <div className="flex items-center justify-between">
                       <div>
-                        <div className="text-[7px] font-mono tracking-[0.22em] text-[var(--text-secondary)]">MOBILE COMMAND PANEL</div>
+                        <div className="text-[7px] font-mono tracking-[0.22em] text-[var(--text-secondary)]">{copy.status.mobileCommandPanel}</div>
                         <span className="hud-text mt-1 block text-[9px] text-[var(--text-primary)]">
-                          {mobilePanel === 'layers' ? 'LAYERS & STATS' : mobilePanel === 'markets' ? 'MACRO ATLAS' : mobilePanel === 'intel' ? 'SIGNAL LEDGER' : mobilePanel === 'recon' ? 'AEGIS RECON' : 'SEARCH'}
+                          {mobilePanel === 'layers' ? copy.status.layersStats : mobilePanel === 'markets' ? copy.status.macroAtlas : mobilePanel === 'intel' ? copy.status.signalLedger : mobilePanel === 'recon' ? 'AEGIS RECON' : copy.status.search}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
                         <div className="rounded-full border border-[var(--border-primary)]/40 bg-white/[0.04] px-2 py-1 text-[7px] font-mono tracking-[0.18em] text-[var(--text-secondary)]">
-                          {backendStatus === 'connected' ? 'LIVE' : backendStatus === 'error' ? 'DEGRADED' : 'SYNCING'}
+                          {backendStatus === 'connected' ? copy.focus.live : backendStatus === 'error' ? copy.focus.degraded : copy.focus.syncing}
                         </div>
                         <button onClick={() => setMobilePanel(null)} className="text-[var(--text-muted)] p-1"><X className="w-4 h-4" /></button>
                       </div>
@@ -1498,15 +1557,15 @@ export default function Dashboard() {
                   </div>
                   <div className="mb-2 grid grid-cols-3 gap-2">
                     <div className="rounded-lg border border-[var(--border-secondary)]/35 bg-black/20 px-2 py-2">
-                      <div className="text-[6px] font-mono tracking-[0.22em] text-[var(--text-muted)]">MODE</div>
+                      <div className="text-[6px] font-mono tracking-[0.22em] text-[var(--text-muted)]">{copy.status.mode}</div>
                       <div className="mt-1 text-[9px] font-mono leading-tight text-[var(--text-primary)]">{operationalModeLabel}</div>
                     </div>
                     <div className="rounded-lg border border-[var(--border-secondary)]/35 bg-black/20 px-2 py-2 text-center">
-                      <div className="text-[6px] font-mono tracking-[0.22em] text-[var(--text-muted)]">ALERTS</div>
+                      <div className="text-[6px] font-mono tracking-[0.22em] text-[var(--text-muted)]">{copy.status.alerts}</div>
                       <div className="mt-1 text-[11px] font-bold tabular-nums" style={{ color: activeIntelAlerts > 0 ? '#FF9500' : 'var(--alert-green)' }}>{activeIntelAlerts}</div>
                     </div>
                     <div className="rounded-lg border border-[var(--border-secondary)]/35 bg-black/20 px-2 py-2 text-center">
-                      <div className="text-[6px] font-mono tracking-[0.22em] text-[var(--text-muted)]">TRACKED</div>
+                      <div className="text-[6px] font-mono tracking-[0.22em] text-[var(--text-muted)]">{copy.status.tracked}</div>
                       <div className="mt-1 text-[11px] font-bold tabular-nums text-[var(--gold-primary)]">{trackedEntityCount.toLocaleString()}</div>
                     </div>
                   </div>
@@ -1521,9 +1580,9 @@ export default function Dashboard() {
                           <div><div className="hud-label" style={{fontSize:'6px'}}>NUC</div><div className="hud-value text-[9px]" style={{color:'var(--accent-nuclear)'}}>{(data.infrastructure?.length||0)}</div></div>
                         </div>
                       </div>
-                      <LayerPanel data={data} activeLayers={activeLayers} setActiveLayers={setActiveLayers} />
+                      <LayerPanel data={data} activeLayers={activeLayers} setActiveLayers={setActiveLayers} locale={locale} />
                       <div className="mt-2">
-                        <ViewPresets onNavigate={(lat, lng, zoom) => { setFlyToLocation({ lat, lng, ts: Date.now() }); setMapView(v => ({ ...v, zoom })); setMobilePanel(null); }} />
+                        <ViewPresets locale={locale} onNavigate={(lat, lng, zoom) => { setFlyToLocation({ lat, lng, ts: Date.now() }); setMapView(v => ({ ...v, zoom })); setMobilePanel(null); }} />
                       </div>
                     </>
                   )}
