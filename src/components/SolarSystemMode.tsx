@@ -206,6 +206,98 @@ const BODIES: CelestialBody[] = [
 
 const bodyById = Object.fromEntries(BODIES.map((body) => [body.id, body])) as Record<CelestialBodyId, CelestialBody>;
 
+type ObservatoryProfile = {
+  nasaName: string;
+  mission: string;
+  starField: string;
+  meteorStream: string;
+  smallBodies: string;
+  radiant: string;
+  reference: string;
+  metrics: [string, string, string];
+};
+
+const OBSERVATORY_PROFILES: Record<Exclude<CelestialBodyId, 'earth'>, ObservatoryProfile> = {
+  moon: {
+    nasaName: 'NASA LRO / ARTEMIS REFERENCE',
+    mission: 'LUNAR ORBITAL RECONNAISSANCE',
+    starField: 'Milky Way background · near-Earth parallax grid',
+    meteorStream: 'Sporadic micrometeoroid flux · no atmosphere shield',
+    smallBodies: 'Cislunar debris watch · translunar injection corridors',
+    radiant: 'Lunar apex / anti-apex dust population',
+    reference: 'Reference: NASA LRO + Meteoroid Environment Office style data layer',
+    metrics: ['NO WEATHER', 'IMPACT GARDENING', 'POLAR ICE WATCH'],
+  },
+  mars: {
+    nasaName: 'NASA MRO / JPL HORIZONS REFERENCE',
+    mission: 'MARS RECONNAISSANCE ORBITER CONTEXT',
+    starField: 'Galactic plane backdrop · Phobos/Deimos orbital traces',
+    meteorStream: 'Martian meteor entries · thin-atmosphere ablation',
+    smallBodies: 'Mars-crossing asteroid family · NEO transfer corridor',
+    radiant: 'Anti-solar radiant · ecliptic dust lane',
+    reference: 'Reference: NASA/JPL Horizons + MRO observational vocabulary',
+    metrics: ['PHOBOS TRACK', 'DUST OPTICAL DEPTH', 'MARS CROSSERS'],
+  },
+  venus: {
+    nasaName: 'NASA DAVINCI / VERITAS REFERENCE',
+    mission: 'VENUS ATMOSPHERIC OBSERVATORY CONTEXT',
+    starField: 'Inner-system star wash · solar glare suppression',
+    meteorStream: 'High-speed inner-system dust impactors',
+    smallBodies: 'Atira/Aten-like inner NEO corridor',
+    radiant: 'Sunward dust stream · dawn/dusk sector',
+    reference: 'Reference: NASA Venus mission concepts + small-body classes',
+    metrics: ['CLOUD DECK', 'SOLAR GLARE', 'INNER NEO'],
+  },
+  jupiter: {
+    nasaName: 'NASA JUNO / JPL SMALL-BODY REFERENCE',
+    mission: 'JOVIAN SYSTEM OBSERVATORY CONTEXT',
+    starField: 'Deep star catalog · galactic background behind gas giant',
+    meteorStream: 'Shoemaker-Levy class impact watch · cometary fragments',
+    smallBodies: 'Trojan swarms L4/L5 · irregular moon/debris family',
+    radiant: 'Outer-system comet radiant · high-gravity capture field',
+    reference: 'Reference: NASA Juno + JPL small-body dynamics vocabulary',
+    metrics: ['TROJAN FIELD', 'COMET WATCH', 'MAGNETOSPHERE'],
+  },
+  saturn: {
+    nasaName: 'NASA CASSINI / RINGPLANE REFERENCE',
+    mission: 'SATURN RINGPLANE OBSERVATORY CONTEXT',
+    starField: 'Occultation-style star background · ringplane cuts',
+    meteorStream: 'Ring particle impact flashes · icy meteoroid stream',
+    smallBodies: 'Ring-plane debris · shepherd moon resonance tracks',
+    radiant: 'E-ring / Enceladus plume dust corridor',
+    reference: 'Reference: NASA Cassini ringplane science vocabulary',
+    metrics: ['RING DUST', 'TITAN TRACK', 'ICE PARTICLES'],
+  },
+  neptune: {
+    nasaName: 'NASA VOYAGER / DEEP SKY REFERENCE',
+    mission: 'OUTER PLANET DEEP-FIELD CONTEXT',
+    starField: 'Deep sky catalog · low solar illumination field',
+    meteorStream: 'Kuiper-belt dust stream · distant cometary debris',
+    smallBodies: 'Trans-Neptunian object corridor · scattered disk traces',
+    radiant: 'Far-field ecliptic radiant · cold-object population',
+    reference: 'Reference: NASA Voyager + outer solar system object classes',
+    metrics: ['TNO WATCH', 'KUIPER DUST', 'LOW LIGHT'],
+  },
+};
+
+const STAR_CATALOG_POINTS = [
+  { left: '8%', top: '16%', size: 2, label: 'SIRIUS' },
+  { left: '18%', top: '70%', size: 1, label: 'RIGEL' },
+  { left: '30%', top: '24%', size: 1.5, label: 'VEGA' },
+  { left: '43%', top: '12%', size: 1, label: 'POLARIS' },
+  { left: '66%', top: '18%', size: 2, label: 'ARCTURUS' },
+  { left: '78%', top: '62%', size: 1.2, label: 'ALTAIR' },
+  { left: '91%', top: '35%', size: 1.6, label: 'DENEB' },
+  { left: '55%', top: '82%', size: 1, label: 'SPICA' },
+] as const;
+
+const METEOR_TRACKS = [
+  { left: '12%', top: '28%', width: 84, rotate: -22, delay: 0.2 },
+  { left: '68%', top: '30%', width: 110, rotate: -34, delay: 1.4 },
+  { left: '26%', top: '76%', width: 76, rotate: -18, delay: 2.1 },
+  { left: '76%', top: '78%', width: 92, rotate: -28, delay: 3.0 },
+] as const;
+
 function getAdjacentBody(selected: CelestialBodyId, direction: -1 | 1) {
   const index = BODIES.findIndex((body) => body.id === selected);
   const nextIndex = (index + direction + BODIES.length) % BODIES.length;
@@ -758,6 +850,112 @@ function OrbitalSceneAccents({ body }: { body: CelestialBody }) {
   );
 }
 
+function NasaObservatoryLayer({ body, profile }: { body: CelestialBody; profile: ObservatoryProfile }) {
+  return (
+    <>
+      <div className="absolute inset-0 opacity-60 [mask-image:radial-gradient(circle_at_center,black_0%,black_64%,transparent_100%)]">
+        <div
+          aria-hidden="true"
+          className="absolute inset-0"
+          style={{
+            backgroundImage:
+              'radial-gradient(circle, rgba(255,255,255,0.72) 0 1px, transparent 1.8px), radial-gradient(circle, rgba(118,228,234,0.46) 0 1px, transparent 2px), radial-gradient(circle, rgba(183,200,177,0.36) 0 1px, transparent 2.2px)',
+            backgroundSize: '118px 118px, 173px 173px, 241px 241px',
+            backgroundPosition: '0 0, 44px 38px, 96px 74px',
+          }}
+        />
+      </div>
+
+      {STAR_CATALOG_POINTS.map((star) => (
+        <div
+          key={star.label}
+          className="absolute hidden items-center gap-1.5 md:flex"
+          style={{ left: star.left, top: star.top }}
+        >
+          <span
+            className="rounded-full bg-white shadow-[0_0_12px_rgba(255,255,255,0.75)]"
+            style={{ width: star.size * 2.5, height: star.size * 2.5 }}
+          />
+          <span className="text-[6px] font-mono tracking-[0.24em] text-white/38">{star.label}</span>
+        </div>
+      ))}
+
+      <motion.div
+        aria-hidden="true"
+        className="absolute left-1/2 top-1/2 h-[min(114vh,1040px)] w-[min(114vh,1040px)] -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed"
+        style={{ borderColor: body.orbitTint }}
+        animate={{ rotate: 360 }}
+        transition={{ repeat: Infinity, duration: 180, ease: 'linear' }}
+      >
+        {Array.from({ length: 18 }).map((_, index) => (
+          <span
+            key={`belt-${index}`}
+            className="absolute h-1 w-1 rounded-full bg-white/55 shadow-[0_0_8px_rgba(255,255,255,0.44)]"
+            style={{
+              left: `${50 + Math.cos((index / 18) * Math.PI * 2) * 49}%`,
+              top: `${50 + Math.sin((index / 18) * Math.PI * 2) * 49}%`,
+              opacity: index % 3 === 0 ? 0.88 : 0.45,
+            }}
+          />
+        ))}
+      </motion.div>
+
+      {METEOR_TRACKS.map((track, index) => (
+        <motion.div
+          key={`meteor-${index}`}
+          aria-hidden="true"
+          className="absolute h-[2px] origin-right rounded-full"
+          style={{
+            left: track.left,
+            top: track.top,
+            width: track.width,
+            rotate: `${track.rotate}deg`,
+            background: `linear-gradient(90deg, transparent, rgba(255,255,255,0.88), ${body.accent})`,
+            boxShadow: `0 0 18px ${body.glow}`,
+          }}
+          animate={{ x: [0, 36, 0], y: [0, -14, 0], opacity: [0, 0.95, 0] }}
+          transition={{ repeat: Infinity, duration: 5.8, delay: track.delay, ease: 'easeInOut' }}
+        />
+      ))}
+
+      <div className="absolute left-[8%] bottom-[10%] hidden max-w-[20rem] rounded-[1.4rem] border border-white/10 bg-[rgba(3,8,16,0.54)] p-3 backdrop-blur-xl lg:block">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <div className="text-[7px] font-mono tracking-[0.3em] text-[var(--text-secondary)]">NASA / JPL OBSERVATORY LAYER</div>
+            <div className="mt-1 text-[10px] font-semibold tracking-[0.18em] text-[var(--text-primary)]">{profile.nasaName}</div>
+          </div>
+          <span className="rounded-full border border-white/10 px-2 py-1 text-[6px] font-mono tracking-[0.16em]" style={{ color: body.accent }}>
+            REF
+          </span>
+        </div>
+        <div className="mt-3 grid gap-1.5">
+          {[profile.starField, profile.meteorStream, profile.smallBodies, profile.radiant].map((item) => (
+            <div key={item} className="rounded-xl border border-white/8 bg-white/[0.035] px-2.5 py-1.5 text-[7px] font-mono leading-4 tracking-[0.13em] text-[var(--text-muted)]">
+              {item}
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 text-[6px] font-mono leading-4 tracking-[0.18em] text-white/36">{profile.reference}</div>
+      </div>
+
+      <div className="absolute right-[8%] bottom-[12%] hidden w-[18rem] rounded-[1.4rem] border border-white/10 bg-[rgba(3,8,16,0.54)] p-3 backdrop-blur-xl xl:block">
+        <div className="text-[7px] font-mono tracking-[0.3em] text-[var(--text-secondary)]">METEOR / SMALL-BODY WATCH</div>
+        <div className="mt-2 grid grid-cols-1 gap-1.5">
+          {profile.metrics.map((item) => (
+            <div key={item} className="flex items-center justify-between rounded-xl border border-white/8 bg-white/[0.035] px-2.5 py-1.5">
+              <span className="text-[7px] font-mono tracking-[0.16em] text-[var(--text-muted)]">{item}</span>
+              <span className="h-1.5 w-1.5 rounded-full" style={{ background: body.accent, boxShadow: `0 0 10px ${body.accent}` }} />
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 rounded-xl border border-white/8 bg-black/20 px-2.5 py-2 text-[7px] font-mono leading-4 tracking-[0.15em] text-[var(--text-secondary)]">
+          Catalog labels are reference-style overlays; Earth Ops remains the live-data surface.
+        </div>
+      </div>
+    </>
+  );
+}
+
 export default function SolarSystemMode({
   selected,
   onSelect,
@@ -858,6 +1056,7 @@ export default function SolarSystemMode({
   };
 
   const scene = !isEarth ? sceneConfigs[activeBody.id as Exclude<CelestialBodyId, 'earth'>] : null;
+  const observatoryProfile = !isEarth ? OBSERVATORY_PROFILES[activeBody.id as Exclude<CelestialBodyId, 'earth'>] : null;
 
   return (
     <>
@@ -887,6 +1086,7 @@ export default function SolarSystemMode({
 
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_16%,rgba(255,255,255,0.06),transparent_34%)]" />
             <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),transparent_14%,transparent_82%,rgba(255,255,255,0.02))]" />
+            {observatoryProfile && <NasaObservatoryLayer body={activeBody} profile={observatoryProfile} />}
 
             {!isMobile && (
               <>
@@ -982,6 +1182,11 @@ export default function SolarSystemMode({
                   <div className="text-[8px] font-mono tracking-[0.32em] text-[var(--text-secondary)]">{activeBody.code}</div>
                   <div className="mt-1 text-base font-semibold tracking-[0.24em] text-[var(--text-heading)] md:text-lg">{activeBody.name.toUpperCase()}</div>
                   <div className="mt-1 text-[8px] font-mono tracking-[0.18em] text-[var(--text-muted)]">{activeBody.diameter} · {activeBody.day}</div>
+                  {observatoryProfile && (
+                    <div className="mt-2 text-[7px] font-mono leading-4 tracking-[0.16em] text-[var(--cyan-primary)]">
+                      {observatoryProfile.mission}
+                    </div>
+                  )}
                 </div>
                 <div className="rounded-full border border-white/10 bg-black/20 px-2.5 py-1 text-[7px] font-mono tracking-[0.18em] text-[var(--text-secondary)]">
                   VISUAL-ONLY MODE
