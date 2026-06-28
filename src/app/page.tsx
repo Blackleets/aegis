@@ -131,14 +131,6 @@ interface DashboardData extends Record<string, unknown> {
   sdk_entities?: unknown[];
 }
 
-interface GlobalStats {
-  flights: number;
-  sats: number;
-  cctv: number;
-  weather: number;
-  nuclear: number;
-}
-
 interface UsageMetrics {
   onlineUsers: number;
   totalUsers: number;
@@ -253,7 +245,6 @@ export default function Dashboard() {
   const [backendStatus, setBackendStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
   const [mapView, setMapView] = useState<MapView>(initialUrlState.mapView);
   const [flyToLocation, setFlyToLocation] = useState<FlyToLocation | null>(initialUrlState.flyToLocation);
-  const [globalStats, setGlobalStats] = useState<GlobalStats | null>(null);
   const [usageMetrics, setUsageMetrics] = useState<UsageMetrics | null>(null);
   const mouseCoordsRef = useRef<Coordinate | null>(null);
   const coordsDisplayRef = useRef<HTMLDivElement>(null);
@@ -325,16 +316,6 @@ export default function Dashboard() {
       window.history.replaceState(null, '', url);
     }, 1500);
   }, [mapView, activeLayers]);
-
-  // Global Stats Fetch
-  useEffect(() => {
-    fetch('/api/stats')
-      .then(res => res.json())
-      .then((d: { stats?: GlobalStats }) => {
-        if (d.stats) setGlobalStats(d.stats);
-      })
-      .catch(console.error);
-  }, []);
 
   // Presence + cumulative usage counter
   useEffect(() => {
@@ -1235,25 +1216,6 @@ export default function Dashboard() {
         {showLayers && (
           <>
             <LayerPanel data={dataWithSdk} activeLayers={activeLayers} setActiveLayers={setActiveLayers} locale={locale} />
-            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.5 }} className="glass-panel px-3.5 py-3 pointer-events-auto overflow-hidden border border-[var(--border-primary)]/80 bg-[linear-gradient(180deg,rgba(14,24,34,0.96),rgba(18,29,42,0.9))]">
-              <div className="mb-2.5 flex items-center justify-between rounded-2xl border border-[var(--border-primary)]/45 bg-white/[0.035] px-3 py-2.5">
-                <div>
-                  <div className="text-[8px] font-mono tracking-[0.26em] text-[var(--text-secondary)]">{copy.status.operationsSummary}</div>
-                  <div className="mt-1 text-[10px] font-semibold tracking-[0.16em] text-[var(--text-primary)]">{operationalModeLabel}</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-[8px] font-mono tracking-[0.16em] text-[var(--text-muted)]">{copy.status.liveNow}</div>
-                  <div className="mt-1 text-[13px] font-bold tabular-nums" style={{ color: usageMetrics && usageMetrics.onlineUsers > 0 ? 'var(--alert-green)' : 'var(--text-secondary)' }}>{usageMetrics ? usageMetrics.onlineUsers : 0}</div>
-                </div>
-              </div>
-              <div className="grid grid-cols-5 gap-2 text-center">
-                <div><div className="hud-label">{copy.status.aircraft}</div><div className="hud-value text-[10px] animate-data-pulse">{globalStats ? globalStats.flights.toLocaleString() : '0'}</div></div>
-                <div><div className="hud-label">{copy.status.sats}</div><div className="hud-value text-[10px]">{globalStats ? globalStats.sats.toLocaleString() : '0'}</div></div>
-                <div><div className="hud-label">{copy.status.cctv}</div><div className="hud-value text-[10px]">{globalStats ? globalStats.cctv.toLocaleString() : '0'}</div></div>
-                <div><div className="hud-label">{copy.status.weather}</div><div className="hud-value text-[10px]" style={{ color: 'var(--accent-weather)' }}>{globalStats ? globalStats.weather.toLocaleString() : '0'}</div></div>
-                <div><div className="hud-label">{copy.status.nuclear}</div><div className="hud-value text-[10px]" style={{ color: 'var(--accent-nuclear)' }}>{globalStats ? globalStats.nuclear.toLocaleString() : '0'}</div></div>
-              </div>
-            </motion.div>
             <ViewPresets locale={locale} onNavigate={(lat, lng, zoom) => { setFlyToLocation({ lat, lng, ts: Date.now() }); setMapView(v => ({ ...v, zoom })); }} />
           </>
         )}
@@ -1278,33 +1240,6 @@ export default function Dashboard() {
 
       {/* ── RIGHT HUD (desktop): Search + focused desk ── */}
       {showDesktopRails && <div className="desktop-panel absolute right-4 xl:right-5 top-20 bottom-24 xl:bottom-24 w-[16rem] xl:w-[17rem] 2xl:w-[18rem] flex flex-col gap-2.5 z-[200] min-h-0 pointer-events-auto overflow-y-auto styled-scrollbar pr-1">
-        <div className="glass-panel overflow-hidden border border-[var(--border-primary)]/80 bg-[linear-gradient(180deg,rgba(14,24,34,0.96),rgba(18,29,42,0.9))] shadow-[0_16px_42px_rgba(0,0,0,0.18)]">
-          <div className="flex items-center justify-between border-b border-[var(--border-primary)]/45 px-3.5 py-2.5">
-            <div>
-              <div className="text-[8px] font-mono tracking-[0.26em] text-[var(--text-secondary)]">{copy.status.commandPosture}</div>
-              <div className="mt-1 text-[10px] font-semibold tracking-[0.16em] text-[var(--text-primary)]">{operationalModeLabel}</div>
-            </div>
-            <div className="flex items-center gap-2 rounded-full border border-[var(--border-primary)]/45 bg-white/[0.035] px-2 py-1 text-[8px] font-mono text-[var(--text-secondary)]">
-              <div className={`h-1.5 w-1.5 rounded-full ${backendStatus === 'connected' ? 'bg-[var(--alert-green)]' : backendStatus === 'error' ? 'bg-[var(--alert-red)]' : 'bg-[var(--gold-primary)]'} animate-aegis-pulse`} />
-              <span>{backendStatus === 'connected' ? copy.focus.live : backendStatus === 'error' ? copy.focus.degraded : copy.focus.syncing}</span>
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-2 p-3">
-            <div className="rounded-2xl border border-white/8 bg-white/[0.035] px-3 py-2.5 text-center">
-              <div className="text-[7px] font-mono tracking-[0.18em] text-[var(--text-muted)]">{copy.status.alerts}</div>
-              <div className="mt-1 text-[13px] font-bold tabular-nums" style={{ color: activeIntelAlerts > 0 ? '#F59E0B' : 'var(--alert-green)' }}>{activeIntelAlerts}</div>
-            </div>
-            <div className="rounded-2xl border border-white/8 bg-white/[0.035] px-3 py-2.5 text-center">
-              <div className="text-[7px] font-mono tracking-[0.18em] text-[var(--text-muted)]">{copy.status.tracked}</div>
-              <div className="mt-1 text-[13px] font-bold tabular-nums text-[var(--gold-primary)]">{trackedEntityCount.toLocaleString()}</div>
-            </div>
-            <div className="rounded-2xl border border-white/8 bg-white/[0.035] px-3 py-2.5 text-center">
-              <div className="text-[7px] font-mono tracking-[0.18em] text-[var(--text-muted)]">{copy.status.liveNow}</div>
-              <div className="mt-1 text-[13px] font-bold tabular-nums" style={{ color: usageMetrics && usageMetrics.onlineUsers > 0 ? 'var(--alert-green)' : 'var(--text-secondary)' }}>{usageMetrics ? usageMetrics.onlineUsers : 0}</div>
-            </div>
-          </div>
-        </div>
-
         <IncidentFusionStrip
           backendStatus={backendStatus}
           trackedEntityCount={trackedEntityCount}

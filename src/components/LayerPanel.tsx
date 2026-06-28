@@ -134,7 +134,7 @@ const LAYER_GROUPS: LayerGroup[] = [
 ];
 
 const ALL_LAYERS = LAYER_GROUPS.flatMap((g) => g.layers);
-const DEFAULT_EXPANDED = new Set(['sdk', 'surveillance']);
+const DEFAULT_EXPANDED = new Set(['surveillance']);
 
 function LayerPanel({ data, activeLayers, setActiveLayers, locale }: LayerPanelProps) {
   const t = panelCopy[locale] ?? panelCopy.en;
@@ -210,7 +210,7 @@ function LayerPanel({ data, activeLayers, setActiveLayers, locale }: LayerPanelP
         </div>
       </div>
 
-      <div className="space-y-1 max-h-[16rem] overflow-y-auto pr-1 styled-scrollbar">
+      <div className="space-y-0.5 max-h-[12.5rem] overflow-y-auto pr-1 styled-scrollbar">
         {LAYER_GROUPS.map((group) => {
           const isExpanded = expandedGroups[group.key];
           const groupActiveCount = group.layers.filter((layer) => activeLayers[layer.key]).length;

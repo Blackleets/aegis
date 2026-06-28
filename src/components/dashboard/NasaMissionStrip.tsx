@@ -39,7 +39,7 @@ function formatUtc(date: string | undefined, locale: Locale) {
 
 export default function NasaMissionStrip({ locale, events, source, updatedAt, totalOpen }: NasaMissionStripProps) {
   const copy = getDashboardCopy(locale).nasa;
-  const topEvents = events.slice(0, 3);
+  const topEvents = events.slice(0, 2);
 
   return (
     <motion.div

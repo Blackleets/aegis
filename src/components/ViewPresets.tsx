@@ -41,29 +41,30 @@ const copy = {
 
 export default function ViewPresets({ onNavigate, locale }: ViewPresetsProps) {
   const t = copy[locale] ?? copy.en;
+  const visiblePresets = PRESETS.filter((preset) => preset.hot || ['global', 'europe', 'americas'].includes(preset.key));
 
   return (
     <motion.div
       initial={{ opacity: 0, x: -20 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: 0.7, duration: 0.6 }}
-      className="glass-panel p-2.5 pointer-events-auto"
+      className="glass-panel p-2 pointer-events-auto"
     >
-      <div className="flex items-center gap-2 mb-2">
-        <Globe className="w-3.5 h-3.5 text-[var(--gold-primary)]" />
-        <span className="hud-text text-[12px] text-[var(--text-primary)] tracking-widest">{t.title}</span>
+      <div className="flex items-center gap-2 mb-1.5">
+        <Globe className="w-3 h-3 text-[var(--gold-primary)]" />
+        <span className="hud-text text-[10px] text-[var(--text-primary)] tracking-widest">{t.title}</span>
         <span className="gotham-tag gotham-tag--critical" style={{ fontSize: '7px', padding: '1px 4px', marginLeft: 'auto' }}>
           {PRESETS.filter(p => p.hot).length} {t.hot}
         </span>
       </div>
-      <div className="grid grid-cols-2 gap-1">
-        {PRESETS.map(p => (
+      <div className="grid grid-cols-2 gap-0.5">
+        {visiblePresets.map(p => (
           <button
             key={p.key}
             onClick={() => onNavigate(p.lat, p.lng, p.zoom)}
-            className={`flex items-center gap-1.5 px-2 py-1.5 rounded text-[10px] font-mono tracking-wider border border-transparent hover:border-[var(--border-primary)] hover:text-[var(--gold-primary)] transition-all hover:scale-[1.02] active:scale-[0.98] ${p.hot ? 'text-[var(--alert-red)] hover:border-[var(--alert-red)]/30 hover:bg-[var(--alert-red)]/5' : 'text-[var(--text-muted)] hover:bg-[var(--hover-accent)]'}`}
+            className={`flex items-center gap-1.5 px-2 py-1 rounded text-[8px] font-mono tracking-wider border border-transparent hover:border-[var(--border-primary)] hover:text-[var(--gold-primary)] transition-all hover:scale-[1.02] active:scale-[0.98] ${p.hot ? 'text-[var(--alert-red)] hover:border-[var(--alert-red)]/30 hover:bg-[var(--alert-red)]/5' : 'text-[var(--text-muted)] hover:bg-[var(--hover-accent)]'}`}
           >
-            <span className="text-[11px] flex-shrink-0">{p.icon}</span>
+            <span className="text-[10px] flex-shrink-0">{p.icon}</span>
             <span>{p.label[locale] ?? p.label.en}</span>
             {p.hot && <span className="w-1.5 h-1.5 rounded-full bg-[var(--alert-red)] animate-aegis-pulse ml-auto flex-shrink-0" />}
           </button>

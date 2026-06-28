@@ -547,7 +547,7 @@ function TickerRow({
 }
 
 export default function MarketsPanel({ data, spaceWeather, feedFreshness }: MarketsPanelProps) {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const [activeSection, setActiveSection] = useState<SectionKey>('crypto');
   const [selectedAsset, setSelectedAsset] = useState<SelectedAsset | null>(null);
   const [spotlightName, setSpotlightName] = useState<(typeof CRYPTO_SPOTLIGHT)[number]>('Bitcoin');

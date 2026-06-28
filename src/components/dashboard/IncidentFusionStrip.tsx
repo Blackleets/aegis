@@ -65,6 +65,9 @@ export default function IncidentFusionStrip({
     gdeltCount > 0 ? 'GDELT' : null,
     maritimePressure > 0 ? 'MARITIME' : null,
   ].filter(Boolean).join(' · ') || 'STANDBY';
+  const metricCardClass = variant === 'rail'
+    ? 'rounded-xl border border-white/8 bg-white/[0.035] px-2.5 py-1.5'
+    : 'rounded-2xl border border-white/8 bg-white/[0.035] px-3 py-2';
 
   return (
     <motion.div
@@ -75,7 +78,7 @@ export default function IncidentFusionStrip({
         ? 'shrink-0 pointer-events-auto'
         : 'absolute left-1/2 top-[5.25rem] z-[198] hidden w-[min(40rem,calc(100vw-44rem))] min-w-[28rem] -translate-x-1/2 pointer-events-none xl:block'}
     >
-      <div className="sovereign-panel px-3.5 py-3 backdrop-blur-xl">
+      <div className={variant === 'rail' ? 'sovereign-panel px-3 py-2.5 backdrop-blur-xl' : 'sovereign-panel px-3.5 py-3 backdrop-blur-xl'}>
         <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[rgba(183,200,177,0.28)] to-transparent" />
         <div className="flex items-center justify-between gap-4">
           <div className="min-w-0">
@@ -94,19 +97,19 @@ export default function IncidentFusionStrip({
         </div>
 
         <div className={`mt-3 grid gap-2 ${variant === 'rail' ? 'grid-cols-2' : 'grid-cols-4'}`}>
-          <div className="rounded-2xl border border-white/8 bg-white/[0.035] px-3 py-2">
+          <div className={metricCardClass}>
             <div className="flex items-center gap-1.5 text-[7px] font-mono tracking-[0.18em] text-[var(--text-muted)]"><AlertTriangle className="h-3 w-3" /> ALERTS</div>
             <div className="mt-1 text-[11px] font-bold tabular-nums" style={{ color }}>{activeIntelAlerts + maritimePressure}</div>
           </div>
-          <div className="rounded-2xl border border-white/8 bg-white/[0.035] px-3 py-2">
+          <div className={metricCardClass}>
             <div className="flex items-center gap-1.5 text-[7px] font-mono tracking-[0.18em] text-[var(--text-muted)]"><Database className="h-3 w-3" /> TRACKED</div>
             <div className="mt-1 text-[11px] font-bold tabular-nums text-[var(--gold-primary)]">{trackedEntityCount.toLocaleString()}</div>
           </div>
-          <div className="rounded-2xl border border-white/8 bg-white/[0.035] px-3 py-2">
+          <div className={metricCardClass}>
             <div className="flex items-center gap-1.5 text-[7px] font-mono tracking-[0.18em] text-[var(--text-muted)]"><Activity className="h-3 w-3" /> SOURCES</div>
             <div className="mt-1 truncate text-[9px] font-semibold tracking-[0.12em] text-[var(--cyan-primary)]">{sourceMix}</div>
           </div>
-          <div className="rounded-2xl border border-white/8 bg-white/[0.035] px-3 py-2">
+          <div className={metricCardClass}>
             <div className="text-[7px] font-mono tracking-[0.18em] text-[var(--text-muted)]">EVENT MESH</div>
             <div className="mt-1 text-[11px] font-bold tabular-nums text-[var(--text-primary)]">{(newsCount + earthquakeCount + gdeltCount).toLocaleString()}</div>
           </div>
