@@ -3,6 +3,7 @@
 import { AnimatePresence, motion, type PanInfo } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import { getDashboardCopy, type Locale } from '@/lib/i18n';
+import { PlanetWebGL } from '@/components/PlanetWebGL';
 
 export type CelestialBodyId = 'earth' | 'moon' | 'mars' | 'venus' | 'jupiter' | 'saturn' | 'neptune';
 
@@ -216,6 +217,26 @@ type ObservatoryProfile = {
   radiant: string;
   reference: string;
   metrics: [string, string, string];
+};
+
+type NasaNeoObject = {
+  id: string;
+  name: string;
+  hazardous: boolean;
+  close_approach: string | null;
+  miss_lunar: number;
+  velocity_kps: number;
+  diameter_m: number;
+  jpl_url?: string | null;
+};
+
+type NasaNeoFeed = {
+  source?: string;
+  status?: 'ok' | 'error';
+  fetched_at?: string;
+  total?: number;
+  hazardous_count?: number;
+  closest?: NasaNeoObject[];
 };
 
 const OBSERVATORY_PROFILES: Record<Exclude<CelestialBodyId, 'earth'>, ObservatoryProfile> = {
@@ -907,6 +928,83 @@ function NasaMissionHeader({ body, profile }: { body: CelestialBody; profile: Ob
   );
 }
 
+function formatNeoTime(value?: string | null) {
+  if (!value) return 'TBD';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value.slice(0, 16);
+  return parsed.toISOString().slice(5, 16).replace('T', ' ');
+}
+
+function NasaLiveNeoPanel({ body, feed }: { body: CelestialBody; feed: NasaNeoFeed | null }) {
+  const objects = feed?.closest || [];
+  const status = feed?.status === 'ok' ? 'LIVE' : feed ? 'DEGRADED' : 'SYNCING';
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 18 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: 0.18, duration: 0.34 }}
+      className="absolute right-6 top-[43%] z-[256] hidden w-[19rem] pointer-events-none xl:block"
+    >
+      <div className="overflow-hidden rounded-[1.45rem] border border-[rgba(118,228,234,0.20)] bg-[rgba(3,8,16,0.62)] p-3 shadow-[0_16px_50px_rgba(0,0,0,0.30)] backdrop-blur-xl">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="text-[7px] font-mono tracking-[0.30em] text-[var(--cyan-primary)]">NASA LIVE DATA V2</div>
+            <div className="mt-1 text-[10px] font-semibold tracking-[0.20em] text-[var(--text-heading)]">NEO CLOSE APPROACH WATCH</div>
+          </div>
+          <span className="rounded-full border border-white/10 bg-black/20 px-2 py-1 text-[6px] font-mono tracking-[0.18em]" style={{ color: body.accent }}>
+            {status}
+          </span>
+        </div>
+
+        <div className="mt-3 grid grid-cols-3 gap-1.5 text-center">
+          <div className="rounded-xl border border-white/8 bg-white/[0.035] px-2 py-1.5">
+            <div className="text-[6px] font-mono tracking-[0.2em] text-[var(--text-muted)]">OBJECTS</div>
+            <div className="mt-0.5 text-[10px] font-semibold" style={{ color: body.accent }}>{feed?.total ?? '—'}</div>
+          </div>
+          <div className="rounded-xl border border-white/8 bg-white/[0.035] px-2 py-1.5">
+            <div className="text-[6px] font-mono tracking-[0.2em] text-[var(--text-muted)]">PHA</div>
+            <div className="mt-0.5 text-[10px] font-semibold text-[#FFB020]">{feed?.hazardous_count ?? '—'}</div>
+          </div>
+          <div className="rounded-xl border border-white/8 bg-white/[0.035] px-2 py-1.5">
+            <div className="text-[6px] font-mono tracking-[0.2em] text-[var(--text-muted)]">SRC</div>
+            <div className="mt-0.5 text-[9px] font-semibold text-[var(--cyan-primary)]">NeoWs</div>
+          </div>
+        </div>
+
+        <div className="mt-3 space-y-1.5">
+          {(objects.length ? objects.slice(0, 4) : [null, null, null, null]).map((object, index) => (
+            <div key={object?.id || `neo-placeholder-${index}`} className="rounded-xl border border-white/8 bg-black/20 px-2.5 py-2">
+              {object ? (
+                <>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate text-[8px] font-semibold tracking-[0.16em] text-[var(--text-primary)]">{object.name.replace(/[()]/g, '')}</span>
+                    <span className={`rounded-full border px-1.5 py-0.5 text-[5px] font-mono tracking-[0.16em] ${object.hazardous ? 'border-[#FFB020]/40 text-[#FFB020]' : 'border-white/10 text-[var(--text-muted)]'}`}>
+                      {object.hazardous ? 'PHA' : 'PASS'}
+                    </span>
+                  </div>
+                  <div className="mt-1 grid grid-cols-3 gap-1 text-[6px] font-mono tracking-[0.12em] text-white/45">
+                    <span>{object.miss_lunar} LD</span>
+                    <span>{object.velocity_kps} km/s</span>
+                    <span>{object.diameter_m} m</span>
+                  </div>
+                  <div className="mt-1 text-[6px] font-mono tracking-[0.16em] text-[var(--text-muted)]">CA {formatNeoTime(object.close_approach)}</div>
+                </>
+              ) : (
+                <div className="h-9 animate-pulse rounded-lg bg-white/[0.035]" />
+              )}
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-3 text-[6px] font-mono leading-4 tracking-[0.16em] text-white/35">
+          Live/cached NASA NeoWs feed. Distances shown in lunar distances; Earth Ops remains primary operational surface.
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
 function NasaObservatoryLayer({ body, profile }: { body: CelestialBody; profile: ObservatoryProfile }) {
   return (
     <>
@@ -1051,6 +1149,36 @@ export default function SolarSystemMode({
   const [planetZoom, setPlanetZoom] = useState(1);
   const [autoRotate, setAutoRotate] = useState(true);
   const [viewResetKey, setViewResetKey] = useState(0);
+  const [neoFeed, setNeoFeed] = useState<NasaNeoFeed | null>(null);
+
+  useEffect(() => {
+    if (!enabled || isEarth) return undefined;
+
+    let cancelled = false;
+    const controller = new AbortController();
+
+    const loadNeoFeed = async () => {
+      try {
+        const res = await fetch('/api/nasa/neo', { signal: controller.signal });
+        if (!res.ok) return;
+        const payload = await res.json() as NasaNeoFeed;
+        if (!cancelled) setNeoFeed(payload);
+      } catch (error) {
+        if (!cancelled && error instanceof Error && error.name !== 'AbortError') {
+          console.warn('[AEGIS] NASA NeoWs suppressed error:', error.message);
+        }
+      }
+    };
+
+    void loadNeoFeed();
+    const interval = window.setInterval(loadNeoFeed, 3600000);
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+      window.clearInterval(interval);
+    };
+  }, [enabled, isEarth]);
 
   useEffect(() => {
     if (!enabled || isEarth || !autoRotate) return undefined;
@@ -1164,6 +1292,7 @@ export default function SolarSystemMode({
             <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),transparent_14%,transparent_82%,rgba(255,255,255,0.02))]" />
             {observatoryProfile && <NasaObservatoryLayer body={activeBody} profile={observatoryProfile} />}
             {observatoryProfile && <NasaMissionHeader body={activeBody} profile={observatoryProfile} />}
+            <NasaLiveNeoPanel body={activeBody} feed={neoFeed} />
 
             {!isMobile && (
               <>
@@ -1197,13 +1326,12 @@ export default function SolarSystemMode({
                   transition={{ type: 'spring', stiffness: 76, damping: 18 }}
                   className="relative z-10 flex h-full w-full items-center justify-center"
                 >
-                  <PlanetSphere
+                  <PlanetWebGL
                     body={activeBody}
-                    large
-                    interactive
                     rotationOffset={rotationOffsets[selected] ?? 0}
                     zoom={planetZoom}
                     resetKey={viewResetKey}
+                    autoRotate={autoRotate}
                     onRotateDrag={handlePlanetRotateDrag}
                   />
                 </motion.div>

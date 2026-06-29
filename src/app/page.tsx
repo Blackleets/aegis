@@ -214,6 +214,9 @@ function getInitialUrlState() {
       flyToLocation: null as FlyToLocation | null,
       mapView: { zoom: 2.5, latitude: 20 } as MapView,
       activeLayers: DEFAULT_ACTIVE_LAYERS,
+      dashboardMode: 'earth' as DashboardMode,
+      selectedCelestialBody: 'earth' as CelestialBodyId,
+      skipSplash: false,
     };
   }
 
@@ -221,6 +224,15 @@ function getInitialUrlState() {
   const lat = parseFloat(params.get('lat') || '');
   const lon = parseFloat(params.get('lon') || '');
   const zoom = parseFloat(params.get('zoom') || '');
+  const modeParam = params.get('mode');
+  const bodyParam = params.get('body');
+  const normalizedMode: DashboardMode = modeParam === 'solar' || modeParam === 'focus' ? modeParam : 'earth';
+  const normalizedBody: CelestialBodyId = bodyParam === 'moon' || bodyParam === 'mars' || bodyParam === 'venus' || bodyParam === 'jupiter' || bodyParam === 'saturn' || bodyParam === 'neptune' || bodyParam === 'earth'
+    ? bodyParam
+    : normalizedMode === 'solar'
+      ? 'mars'
+      : 'earth';
+  const skipSplash = params.get('nosplash') === '1';
   const nextLayers: ActiveLayers = { ...DEFAULT_ACTIVE_LAYERS };
   const layers = params.get('layers');
 
@@ -235,16 +247,18 @@ function getInitialUrlState() {
     flyToLocation: !Number.isNaN(lat) && !Number.isNaN(lon) ? { lat, lng: lon, ts: Date.now() } : null,
     mapView: { zoom: !Number.isNaN(zoom) ? zoom : 2.5, latitude: 20 },
     activeLayers: nextLayers,
+    dashboardMode: normalizedMode,
+    selectedCelestialBody: normalizedBody,
+    skipSplash,
   };
 }
 
 export default function Dashboard() {
-  const initialUrlState = useMemo(() => getInitialUrlState(), []);
   const [data, setData] = useState<DashboardData>({});
 
   const [backendStatus, setBackendStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
-  const [mapView, setMapView] = useState<MapView>(initialUrlState.mapView);
-  const [flyToLocation, setFlyToLocation] = useState<FlyToLocation | null>(initialUrlState.flyToLocation);
+  const [mapView, setMapView] = useState<MapView>({ zoom: 2.5, latitude: 20 });
+  const [flyToLocation, setFlyToLocation] = useState<FlyToLocation | null>(null);
   const [usageMetrics, setUsageMetrics] = useState<UsageMetrics | null>(null);
   const mouseCoordsRef = useRef<Coordinate | null>(null);
   const coordsDisplayRef = useRef<HTMLDivElement>(null);
@@ -252,11 +266,7 @@ export default function Dashboard() {
   const [regionDossier, setRegionDossier] = useState<RegionDossier | null>(null);
   const [dossierLoading, setDossierLoading] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
-  const [locale, setLocale] = useState<Locale>(() => {
-    if (typeof window === 'undefined') return DEFAULT_LOCALE;
-    const stored = window.localStorage.getItem('aegis-locale');
-    return isLocale(stored) ? stored : DEFAULT_LOCALE;
-  });
+  const [locale, setLocale] = useState<Locale>(DEFAULT_LOCALE);
   const [activeCamera, setActiveCamera] = useState<ActiveCamera | null>(null);
   const [spaceWeather, setSpaceWeather] = useState<SpaceWeather | null>(null);
   const [nasaEventMesh, setNasaEventMesh] = useState<NasaEventMesh | null>(null);
@@ -284,7 +294,7 @@ export default function Dashboard() {
   const lastLocationLabelRef = useRef<string>('');
 
   // ── DEFAULT: Most layers OFF — fast initial load ──
-  const [activeLayers, setActiveLayers] = useState<ActiveLayers>(initialUrlState.activeLayers);
+  const [activeLayers, setActiveLayers] = useState<ActiveLayers>(DEFAULT_ACTIVE_LAYERS);
   const [liveFeedUrl, setLiveFeedUrl] = useState<string | null>(null);
   const [liveFeedName, setLiveFeedName] = useState('');
   const [liveFeedEmbedAllowed, setLiveFeedEmbedAllowed] = useState(true);
@@ -293,6 +303,24 @@ export default function Dashboard() {
   useEffect(() => {
     const splashTimer = setTimeout(() => setShowSplash(false), 2500);
     return () => clearTimeout(splashTimer);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const urlState = getInitialUrlState();
+    const storedLocale = window.localStorage.getItem('aegis-locale');
+
+    const syncFromUrl = window.requestAnimationFrame(() => {
+      setMapView(urlState.mapView);
+      setFlyToLocation(urlState.flyToLocation);
+      setActiveLayers(urlState.activeLayers);
+      setDashboardMode(urlState.dashboardMode);
+      setSelectedCelestialBody(urlState.selectedCelestialBody);
+      if (isLocale(storedLocale)) setLocale(storedLocale);
+      if (urlState.skipSplash || urlState.dashboardMode !== 'earth') setShowSplash(false);
+    });
+
+    return () => window.cancelAnimationFrame(syncFromUrl);
   }, []);
 
   useEffect(() => {
@@ -310,12 +338,14 @@ export default function Dashboard() {
       p.set('lat', (mapView.latitude ?? 20).toFixed(4));
       p.set('lon', '0');
       p.set('zoom', mapView.zoom.toFixed(2));
+      p.set('mode', dashboardMode);
+      p.set('body', selectedCelestialBody);
       const active = Object.entries(activeLayers).filter(([,v]) => v).map(([k]) => k).join(',');
       p.set('layers', active);
       const url = `${window.location.pathname}?${p.toString()}`;
       window.history.replaceState(null, '', url);
     }, 1500);
-  }, [mapView, activeLayers]);
+  }, [mapView, activeLayers, dashboardMode, selectedCelestialBody]);
 
   // Presence + cumulative usage counter
   useEffect(() => {
@@ -1043,10 +1073,12 @@ export default function Dashboard() {
           setSelectedCelestialBody('earth');
         }}
         onSolarView={() => {
+          setShowSplash(false);
           setDashboardMode('solar');
           setSelectedCelestialBody(prev => prev === 'earth' ? 'mars' : prev);
         }}
         onFocus={() => {
+          setShowSplash(false);
           setDashboardMode('focus');
           setSelectedCelestialBody('earth');
         }}

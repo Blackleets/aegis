@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "@react-three/fiber": "^9.6.1",
     "@vercel/analytics": "^2.0.1",
     "framer-motion": "^12.38.0",
     "google-libphonenumber": "^3.2.44",
@@ -26,6 +27,7 @@
     "rss-parser": "^3.13.0",
     "satellite.js": "^7.0.0",
     "sharp": "^0.34.5",
+    "three": "^0.185.0",
     "ws": "^8.21.0"
   },
   "devDependencies": {
