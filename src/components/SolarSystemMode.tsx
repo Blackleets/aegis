@@ -239,6 +239,27 @@ type NasaNeoFeed = {
   closest?: NasaNeoObject[];
 };
 
+type DonkiThreatEvent = {
+  id: string;
+  family: 'CME' | 'FLR' | 'GST' | 'IPS' | 'MPC' | 'SEP';
+  label: string;
+  time: string | null;
+  severity: 'low' | 'watch' | 'storm';
+  summary: string;
+};
+
+type DonkiThreatFeed = {
+  source?: string;
+  status?: 'quiet' | 'watch' | 'storm' | 'error';
+  fetched_at?: string;
+  total?: number;
+  storm_count?: number;
+  watch_count?: number;
+  family_counts?: Partial<Record<DonkiThreatEvent['family'], number>>;
+  events?: DonkiThreatEvent[];
+  degraded?: boolean;
+};
+
 const OBSERVATORY_PROFILES: Record<Exclude<CelestialBodyId, 'earth'>, ObservatoryProfile> = {
   moon: {
     nasaName: 'NASA LRO / ARTEMIS REFERENCE',
@@ -1005,6 +1026,79 @@ function NasaLiveNeoPanel({ body, feed }: { body: CelestialBody; feed: NasaNeoFe
   );
 }
 
+function NasaDonkiThreatPanel({ body, feed }: { body: CelestialBody; feed: DonkiThreatFeed | null }) {
+  const events = feed?.events || [];
+  const status = feed?.status || 'quiet';
+  const statusColor = status === 'storm' ? '#FF3D3D' : status === 'watch' ? '#FFB020' : status === 'error' ? '#8A8F98' : body.accent;
+  const cme = feed?.family_counts?.CME ?? 0;
+  const flare = feed?.family_counts?.FLR ?? 0;
+  const gst = feed?.family_counts?.GST ?? 0;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: -18 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: 0.22, duration: 0.34 }}
+      className="absolute left-6 top-[43%] z-[256] hidden w-[19rem] pointer-events-none xl:block"
+    >
+      <div className="overflow-hidden rounded-[1.45rem] border border-[rgba(255,176,32,0.22)] bg-[rgba(3,8,16,0.64)] p-3 shadow-[0_16px_50px_rgba(0,0,0,0.32)] backdrop-blur-xl">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="text-[7px] font-mono tracking-[0.30em] text-[#FFB020]">NASA DONKI THREAT LAYER</div>
+            <div className="mt-1 text-[10px] font-semibold tracking-[0.20em] text-[var(--text-heading)]">SPACE WEATHER WATCH</div>
+          </div>
+          <span className="rounded-full border border-white/10 bg-black/20 px-2 py-1 text-[6px] font-mono tracking-[0.18em]" style={{ color: statusColor }}>
+            {status.toUpperCase()}
+          </span>
+        </div>
+
+        <div className="mt-3 grid grid-cols-3 gap-1.5 text-center">
+          <div className="rounded-xl border border-white/8 bg-white/[0.035] px-2 py-1.5">
+            <div className="text-[6px] font-mono tracking-[0.2em] text-[var(--text-muted)]">CME</div>
+            <div className="mt-0.5 text-[10px] font-semibold text-[#FFB020]">{cme}</div>
+          </div>
+          <div className="rounded-xl border border-white/8 bg-white/[0.035] px-2 py-1.5">
+            <div className="text-[6px] font-mono tracking-[0.2em] text-[var(--text-muted)]">FLARE</div>
+            <div className="mt-0.5 text-[10px] font-semibold" style={{ color: body.accent }}>{flare}</div>
+          </div>
+          <div className="rounded-xl border border-white/8 bg-white/[0.035] px-2 py-1.5">
+            <div className="text-[6px] font-mono tracking-[0.2em] text-[var(--text-muted)]">GST</div>
+            <div className="mt-0.5 text-[10px] font-semibold text-[#FF6B6B]">{gst}</div>
+          </div>
+        </div>
+
+        <div className="mt-3 space-y-1.5">
+          {(events.length ? events.slice(0, 4) : [null, null, null, null]).map((event, index) => (
+            <div key={event?.id || `donki-placeholder-${index}`} className="rounded-xl border border-white/8 bg-black/20 px-2.5 py-2">
+              {event ? (
+                <>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate text-[8px] font-semibold tracking-[0.16em] text-[var(--text-primary)]">{event.summary}</span>
+                    <span className={`rounded-full border px-1.5 py-0.5 text-[5px] font-mono tracking-[0.16em] ${event.severity === 'storm' ? 'border-[#FF3D3D]/40 text-[#FF3D3D]' : event.severity === 'watch' ? 'border-[#FFB020]/40 text-[#FFB020]' : 'border-white/10 text-[var(--text-muted)]'}`}>
+                      {event.family}
+                    </span>
+                  </div>
+                  <div className="mt-1 flex items-center justify-between text-[6px] font-mono tracking-[0.12em] text-white/45">
+                    <span>{event.label}</span>
+                    <span>{formatNeoTime(event.time)}</span>
+                    <span>{event.severity.toUpperCase()}</span>
+                  </div>
+                </>
+              ) : (
+                <div className="h-8 animate-pulse rounded-lg bg-white/[0.035]" />
+              )}
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-3 text-[6px] font-mono leading-4 tracking-[0.16em] text-white/35">
+          Live/cached NASA DONKI feed: CME, flares, geomagnetic storms, shocks, magnetopause and SEP events.
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
 function NasaObservatoryLayer({ body, profile }: { body: CelestialBody; profile: ObservatoryProfile }) {
   return (
     <>
@@ -1150,6 +1244,7 @@ export default function SolarSystemMode({
   const [autoRotate, setAutoRotate] = useState(true);
   const [viewResetKey, setViewResetKey] = useState(0);
   const [neoFeed, setNeoFeed] = useState<NasaNeoFeed | null>(null);
+  const [donkiFeed, setDonkiFeed] = useState<DonkiThreatFeed | null>(null);
 
   useEffect(() => {
     if (!enabled || isEarth) return undefined;
@@ -1157,21 +1252,30 @@ export default function SolarSystemMode({
     let cancelled = false;
     const controller = new AbortController();
 
-    const loadNeoFeed = async () => {
+    const loadNasaFeeds = async () => {
+      const loadJson = async <T,>(path: string): Promise<T | null> => {
+        const res = await fetch(path, { signal: controller.signal });
+        if (!res.ok) return null;
+        return await res.json() as T;
+      };
+
       try {
-        const res = await fetch('/api/nasa/neo', { signal: controller.signal });
-        if (!res.ok) return;
-        const payload = await res.json() as NasaNeoFeed;
-        if (!cancelled) setNeoFeed(payload);
+        const [neoPayload, donkiPayload] = await Promise.all([
+          loadJson<NasaNeoFeed>('/api/nasa/neo'),
+          loadJson<DonkiThreatFeed>('/api/nasa/donki'),
+        ]);
+        if (cancelled) return;
+        if (neoPayload) setNeoFeed(neoPayload);
+        if (donkiPayload) setDonkiFeed(donkiPayload);
       } catch (error) {
         if (!cancelled && error instanceof Error && error.name !== 'AbortError') {
-          console.warn('[AEGIS] NASA NeoWs suppressed error:', error.message);
+          console.warn('[AEGIS] NASA live feeds suppressed error:', error.message);
         }
       }
     };
 
-    void loadNeoFeed();
-    const interval = window.setInterval(loadNeoFeed, 3600000);
+    void loadNasaFeeds();
+    const interval = window.setInterval(loadNasaFeeds, 1800000);
 
     return () => {
       cancelled = true;
@@ -1292,6 +1396,7 @@ export default function SolarSystemMode({
             <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),transparent_14%,transparent_82%,rgba(255,255,255,0.02))]" />
             {observatoryProfile && <NasaObservatoryLayer body={activeBody} profile={observatoryProfile} />}
             {observatoryProfile && <NasaMissionHeader body={activeBody} profile={observatoryProfile} />}
+            <NasaDonkiThreatPanel body={activeBody} feed={donkiFeed} />
             <NasaLiveNeoPanel body={activeBody} feed={neoFeed} />
 
             {!isMobile && (
