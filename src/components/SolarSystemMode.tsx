@@ -299,6 +299,12 @@ const METEOR_TRACKS = [
   { left: '76%', top: '78%', width: 92, rotate: -28, delay: 3.0 },
 ] as const;
 
+const DSN_STATIONS = [
+  { label: 'DSN GOLDSTONE', left: '13%', top: '58%' },
+  { label: 'DSN MADRID', left: '43%', top: '18%' },
+  { label: 'DSN CANBERRA', left: '77%', top: '55%' },
+] as const;
+
 function getAdjacentBody(selected: CelestialBodyId, direction: -1 | 1) {
   const index = BODIES.findIndex((body) => body.id === selected);
   const nextIndex = (index + direction + BODIES.length) % BODIES.length;
@@ -860,6 +866,47 @@ function OrbitalSceneAccents({ body }: { body: CelestialBody }) {
   );
 }
 
+function NasaMissionHeader({ body, profile }: { body: CelestialBody; profile: ObservatoryProfile }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -18 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.08, duration: 0.36 }}
+      className="absolute left-1/2 top-5 z-[255] hidden w-[min(92vw,54rem)] -translate-x-1/2 pointer-events-none lg:block"
+    >
+      <div className="overflow-hidden rounded-[1.4rem] border border-[rgba(118,228,234,0.22)] bg-[linear-gradient(90deg,rgba(3,11,24,0.78),rgba(5,20,35,0.64),rgba(3,11,24,0.78))] px-4 py-3 shadow-[0_18px_60px_rgba(0,0,0,0.28)] backdrop-blur-xl">
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[rgba(118,228,234,0.68)] to-transparent" />
+        <div className="flex items-start justify-between gap-5">
+          <div>
+            <div className="flex items-center gap-2 text-[7px] font-mono tracking-[0.34em] text-[var(--cyan-primary)]">
+              <span className="h-1.5 w-1.5 rounded-full" style={{ background: body.accent, boxShadow: `0 0 12px ${body.accent}` }} />
+              NASA / JPL DEEP SPACE OBSERVATORY
+            </div>
+            <div className="mt-1 text-[13px] font-semibold tracking-[0.24em] text-[var(--text-heading)]">
+              {profile.nasaName} · {body.name.toUpperCase()} TARGET LOCK
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-1.5 text-center">
+            {['HORIZONS', 'SPICE', 'DSN'].map((item) => (
+              <div key={item} className="rounded-xl border border-white/10 bg-white/[0.035] px-3 py-1.5">
+                <div className="text-[6px] font-mono tracking-[0.22em] text-[var(--text-muted)]">REF</div>
+                <div className="mt-0.5 text-[8px] font-semibold tracking-[0.18em]" style={{ color: body.accent }}>{item}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="mt-3 grid grid-cols-4 gap-2">
+          {[profile.starField, profile.meteorStream, profile.smallBodies, profile.radiant].map((item) => (
+            <div key={item} className="min-h-10 rounded-xl border border-white/8 bg-black/20 px-2.5 py-2 text-[7px] font-mono leading-4 tracking-[0.13em] text-white/54">
+              {item}
+            </div>
+          ))}
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
 function NasaObservatoryLayer({ body, profile }: { body: CelestialBody; profile: ObservatoryProfile }) {
   return (
     <>
@@ -887,6 +934,23 @@ function NasaObservatoryLayer({ body, profile }: { body: CelestialBody; profile:
             style={{ width: star.size * 2.5, height: star.size * 2.5 }}
           />
           <span className="text-[6px] font-mono tracking-[0.24em] text-white/38">{star.label}</span>
+        </div>
+      ))}
+
+      <div className="absolute inset-0 hidden lg:block opacity-50">
+        <div className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-gradient-to-b from-transparent via-[rgba(118,228,234,0.20)] to-transparent" />
+        <div className="absolute left-0 top-1/2 h-px w-full -translate-y-1/2 bg-gradient-to-r from-transparent via-[rgba(118,228,234,0.16)] to-transparent" />
+        <div className="absolute left-1/2 top-1/2 h-[min(84vh,760px)] w-[min(84vh,760px)] -translate-x-1/2 -translate-y-1/2 rounded-full border border-[rgba(118,228,234,0.08)]" />
+      </div>
+
+      {DSN_STATIONS.map((station) => (
+        <div
+          key={station.label}
+          className="absolute hidden items-center gap-2 rounded-full border border-[rgba(118,228,234,0.18)] bg-[rgba(4,12,24,0.58)] px-2.5 py-1 text-[6px] font-mono tracking-[0.22em] text-[var(--cyan-primary)] backdrop-blur-md lg:flex"
+          style={{ left: station.left, top: station.top }}
+        >
+          <span className="h-1.5 w-1.5 rounded-full" style={{ background: body.accent, boxShadow: `0 0 10px ${body.accent}` }} />
+          {station.label}
         </div>
       ))}
 
@@ -1099,6 +1163,7 @@ export default function SolarSystemMode({
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_16%,rgba(255,255,255,0.06),transparent_34%)]" />
             <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),transparent_14%,transparent_82%,rgba(255,255,255,0.02))]" />
             {observatoryProfile && <NasaObservatoryLayer body={activeBody} profile={observatoryProfile} />}
+            {observatoryProfile && <NasaMissionHeader body={activeBody} profile={observatoryProfile} />}
 
             {!isMobile && (
               <>
