@@ -914,9 +914,9 @@ function NasaMissionHeader({ body, profile }: { body: CelestialBody; profile: Ob
       initial={{ opacity: 0, y: -18 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.08, duration: 0.36 }}
-      className="absolute left-1/2 top-5 z-[255] hidden w-[min(92vw,54rem)] -translate-x-1/2 pointer-events-none lg:block"
+      className="absolute left-1/2 top-[8.25rem] z-[230] hidden w-[min(66vw,48rem)] -translate-x-1/2 pointer-events-none xl:block"
     >
-      <div className="overflow-hidden rounded-[1.4rem] border border-[rgba(118,228,234,0.22)] bg-[linear-gradient(90deg,rgba(3,11,24,0.78),rgba(5,20,35,0.64),rgba(3,11,24,0.78))] px-4 py-3 shadow-[0_18px_60px_rgba(0,0,0,0.28)] backdrop-blur-xl">
+      <div className="overflow-hidden rounded-[1.15rem] border border-[rgba(118,228,234,0.18)] bg-[linear-gradient(90deg,rgba(3,11,24,0.66),rgba(5,20,35,0.52),rgba(3,11,24,0.66))] px-3.5 py-2.5 shadow-[0_14px_46px_rgba(0,0,0,0.24)] backdrop-blur-xl">
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[rgba(118,228,234,0.68)] to-transparent" />
         <div className="flex items-start justify-between gap-5">
           <div>
@@ -937,9 +937,9 @@ function NasaMissionHeader({ body, profile }: { body: CelestialBody; profile: Ob
             ))}
           </div>
         </div>
-        <div className="mt-3 grid grid-cols-4 gap-2">
+        <div className="mt-2 grid grid-cols-4 gap-1.5">
           {[profile.starField, profile.meteorStream, profile.smallBodies, profile.radiant].map((item) => (
-            <div key={item} className="min-h-10 rounded-xl border border-white/8 bg-black/20 px-2.5 py-2 text-[7px] font-mono leading-4 tracking-[0.13em] text-white/54">
+            <div key={item} className="truncate rounded-lg border border-white/8 bg-black/20 px-2 py-1.5 text-[6px] font-mono tracking-[0.12em] text-white/48">
               {item}
             </div>
           ))}
@@ -965,9 +965,9 @@ function NasaLiveNeoPanel({ body, feed }: { body: CelestialBody; feed: NasaNeoFe
       initial={{ opacity: 0, x: 18 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: 0.18, duration: 0.34 }}
-      className="absolute right-6 top-[43%] z-[256] hidden w-[19rem] pointer-events-none xl:block"
+      className="absolute right-5 top-[14rem] z-[256] hidden w-[18rem] pointer-events-none xl:block"
     >
-      <div className="overflow-hidden rounded-[1.45rem] border border-[rgba(118,228,234,0.20)] bg-[rgba(3,8,16,0.62)] p-3 shadow-[0_16px_50px_rgba(0,0,0,0.30)] backdrop-blur-xl">
+      <div className="max-h-[18rem] overflow-y-auto rounded-[1.3rem] border border-[rgba(118,228,234,0.20)] bg-[rgba(3,8,16,0.62)] p-3 shadow-[0_16px_50px_rgba(0,0,0,0.30)] backdrop-blur-xl styled-scrollbar">
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="text-[7px] font-mono tracking-[0.30em] text-[var(--cyan-primary)]">NASA LIVE DATA V2</div>
@@ -1039,9 +1039,9 @@ function NasaDonkiThreatPanel({ body, feed }: { body: CelestialBody; feed: Donki
       initial={{ opacity: 0, x: -18 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: 0.22, duration: 0.34 }}
-      className="absolute left-6 top-[43%] z-[256] hidden w-[19rem] pointer-events-none xl:block"
+      className="absolute left-5 top-[14rem] z-[256] hidden w-[18rem] pointer-events-none xl:block"
     >
-      <div className="overflow-hidden rounded-[1.45rem] border border-[rgba(255,176,32,0.22)] bg-[rgba(3,8,16,0.64)] p-3 shadow-[0_16px_50px_rgba(0,0,0,0.32)] backdrop-blur-xl">
+      <div className="max-h-[18rem] overflow-y-auto rounded-[1.3rem] border border-[rgba(255,176,32,0.22)] bg-[rgba(3,8,16,0.64)] p-3 shadow-[0_16px_50px_rgba(0,0,0,0.32)] backdrop-blur-xl styled-scrollbar">
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="text-[7px] font-mono tracking-[0.30em] text-[#FFB020]">NASA DONKI THREAT LAYER</div>
@@ -1099,7 +1099,7 @@ function NasaDonkiThreatPanel({ body, feed }: { body: CelestialBody; feed: Donki
   );
 }
 
-function NasaObservatoryLayer({ body, profile }: { body: CelestialBody; profile: ObservatoryProfile }) {
+function NasaObservatoryLayer({ body }: { body: CelestialBody }) {
   return (
     <>
       <div className="absolute inset-0 opacity-60 [mask-image:radial-gradient(circle_at_center,black_0%,black_64%,transparent_100%)]">
@@ -1184,40 +1184,6 @@ function NasaObservatoryLayer({ body, profile }: { body: CelestialBody; profile:
         />
       ))}
 
-      <div className="absolute left-[8%] bottom-[10%] hidden max-w-[20rem] rounded-[1.4rem] border border-white/10 bg-[rgba(3,8,16,0.54)] p-3 backdrop-blur-xl lg:block">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <div className="text-[7px] font-mono tracking-[0.3em] text-[var(--text-secondary)]">NASA / JPL OBSERVATORY LAYER</div>
-            <div className="mt-1 text-[10px] font-semibold tracking-[0.18em] text-[var(--text-primary)]">{profile.nasaName}</div>
-          </div>
-          <span className="rounded-full border border-white/10 px-2 py-1 text-[6px] font-mono tracking-[0.16em]" style={{ color: body.accent }}>
-            REF
-          </span>
-        </div>
-        <div className="mt-3 grid gap-1.5">
-          {[profile.starField, profile.meteorStream, profile.smallBodies, profile.radiant].map((item) => (
-            <div key={item} className="rounded-xl border border-white/8 bg-white/[0.035] px-2.5 py-1.5 text-[7px] font-mono leading-4 tracking-[0.13em] text-[var(--text-muted)]">
-              {item}
-            </div>
-          ))}
-        </div>
-        <div className="mt-3 text-[6px] font-mono leading-4 tracking-[0.18em] text-white/36">{profile.reference}</div>
-      </div>
-
-      <div className="absolute right-[8%] bottom-[12%] hidden w-[18rem] rounded-[1.4rem] border border-white/10 bg-[rgba(3,8,16,0.54)] p-3 backdrop-blur-xl xl:block">
-        <div className="text-[7px] font-mono tracking-[0.3em] text-[var(--text-secondary)]">METEOR / SMALL-BODY WATCH</div>
-        <div className="mt-2 grid grid-cols-1 gap-1.5">
-          {profile.metrics.map((item) => (
-            <div key={item} className="flex items-center justify-between rounded-xl border border-white/8 bg-white/[0.035] px-2.5 py-1.5">
-              <span className="text-[7px] font-mono tracking-[0.16em] text-[var(--text-muted)]">{item}</span>
-              <span className="h-1.5 w-1.5 rounded-full" style={{ background: body.accent, boxShadow: `0 0 10px ${body.accent}` }} />
-            </div>
-          ))}
-        </div>
-        <div className="mt-3 rounded-xl border border-white/8 bg-black/20 px-2.5 py-2 text-[7px] font-mono leading-4 tracking-[0.15em] text-[var(--text-secondary)]">
-          Catalog labels are reference-style overlays; Earth Ops remains the live-data surface.
-        </div>
-      </div>
     </>
   );
 }
@@ -1394,7 +1360,7 @@ export default function SolarSystemMode({
 
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_16%,rgba(255,255,255,0.06),transparent_34%)]" />
             <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),transparent_14%,transparent_82%,rgba(255,255,255,0.02))]" />
-            {observatoryProfile && <NasaObservatoryLayer body={activeBody} profile={observatoryProfile} />}
+            {observatoryProfile && <NasaObservatoryLayer body={activeBody} />}
             {observatoryProfile && <NasaMissionHeader body={activeBody} profile={observatoryProfile} />}
             <NasaDonkiThreatPanel body={activeBody} feed={donkiFeed} />
             <NasaLiveNeoPanel body={activeBody} feed={neoFeed} />
@@ -1422,7 +1388,7 @@ export default function SolarSystemMode({
             <div className="absolute left-1/2 top-1/2 h-[min(96vh,1020px)] w-[min(96vh,1020px)] -translate-x-1/2 -translate-y-[51%] rounded-full border border-white/[0.02]" />
 
             <div className={`absolute ${scene.heroWrap} flex -translate-x-1/2 -translate-y-1/2 items-center justify-center pointer-events-none`}>
-              <div className="relative h-[min(94vh,900px)] w-[min(94vw,980px)] max-w-[98vw]">
+              <div className="relative h-[min(76vh,720px)] w-[min(76vw,820px)] max-w-[84vw]">
                 {!isMobile && <OrbitalSceneAccents body={activeBody} />}
                 <motion.div
                   initial={{ scale: 0.8, x: scene.heroMotion.x, y: scene.heroMotion.y, opacity: 0 }}
@@ -1459,67 +1425,24 @@ export default function SolarSystemMode({
               />
             )}
 
-            {!isMobile && (
-              <>
-                <motion.div
-                  initial={{ opacity: 0, y: -18 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.18 }}
-                  className="absolute left-6 top-[18%] max-w-[14.5rem] rounded-[1.35rem] border border-white/10 bg-[rgba(7,12,18,0.54)] px-3.5 py-3 backdrop-blur-xl"
-                >
-                  <div className="text-[7px] font-mono tracking-[0.28em] text-[var(--text-secondary)]">PLANETARY VISTA</div>
-                  <div className="mt-2 text-[11px] font-semibold tracking-[0.18em] text-[var(--text-primary)]">{activeBody.vistaLabel}</div>
-                  <div className="mt-2 text-[7px] font-mono tracking-[0.2em]" style={{ color: activeBody.accent }}>{activeBody.detailPill}</div>
-                  <div className="mt-3 grid grid-cols-1 gap-1.5">
-                    {scene.leftPanel.split('\n').map((item) => (
-                      <div key={item} className="rounded-full border border-white/8 bg-white/[0.035] px-2.5 py-1 text-[7px] font-mono tracking-[0.18em] text-[var(--text-muted)]">
-                        {item}
-                      </div>
-                    ))}
+            {isMobile && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.12 }}
+                className="absolute left-1/2 top-[63%] w-[90vw] max-w-[20rem] -translate-x-1/2 rounded-[1.4rem] border border-white/10 bg-[rgba(7,12,18,0.58)] px-3.5 py-3 backdrop-blur-xl"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-[8px] font-mono tracking-[0.32em] text-[var(--text-secondary)]">{activeBody.code}</div>
+                    <div className="mt-1 text-base font-semibold tracking-[0.24em] text-[var(--text-heading)]">{activeBody.name.toUpperCase()}</div>
                   </div>
-                </motion.div>
-              </>
+                  <div className="rounded-full border border-white/10 bg-black/20 px-2.5 py-1 text-[7px] font-mono tracking-[0.18em] text-[var(--text-secondary)]">
+                    VISUAL
+                  </div>
+                </div>
+              </motion.div>
             )}
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.12 }}
-              className={`absolute ${isMobile ? 'left-1/2 top-[63%] w-[90vw] max-w-[20rem] -translate-x-1/2' : 'right-6 top-[18%] w-[18.5rem]'} rounded-[1.65rem] border border-white/10 bg-[rgba(7,12,18,0.58)] px-3.5 py-3 backdrop-blur-xl`}
-            >
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-[8px] font-mono tracking-[0.32em] text-[var(--text-secondary)]">{activeBody.code}</div>
-                  <div className="mt-1 text-base font-semibold tracking-[0.24em] text-[var(--text-heading)] md:text-lg">{activeBody.name.toUpperCase()}</div>
-                  <div className="mt-1 text-[8px] font-mono tracking-[0.18em] text-[var(--text-muted)]">{activeBody.diameter} · {activeBody.day}</div>
-                  {observatoryProfile && (
-                    <div className="mt-2 text-[7px] font-mono leading-4 tracking-[0.16em] text-[var(--cyan-primary)]">
-                      {observatoryProfile.mission}
-                    </div>
-                  )}
-                </div>
-                <div className="rounded-full border border-white/10 bg-black/20 px-2.5 py-1 text-[7px] font-mono tracking-[0.18em] text-[var(--text-secondary)]">
-                  VISUAL-ONLY MODE
-                </div>
-              </div>
-
-              <div className="mt-3 grid grid-cols-3 gap-2">
-                {scene.telemetry.map((item) => (
-                  <div key={item} className="rounded-xl border border-white/8 bg-white/[0.03] px-2 py-2 text-center">
-                    <div className="text-[6px] font-mono tracking-[0.22em] text-[var(--text-muted)]">SIGNAL</div>
-                    <div className="mt-1 text-[9px] font-semibold tracking-[0.14em]" style={{ color: activeBody.accent }}>{item}</div>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-3 rounded-2xl border border-white/8 bg-black/20 px-3 py-2 text-[7px] font-mono leading-5 tracking-[0.18em] text-[var(--text-muted)]">
-                {scene.rightPanel.split('\n').join(' · ')}
-              </div>
-            </motion.div>
-
-            <div className={`absolute ${isMobile ? 'top-16 left-1/2 -translate-x-1/2' : 'left-6 bottom-[18%]'} rounded-2xl border border-white/10 bg-[rgba(7,12,18,0.58)] px-3 py-2 shadow-[0_10px_36px_rgba(0,0,0,0.24)] backdrop-blur-xl`}>
-              <div className="text-[7px] font-mono tracking-[0.24em] text-[var(--text-secondary)]">VISUAL SURFACE</div>
-              <div className="mt-1 text-[9px] font-semibold tracking-[0.16em] text-[var(--text-primary)]">RETURN TO EARTH FOR LIVE DATA</div>
-            </div>
           </motion.div>
         )}
       </AnimatePresence>
