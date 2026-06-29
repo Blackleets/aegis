@@ -432,7 +432,7 @@ export function PlanetWebGL({
   return (
     <motion.div
       key={`${body.id}-${resetKey}`}
-      className="relative z-10 h-[min(54vh,620px)] w-[min(54vh,620px)] max-h-[72vw] max-w-[72vw] shrink-0 overflow-hidden rounded-full cursor-grab pointer-events-auto active:cursor-grabbing md:max-h-none md:max-w-none"
+      className="relative z-10 h-[min(44vh,500px)] w-[min(44vh,500px)] max-h-[62vw] max-w-[62vw] shrink-0 overflow-hidden rounded-full cursor-grab pointer-events-auto active:cursor-grabbing md:max-h-none md:max-w-none"
       drag
       dragMomentum={false}
       dragElastic={0.12}
@@ -447,7 +447,7 @@ export function PlanetWebGL({
       <Canvas
         className="absolute inset-0 h-full w-full"
         dpr={[1, 2]}
-        camera={{ position: [0, 0, 5.15], fov: 30 }}
+        camera={{ position: [0, 0, 6.4], fov: 28 }}
         gl={{ antialias: true, alpha: true }}
         shadows
       >

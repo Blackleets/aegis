@@ -208,145 +208,6 @@ const BODIES: CelestialBody[] = [
 
 const bodyById = Object.fromEntries(BODIES.map((body) => [body.id, body])) as Record<CelestialBodyId, CelestialBody>;
 
-type ObservatoryProfile = {
-  nasaName: string;
-  mission: string;
-  starField: string;
-  meteorStream: string;
-  smallBodies: string;
-  radiant: string;
-  reference: string;
-  metrics: [string, string, string];
-};
-
-type NasaNeoObject = {
-  id: string;
-  name: string;
-  hazardous: boolean;
-  close_approach: string | null;
-  miss_lunar: number;
-  velocity_kps: number;
-  diameter_m: number;
-  jpl_url?: string | null;
-};
-
-type NasaNeoFeed = {
-  source?: string;
-  status?: 'ok' | 'error';
-  fetched_at?: string;
-  total?: number;
-  hazardous_count?: number;
-  closest?: NasaNeoObject[];
-};
-
-type DonkiThreatEvent = {
-  id: string;
-  family: 'CME' | 'FLR' | 'GST' | 'IPS' | 'MPC' | 'SEP';
-  label: string;
-  time: string | null;
-  severity: 'low' | 'watch' | 'storm';
-  summary: string;
-};
-
-type DonkiThreatFeed = {
-  source?: string;
-  status?: 'quiet' | 'watch' | 'storm' | 'error';
-  fetched_at?: string;
-  total?: number;
-  storm_count?: number;
-  watch_count?: number;
-  family_counts?: Partial<Record<DonkiThreatEvent['family'], number>>;
-  events?: DonkiThreatEvent[];
-  degraded?: boolean;
-};
-
-const OBSERVATORY_PROFILES: Record<Exclude<CelestialBodyId, 'earth'>, ObservatoryProfile> = {
-  moon: {
-    nasaName: 'NASA LRO / ARTEMIS REFERENCE',
-    mission: 'LUNAR ORBITAL RECONNAISSANCE',
-    starField: 'Milky Way background · near-Earth parallax grid',
-    meteorStream: 'Sporadic micrometeoroid flux · no atmosphere shield',
-    smallBodies: 'Cislunar debris watch · translunar injection corridors',
-    radiant: 'Lunar apex / anti-apex dust population',
-    reference: 'Reference: NASA LRO + Meteoroid Environment Office style data layer',
-    metrics: ['NO WEATHER', 'IMPACT GARDENING', 'POLAR ICE WATCH'],
-  },
-  mars: {
-    nasaName: 'NASA MRO / JPL HORIZONS REFERENCE',
-    mission: 'MARS RECONNAISSANCE ORBITER CONTEXT',
-    starField: 'Galactic plane backdrop · Phobos/Deimos orbital traces',
-    meteorStream: 'Martian meteor entries · thin-atmosphere ablation',
-    smallBodies: 'Mars-crossing asteroid family · NEO transfer corridor',
-    radiant: 'Anti-solar radiant · ecliptic dust lane',
-    reference: 'Reference: NASA/JPL Horizons + MRO observational vocabulary',
-    metrics: ['PHOBOS TRACK', 'DUST OPTICAL DEPTH', 'MARS CROSSERS'],
-  },
-  venus: {
-    nasaName: 'NASA DAVINCI / VERITAS REFERENCE',
-    mission: 'VENUS ATMOSPHERIC OBSERVATORY CONTEXT',
-    starField: 'Inner-system star wash · solar glare suppression',
-    meteorStream: 'High-speed inner-system dust impactors',
-    smallBodies: 'Atira/Aten-like inner NEO corridor',
-    radiant: 'Sunward dust stream · dawn/dusk sector',
-    reference: 'Reference: NASA Venus mission concepts + small-body classes',
-    metrics: ['CLOUD DECK', 'SOLAR GLARE', 'INNER NEO'],
-  },
-  jupiter: {
-    nasaName: 'NASA JUNO / JPL SMALL-BODY REFERENCE',
-    mission: 'JOVIAN SYSTEM OBSERVATORY CONTEXT',
-    starField: 'Deep star catalog · galactic background behind gas giant',
-    meteorStream: 'Shoemaker-Levy class impact watch · cometary fragments',
-    smallBodies: 'Trojan swarms L4/L5 · irregular moon/debris family',
-    radiant: 'Outer-system comet radiant · high-gravity capture field',
-    reference: 'Reference: NASA Juno + JPL small-body dynamics vocabulary',
-    metrics: ['TROJAN FIELD', 'COMET WATCH', 'MAGNETOSPHERE'],
-  },
-  saturn: {
-    nasaName: 'NASA CASSINI / RINGPLANE REFERENCE',
-    mission: 'SATURN RINGPLANE OBSERVATORY CONTEXT',
-    starField: 'Occultation-style star background · ringplane cuts',
-    meteorStream: 'Ring particle impact flashes · icy meteoroid stream',
-    smallBodies: 'Ring-plane debris · shepherd moon resonance tracks',
-    radiant: 'E-ring / Enceladus plume dust corridor',
-    reference: 'Reference: NASA Cassini ringplane science vocabulary',
-    metrics: ['RING DUST', 'TITAN TRACK', 'ICE PARTICLES'],
-  },
-  neptune: {
-    nasaName: 'NASA VOYAGER / DEEP SKY REFERENCE',
-    mission: 'OUTER PLANET DEEP-FIELD CONTEXT',
-    starField: 'Deep sky catalog · low solar illumination field',
-    meteorStream: 'Kuiper-belt dust stream · distant cometary debris',
-    smallBodies: 'Trans-Neptunian object corridor · scattered disk traces',
-    radiant: 'Far-field ecliptic radiant · cold-object population',
-    reference: 'Reference: NASA Voyager + outer solar system object classes',
-    metrics: ['TNO WATCH', 'KUIPER DUST', 'LOW LIGHT'],
-  },
-};
-
-const STAR_CATALOG_POINTS = [
-  { left: '8%', top: '16%', size: 2, label: 'SIRIUS' },
-  { left: '18%', top: '70%', size: 1, label: 'RIGEL' },
-  { left: '30%', top: '24%', size: 1.5, label: 'VEGA' },
-  { left: '43%', top: '12%', size: 1, label: 'POLARIS' },
-  { left: '66%', top: '18%', size: 2, label: 'ARCTURUS' },
-  { left: '78%', top: '62%', size: 1.2, label: 'ALTAIR' },
-  { left: '91%', top: '35%', size: 1.6, label: 'DENEB' },
-  { left: '55%', top: '82%', size: 1, label: 'SPICA' },
-] as const;
-
-const METEOR_TRACKS = [
-  { left: '12%', top: '28%', width: 84, rotate: -22, delay: 0.2 },
-  { left: '68%', top: '30%', width: 110, rotate: -34, delay: 1.4 },
-  { left: '26%', top: '76%', width: 76, rotate: -18, delay: 2.1 },
-  { left: '76%', top: '78%', width: 92, rotate: -28, delay: 3.0 },
-] as const;
-
-const DSN_STATIONS = [
-  { label: 'DSN GOLDSTONE', left: '13%', top: '58%' },
-  { label: 'DSN MADRID', left: '43%', top: '18%' },
-  { label: 'DSN CANBERRA', left: '77%', top: '55%' },
-] as const;
-
 function getAdjacentBody(selected: CelestialBodyId, direction: -1 | 1) {
   const index = BODIES.findIndex((body) => body.id === selected);
   const nextIndex = (index + direction + BODIES.length) % BODIES.length;
@@ -908,286 +769,6 @@ function OrbitalSceneAccents({ body }: { body: CelestialBody }) {
   );
 }
 
-function NasaMissionHeader({ body, profile }: { body: CelestialBody; profile: ObservatoryProfile }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: -18 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.08, duration: 0.36 }}
-      className="absolute left-1/2 top-[8.25rem] z-[230] hidden w-[min(66vw,48rem)] -translate-x-1/2 pointer-events-none xl:block"
-    >
-      <div className="overflow-hidden rounded-[1.15rem] border border-[rgba(118,228,234,0.18)] bg-[linear-gradient(90deg,rgba(3,11,24,0.66),rgba(5,20,35,0.52),rgba(3,11,24,0.66))] px-3.5 py-2.5 shadow-[0_14px_46px_rgba(0,0,0,0.24)] backdrop-blur-xl">
-        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[rgba(118,228,234,0.68)] to-transparent" />
-        <div className="flex items-start justify-between gap-5">
-          <div>
-            <div className="flex items-center gap-2 text-[7px] font-mono tracking-[0.34em] text-[var(--cyan-primary)]">
-              <span className="h-1.5 w-1.5 rounded-full" style={{ background: body.accent, boxShadow: `0 0 12px ${body.accent}` }} />
-              NASA / JPL DEEP SPACE OBSERVATORY
-            </div>
-            <div className="mt-1 text-[13px] font-semibold tracking-[0.24em] text-[var(--text-heading)]">
-              {profile.nasaName} · {body.name.toUpperCase()} TARGET LOCK
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-1.5 text-center">
-            {['HORIZONS', 'SPICE', 'DSN'].map((item) => (
-              <div key={item} className="rounded-xl border border-white/10 bg-white/[0.035] px-3 py-1.5">
-                <div className="text-[6px] font-mono tracking-[0.22em] text-[var(--text-muted)]">REF</div>
-                <div className="mt-0.5 text-[8px] font-semibold tracking-[0.18em]" style={{ color: body.accent }}>{item}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="mt-2 grid grid-cols-4 gap-1.5">
-          {[profile.starField, profile.meteorStream, profile.smallBodies, profile.radiant].map((item) => (
-            <div key={item} className="truncate rounded-lg border border-white/8 bg-black/20 px-2 py-1.5 text-[6px] font-mono tracking-[0.12em] text-white/48">
-              {item}
-            </div>
-          ))}
-        </div>
-      </div>
-    </motion.div>
-  );
-}
-
-function formatNeoTime(value?: string | null) {
-  if (!value) return 'TBD';
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return value.slice(0, 16);
-  return parsed.toISOString().slice(5, 16).replace('T', ' ');
-}
-
-function NasaLiveNeoPanel({ body, feed }: { body: CelestialBody; feed: NasaNeoFeed | null }) {
-  const objects = feed?.closest || [];
-  const status = feed?.status === 'ok' ? 'LIVE' : feed ? 'DEGRADED' : 'SYNCING';
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, x: 18 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: 0.18, duration: 0.34 }}
-      className="absolute right-5 top-[14rem] z-[256] hidden w-[18rem] pointer-events-none xl:block"
-    >
-      <div className="max-h-[18rem] overflow-y-auto rounded-[1.3rem] border border-[rgba(118,228,234,0.20)] bg-[rgba(3,8,16,0.62)] p-3 shadow-[0_16px_50px_rgba(0,0,0,0.30)] backdrop-blur-xl styled-scrollbar">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="text-[7px] font-mono tracking-[0.30em] text-[var(--cyan-primary)]">NASA LIVE DATA V2</div>
-            <div className="mt-1 text-[10px] font-semibold tracking-[0.20em] text-[var(--text-heading)]">NEO CLOSE APPROACH WATCH</div>
-          </div>
-          <span className="rounded-full border border-white/10 bg-black/20 px-2 py-1 text-[6px] font-mono tracking-[0.18em]" style={{ color: body.accent }}>
-            {status}
-          </span>
-        </div>
-
-        <div className="mt-3 grid grid-cols-3 gap-1.5 text-center">
-          <div className="rounded-xl border border-white/8 bg-white/[0.035] px-2 py-1.5">
-            <div className="text-[6px] font-mono tracking-[0.2em] text-[var(--text-muted)]">OBJECTS</div>
-            <div className="mt-0.5 text-[10px] font-semibold" style={{ color: body.accent }}>{feed?.total ?? '—'}</div>
-          </div>
-          <div className="rounded-xl border border-white/8 bg-white/[0.035] px-2 py-1.5">
-            <div className="text-[6px] font-mono tracking-[0.2em] text-[var(--text-muted)]">PHA</div>
-            <div className="mt-0.5 text-[10px] font-semibold text-[#FFB020]">{feed?.hazardous_count ?? '—'}</div>
-          </div>
-          <div className="rounded-xl border border-white/8 bg-white/[0.035] px-2 py-1.5">
-            <div className="text-[6px] font-mono tracking-[0.2em] text-[var(--text-muted)]">SRC</div>
-            <div className="mt-0.5 text-[9px] font-semibold text-[var(--cyan-primary)]">NeoWs</div>
-          </div>
-        </div>
-
-        <div className="mt-3 space-y-1.5">
-          {(objects.length ? objects.slice(0, 4) : [null, null, null, null]).map((object, index) => (
-            <div key={object?.id || `neo-placeholder-${index}`} className="rounded-xl border border-white/8 bg-black/20 px-2.5 py-2">
-              {object ? (
-                <>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="truncate text-[8px] font-semibold tracking-[0.16em] text-[var(--text-primary)]">{object.name.replace(/[()]/g, '')}</span>
-                    <span className={`rounded-full border px-1.5 py-0.5 text-[5px] font-mono tracking-[0.16em] ${object.hazardous ? 'border-[#FFB020]/40 text-[#FFB020]' : 'border-white/10 text-[var(--text-muted)]'}`}>
-                      {object.hazardous ? 'PHA' : 'PASS'}
-                    </span>
-                  </div>
-                  <div className="mt-1 grid grid-cols-3 gap-1 text-[6px] font-mono tracking-[0.12em] text-white/45">
-                    <span>{object.miss_lunar} LD</span>
-                    <span>{object.velocity_kps} km/s</span>
-                    <span>{object.diameter_m} m</span>
-                  </div>
-                  <div className="mt-1 text-[6px] font-mono tracking-[0.16em] text-[var(--text-muted)]">CA {formatNeoTime(object.close_approach)}</div>
-                </>
-              ) : (
-                <div className="h-9 animate-pulse rounded-lg bg-white/[0.035]" />
-              )}
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-3 text-[6px] font-mono leading-4 tracking-[0.16em] text-white/35">
-          Live/cached NASA NeoWs feed. Distances shown in lunar distances; Earth Ops remains primary operational surface.
-        </div>
-      </div>
-    </motion.div>
-  );
-}
-
-function NasaDonkiThreatPanel({ body, feed }: { body: CelestialBody; feed: DonkiThreatFeed | null }) {
-  const events = feed?.events || [];
-  const status = feed?.status || 'quiet';
-  const statusColor = status === 'storm' ? '#FF3D3D' : status === 'watch' ? '#FFB020' : status === 'error' ? '#8A8F98' : body.accent;
-  const cme = feed?.family_counts?.CME ?? 0;
-  const flare = feed?.family_counts?.FLR ?? 0;
-  const gst = feed?.family_counts?.GST ?? 0;
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, x: -18 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: 0.22, duration: 0.34 }}
-      className="absolute left-5 top-[14rem] z-[256] hidden w-[18rem] pointer-events-none xl:block"
-    >
-      <div className="max-h-[18rem] overflow-y-auto rounded-[1.3rem] border border-[rgba(255,176,32,0.22)] bg-[rgba(3,8,16,0.64)] p-3 shadow-[0_16px_50px_rgba(0,0,0,0.32)] backdrop-blur-xl styled-scrollbar">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="text-[7px] font-mono tracking-[0.30em] text-[#FFB020]">NASA DONKI THREAT LAYER</div>
-            <div className="mt-1 text-[10px] font-semibold tracking-[0.20em] text-[var(--text-heading)]">SPACE WEATHER WATCH</div>
-          </div>
-          <span className="rounded-full border border-white/10 bg-black/20 px-2 py-1 text-[6px] font-mono tracking-[0.18em]" style={{ color: statusColor }}>
-            {status.toUpperCase()}
-          </span>
-        </div>
-
-        <div className="mt-3 grid grid-cols-3 gap-1.5 text-center">
-          <div className="rounded-xl border border-white/8 bg-white/[0.035] px-2 py-1.5">
-            <div className="text-[6px] font-mono tracking-[0.2em] text-[var(--text-muted)]">CME</div>
-            <div className="mt-0.5 text-[10px] font-semibold text-[#FFB020]">{cme}</div>
-          </div>
-          <div className="rounded-xl border border-white/8 bg-white/[0.035] px-2 py-1.5">
-            <div className="text-[6px] font-mono tracking-[0.2em] text-[var(--text-muted)]">FLARE</div>
-            <div className="mt-0.5 text-[10px] font-semibold" style={{ color: body.accent }}>{flare}</div>
-          </div>
-          <div className="rounded-xl border border-white/8 bg-white/[0.035] px-2 py-1.5">
-            <div className="text-[6px] font-mono tracking-[0.2em] text-[var(--text-muted)]">GST</div>
-            <div className="mt-0.5 text-[10px] font-semibold text-[#FF6B6B]">{gst}</div>
-          </div>
-        </div>
-
-        <div className="mt-3 space-y-1.5">
-          {(events.length ? events.slice(0, 4) : [null, null, null, null]).map((event, index) => (
-            <div key={event?.id || `donki-placeholder-${index}`} className="rounded-xl border border-white/8 bg-black/20 px-2.5 py-2">
-              {event ? (
-                <>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="truncate text-[8px] font-semibold tracking-[0.16em] text-[var(--text-primary)]">{event.summary}</span>
-                    <span className={`rounded-full border px-1.5 py-0.5 text-[5px] font-mono tracking-[0.16em] ${event.severity === 'storm' ? 'border-[#FF3D3D]/40 text-[#FF3D3D]' : event.severity === 'watch' ? 'border-[#FFB020]/40 text-[#FFB020]' : 'border-white/10 text-[var(--text-muted)]'}`}>
-                      {event.family}
-                    </span>
-                  </div>
-                  <div className="mt-1 flex items-center justify-between text-[6px] font-mono tracking-[0.12em] text-white/45">
-                    <span>{event.label}</span>
-                    <span>{formatNeoTime(event.time)}</span>
-                    <span>{event.severity.toUpperCase()}</span>
-                  </div>
-                </>
-              ) : (
-                <div className="h-8 animate-pulse rounded-lg bg-white/[0.035]" />
-              )}
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-3 text-[6px] font-mono leading-4 tracking-[0.16em] text-white/35">
-          Live/cached NASA DONKI feed: CME, flares, geomagnetic storms, shocks, magnetopause and SEP events.
-        </div>
-      </div>
-    </motion.div>
-  );
-}
-
-function NasaObservatoryLayer({ body }: { body: CelestialBody }) {
-  return (
-    <>
-      <div className="absolute inset-0 opacity-60 [mask-image:radial-gradient(circle_at_center,black_0%,black_64%,transparent_100%)]">
-        <div
-          aria-hidden="true"
-          className="absolute inset-0"
-          style={{
-            backgroundImage:
-              'radial-gradient(circle, rgba(255,255,255,0.72) 0 1px, transparent 1.8px), radial-gradient(circle, rgba(118,228,234,0.46) 0 1px, transparent 2px), radial-gradient(circle, rgba(183,200,177,0.36) 0 1px, transparent 2.2px)',
-            backgroundSize: '118px 118px, 173px 173px, 241px 241px',
-            backgroundPosition: '0 0, 44px 38px, 96px 74px',
-          }}
-        />
-      </div>
-
-      {STAR_CATALOG_POINTS.map((star) => (
-        <div
-          key={star.label}
-          className="absolute hidden items-center gap-1.5 md:flex"
-          style={{ left: star.left, top: star.top }}
-        >
-          <span
-            className="rounded-full bg-white shadow-[0_0_12px_rgba(255,255,255,0.75)]"
-            style={{ width: star.size * 2.5, height: star.size * 2.5 }}
-          />
-          <span className="text-[6px] font-mono tracking-[0.24em] text-white/38">{star.label}</span>
-        </div>
-      ))}
-
-      <div className="absolute inset-0 hidden lg:block opacity-50">
-        <div className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-gradient-to-b from-transparent via-[rgba(118,228,234,0.20)] to-transparent" />
-        <div className="absolute left-0 top-1/2 h-px w-full -translate-y-1/2 bg-gradient-to-r from-transparent via-[rgba(118,228,234,0.16)] to-transparent" />
-        <div className="absolute left-1/2 top-1/2 h-[min(84vh,760px)] w-[min(84vh,760px)] -translate-x-1/2 -translate-y-1/2 rounded-full border border-[rgba(118,228,234,0.08)]" />
-      </div>
-
-      {DSN_STATIONS.map((station) => (
-        <div
-          key={station.label}
-          className="absolute hidden items-center gap-2 rounded-full border border-[rgba(118,228,234,0.18)] bg-[rgba(4,12,24,0.58)] px-2.5 py-1 text-[6px] font-mono tracking-[0.22em] text-[var(--cyan-primary)] backdrop-blur-md lg:flex"
-          style={{ left: station.left, top: station.top }}
-        >
-          <span className="h-1.5 w-1.5 rounded-full" style={{ background: body.accent, boxShadow: `0 0 10px ${body.accent}` }} />
-          {station.label}
-        </div>
-      ))}
-
-      <motion.div
-        aria-hidden="true"
-        className="absolute left-1/2 top-1/2 h-[min(114vh,1040px)] w-[min(114vh,1040px)] -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed"
-        style={{ borderColor: body.orbitTint }}
-        animate={{ rotate: 360 }}
-        transition={{ repeat: Infinity, duration: 180, ease: 'linear' }}
-      >
-        {Array.from({ length: 18 }).map((_, index) => (
-          <span
-            key={`belt-${index}`}
-            className="absolute h-1 w-1 rounded-full bg-white/55 shadow-[0_0_8px_rgba(255,255,255,0.44)]"
-            style={{
-              left: `${50 + Math.cos((index / 18) * Math.PI * 2) * 49}%`,
-              top: `${50 + Math.sin((index / 18) * Math.PI * 2) * 49}%`,
-              opacity: index % 3 === 0 ? 0.88 : 0.45,
-            }}
-          />
-        ))}
-      </motion.div>
-
-      {METEOR_TRACKS.map((track, index) => (
-        <motion.div
-          key={`meteor-${index}`}
-          aria-hidden="true"
-          className="absolute h-[2px] origin-right rounded-full"
-          style={{
-            left: track.left,
-            top: track.top,
-            width: track.width,
-            rotate: `${track.rotate}deg`,
-            background: `linear-gradient(90deg, transparent, rgba(255,255,255,0.88), ${body.accent})`,
-            boxShadow: `0 0 18px ${body.glow}`,
-          }}
-          animate={{ x: [0, 36, 0], y: [0, -14, 0], opacity: [0, 0.95, 0] }}
-          transition={{ repeat: Infinity, duration: 5.8, delay: track.delay, ease: 'easeInOut' }}
-        />
-      ))}
-
-    </>
-  );
-}
-
 export default function SolarSystemMode({
   selected,
   onSelect,
@@ -1209,46 +790,6 @@ export default function SolarSystemMode({
   const [planetZoom, setPlanetZoom] = useState(1);
   const [autoRotate, setAutoRotate] = useState(true);
   const [viewResetKey, setViewResetKey] = useState(0);
-  const [neoFeed, setNeoFeed] = useState<NasaNeoFeed | null>(null);
-  const [donkiFeed, setDonkiFeed] = useState<DonkiThreatFeed | null>(null);
-
-  useEffect(() => {
-    if (!enabled || isEarth) return undefined;
-
-    let cancelled = false;
-    const controller = new AbortController();
-
-    const loadNasaFeeds = async () => {
-      const loadJson = async <T,>(path: string): Promise<T | null> => {
-        const res = await fetch(path, { signal: controller.signal });
-        if (!res.ok) return null;
-        return await res.json() as T;
-      };
-
-      try {
-        const [neoPayload, donkiPayload] = await Promise.all([
-          loadJson<NasaNeoFeed>('/api/nasa/neo'),
-          loadJson<DonkiThreatFeed>('/api/nasa/donki'),
-        ]);
-        if (cancelled) return;
-        if (neoPayload) setNeoFeed(neoPayload);
-        if (donkiPayload) setDonkiFeed(donkiPayload);
-      } catch (error) {
-        if (!cancelled && error instanceof Error && error.name !== 'AbortError') {
-          console.warn('[AEGIS] NASA live feeds suppressed error:', error.message);
-        }
-      }
-    };
-
-    void loadNasaFeeds();
-    const interval = window.setInterval(loadNasaFeeds, 1800000);
-
-    return () => {
-      cancelled = true;
-      controller.abort();
-      window.clearInterval(interval);
-    };
-  }, [enabled, isEarth]);
 
   useEffect(() => {
     if (!enabled || isEarth || !autoRotate) return undefined;
@@ -1286,42 +827,42 @@ export default function SolarSystemMode({
     telemetry: [string, string, string];
   }> = {
     moon: {
-      heroWrap: 'left-1/2 top-[43%]',
+      heroWrap: 'left-1/2 top-[48%]',
       heroMotion: { x: 0, y: 20, scale: 1 },
       leftPanel: 'CRATER DENSITY\nPOLAR SHADOWS\nLOW-ALBEDO RIMS',
       rightPanel: 'LUNA ARC\nPASSIVE SURVEY\nTERMINATOR LOCK',
       telemetry: ['REGOLITH', 'SHADOW MAP', 'ORBITAL SILENCE'],
     },
     mars: {
-      heroWrap: 'left-1/2 top-[43%]',
+      heroWrap: 'left-1/2 top-[48%]',
       heroMotion: { x: 0, y: 20, scale: 1 },
       leftPanel: 'DUST FRONTS\nRIDGE SCARPS\nTHERMAL BASINS',
       rightPanel: 'ARES ARC\nLOW-ORBIT PASS\nSURFACE RECON',
       telemetry: ['OXIDE BELT', 'DRY SKY', 'THIN AIR'],
     },
     venus: {
-      heroWrap: 'left-1/2 top-[43%]',
+      heroWrap: 'left-1/2 top-[48%]',
       heroMotion: { x: 0, y: 20, scale: 1 },
       leftPanel: 'ACID CLOUDS\nHEAT BLOOM\nOPAQUE SHELL',
       rightPanel: 'APHRODITE ARC\nDENSE HAZE\nVISUAL BLIND',
       telemetry: ['SULFUR HAZE', 'HEAT PRESSURE', 'LOW VIS'],
     },
     jupiter: {
-      heroWrap: 'left-1/2 top-[43%]',
+      heroWrap: 'left-1/2 top-[48%]',
       heroMotion: { x: 0, y: 20, scale: 1 },
       leftPanel: 'BAND SHEAR\nRED STORM\nHIGH-VEL BELTS',
       rightPanel: 'JOVIAN ARC\nGAS TORQUE\nMAGNETIC NOISE',
       telemetry: ['RED SPOT', 'SHEAR BELTS', 'HEAVY GAS'],
     },
     saturn: {
-      heroWrap: 'left-1/2 top-[43%]',
+      heroWrap: 'left-1/2 top-[48%]',
       heroMotion: { x: 0, y: 20, scale: 1 },
       leftPanel: 'RING PLANE\nSHEPHERD GAPS\nSHADOW SWEEP',
       rightPanel: 'CRONOS ARC\nGAS LAYERS\nRING OBSERVER',
       telemetry: ['RING SHADOW', 'ICE BELTS', 'PLANE LOCK'],
     },
     neptune: {
-      heroWrap: 'left-1/2 top-[43%]',
+      heroWrap: 'left-1/2 top-[48%]',
       heroMotion: { x: 0, y: 20, scale: 1 },
       leftPanel: 'ICE WINDS\nDEEP BLUE\nCOLD BELTS',
       rightPanel: 'NEP ARC\nOUTER REACH\nLOW-LIGHT VISTA',
@@ -1330,7 +871,6 @@ export default function SolarSystemMode({
   };
 
   const scene = !isEarth ? sceneConfigs[activeBody.id as Exclude<CelestialBodyId, 'earth'>] : null;
-  const observatoryProfile = !isEarth ? OBSERVATORY_PROFILES[activeBody.id as Exclude<CelestialBodyId, 'earth'>] : null;
 
   return (
     <>
@@ -1360,10 +900,6 @@ export default function SolarSystemMode({
 
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_16%,rgba(255,255,255,0.06),transparent_34%)]" />
             <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),transparent_14%,transparent_82%,rgba(255,255,255,0.02))]" />
-            {observatoryProfile && <NasaObservatoryLayer body={activeBody} />}
-            {observatoryProfile && <NasaMissionHeader body={activeBody} profile={observatoryProfile} />}
-            <NasaDonkiThreatPanel body={activeBody} feed={donkiFeed} />
-            <NasaLiveNeoPanel body={activeBody} feed={neoFeed} />
 
             {!isMobile && (
               <>
