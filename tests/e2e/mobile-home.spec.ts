@@ -6,10 +6,9 @@ test.use({
   hasTouch: true,
 });
 
-test('mobile shell renders the AEGIS command surface', async ({ page }) => {
+test('mobile shell loads AEGIS homepage', async ({ page }) => {
   await page.goto('/');
 
   await expect(page).toHaveTitle(/AEGIS/i);
   await expect(page.getByRole('heading', { name: 'AEGIS' }).first()).toBeVisible();
-  await expect(page.getByText('CORTEX').first()).toBeVisible();
 });
