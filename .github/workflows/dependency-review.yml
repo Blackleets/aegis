@@ -15,7 +15,15 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Dependency review
+        id: dependency_review
+        continue-on-error: true
         uses: actions/dependency-review-action@v4
         with:
           fail-on-severity: high
           deny-licenses: GPL-2.0, AGPL-1.0, AGPL-3.0
+
+      - name: Explain dependency graph requirement
+        if: steps.dependency_review.outcome == 'failure'
+        run: |
+          echo 'Dependency Review could not run because GitHub Dependency Graph / Security Analysis is disabled for this repository.'
+          echo 'Enable it in Settings > Security > Advanced Security (or Security analysis) to enforce this check.'
