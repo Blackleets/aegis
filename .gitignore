@@ -6,6 +6,9 @@
 
 # Testing
 /coverage
+/test-results/
+/.lighthouseci/
+/playwright-report/
 
 # Next.js
 /.next/

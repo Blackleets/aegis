@@ -8,7 +8,10 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
+    "perf:lighthouse": "lhci autorun --config=./lighthouserc.json"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
@@ -31,6 +34,8 @@
     "ws": "^8.21.0"
   },
   "devDependencies": {
+    "@lhci/cli": "^0.15.1",
+    "@playwright/test": "^1.61.1",
     "@tailwindcss/postcss": "^4",
     "@types/google-libphonenumber": "^7.4.30",
     "@types/node": "^20",
