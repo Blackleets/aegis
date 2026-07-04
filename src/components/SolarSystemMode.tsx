@@ -905,6 +905,7 @@ export default function SolarSystemMode({
             />
 
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_16%,rgba(255,255,255,0.06),transparent_34%)]" />
+            <div className="absolute left-1/2 top-[48%] h-[min(58vh,560px)] w-[min(58vh,560px)] -translate-x-1/2 -translate-y-1/2 rounded-full opacity-90 blur-3xl" style={{ background: `radial-gradient(circle, ${activeBody.glow} 0%, rgba(255,255,255,0.05) 32%, transparent 72%)` }} />
             <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),transparent_14%,transparent_82%,rgba(255,255,255,0.02))]" />
 
             {!isMobile && (
@@ -926,11 +927,11 @@ export default function SolarSystemMode({
               </>
             )}
 
-            <div className="absolute left-1/2 top-1/2 h-[min(76vh,820px)] w-[min(76vh,820px)] -translate-x-1/2 -translate-y-[51%] rounded-full border" style={{ borderColor: activeBody.orbitTint }} />
-            <div className="absolute left-1/2 top-1/2 h-[min(96vh,1020px)] w-[min(96vh,1020px)] -translate-x-1/2 -translate-y-[51%] rounded-full border border-white/[0.02]" />
+            <div className="absolute left-1/2 top-1/2 h-[min(82vh,900px)] w-[min(82vh,900px)] -translate-x-1/2 -translate-y-[51%] rounded-full border" style={{ borderColor: activeBody.orbitTint }} />
+            <div className="absolute left-1/2 top-1/2 h-[min(104vh,1100px)] w-[min(104vh,1100px)] -translate-x-1/2 -translate-y-[51%] rounded-full border border-white/[0.02]" />
 
             <div className={`absolute ${scene.heroWrap} flex -translate-x-1/2 -translate-y-1/2 items-center justify-center pointer-events-none`}>
-              <div className="relative h-[min(76vh,720px)] w-[min(76vw,820px)] max-w-[84vw]">
+              <div className="relative h-[min(84vh,820px)] w-[min(84vw,900px)] max-w-[90vw]">
                 {!isMobile && <OrbitalSceneAccents body={activeBody} />}
                 <motion.div
                   initial={{ scale: 0.8, x: scene.heroMotion.x, y: scene.heroMotion.y, opacity: 0 }}

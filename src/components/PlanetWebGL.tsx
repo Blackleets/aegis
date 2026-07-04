@@ -239,13 +239,19 @@ function PlanetMesh({
   const scale = useMemo(() => {
     switch (body.id) {
       case 'jupiter':
-        return 1.08;
+        return 1.16;
       case 'saturn':
-        return 1.05;
+        return 1.12;
       case 'moon':
-        return 0.9;
+        return 0.94;
+      case 'mars':
+        return 1.04;
+      case 'venus':
+        return 1.03;
+      case 'neptune':
+        return 1.06;
       default:
-        return 1;
+        return 1.02;
     }
   }, [body.id]);
 
@@ -432,30 +438,32 @@ export function PlanetWebGL({
   return (
     <motion.div
       key={`${body.id}-${resetKey}`}
-      className="relative z-10 h-[min(44vh,500px)] w-[min(44vh,500px)] max-h-[62vw] max-w-[62vw] shrink-0 overflow-hidden rounded-full cursor-grab pointer-events-auto active:cursor-grabbing md:max-h-none md:max-w-none"
+      className="relative z-10 h-[min(54vh,620px)] w-[min(54vh,620px)] max-h-[74vw] max-w-[74vw] shrink-0 overflow-hidden rounded-full cursor-grab pointer-events-auto active:cursor-grabbing md:max-h-none md:max-w-none"
       drag
       dragMomentum={false}
       dragElastic={0.12}
       dragConstraints={{ left: -220, right: 220, top: -120, bottom: 120 }}
-      style={{ scale: zoom, filter: `drop-shadow(0 0 72px ${body.glow})` }}
+      style={{ scale: zoom, filter: `drop-shadow(0 0 96px ${body.glow}) drop-shadow(0 0 42px rgba(255,255,255,0.08))` }}
       whileDrag={{ scale: zoom * 1.018 }}
       onDrag={(_event, info: PanInfo) => onRotateDrag?.(info.delta.x * 0.28)}
       onDoubleClick={() => onRotateDrag?.(-rotationOffset)}
       title="Drag to move and rotate planet."
     >
+      <div className="pointer-events-none absolute inset-[-10%] rounded-full bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.07),transparent_48%,rgba(74,144,255,0.08)_62%,transparent_76%)] blur-2xl" />
       <div className="pointer-events-none absolute inset-0 rounded-full bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.04),transparent_56%,rgba(2,7,18,0.36)_80%,rgba(2,7,18,0.82)_100%)]" />
       <Canvas
         className="absolute inset-0 h-full w-full"
         dpr={[1, 2]}
-        camera={{ position: [0, 0, 6.4], fov: 28 }}
+        camera={{ position: [0, 0, 5.35], fov: 24 }}
         gl={{ antialias: true, alpha: true }}
         shadows
       >
-        <ambientLight intensity={0.22} />
-        <hemisphereLight position={[0, 2.5, 0]} intensity={0.56} groundColor="#02040a" color="#dbeafe" />
-        <directionalLight position={[5.2, 2.8, 6.8]} intensity={2.65} color="#ffffff" />
-        <directionalLight position={[-5.2, -2.4, -4.5]} intensity={0.24} color="#4ea5ff" />
-        <pointLight position={[-2.8, 2.4, 3.2]} intensity={0.96} color={body.accent} />
+        <ambientLight intensity={0.34} />
+        <hemisphereLight position={[0, 2.5, 0]} intensity={0.74} groundColor="#02040a" color="#eef6ff" />
+        <directionalLight position={[5.6, 3.2, 7.1]} intensity={3.1} color="#ffffff" />
+        <directionalLight position={[-5.4, -2.5, -4.8]} intensity={0.34} color="#7db7ff" />
+        <pointLight position={[-2.8, 2.4, 3.2]} intensity={1.18} color={body.accent} />
+        <pointLight position={[2.6, -1.8, 4.2]} intensity={0.42} color="#ffffff" />
         <PlanetMesh body={body} rotationOffset={rotationOffset} autoRotate={autoRotate} />
       </Canvas>
       <div className="pointer-events-none absolute inset-0 rounded-full bg-[radial-gradient(circle_at_30%_28%,rgba(255,255,255,0.2),transparent_18%,transparent_100%)]" />
