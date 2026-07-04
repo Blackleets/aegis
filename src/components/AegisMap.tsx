@@ -54,6 +54,11 @@ interface AegisMapProps {
   mapStyle?: string;
   sweepData?: SweepData | null;
   scanTargets?: ScanTarget[];
+  currentLocation?: { lat: number; lng: number } | null;
+  routeDestination?: { lat: number; lng: number } | null;
+  routePath?: Coordinates[];
+  navigationActive?: boolean;
+  navigationBearing?: number | null;
 }
 
 function computeSolarTerminator(): [number, number][] {
@@ -80,6 +85,20 @@ const EMPTY_FC = { type: 'FeatureCollection' as const, features: [] };
 
 const GLOBE_OVERVIEW_ZOOM = 2.6;
 const GLOBE_DETAIL_ZOOM = 4.2;
+
+const OVERVIEW_ENTITY_LIMITS = {
+  cctv: 180,
+  weather: 90,
+  infrastructure: 120,
+  maritimePorts: 90,
+  maritimeChokepoints: 24,
+  maritimeShips: 180,
+  balloons: 80,
+  radiation: 80,
+  liveNews: 70,
+  sigintNews: 90,
+  sdkLinks: 12,
+} as const;
 
 const OVERVIEW_LABEL_LAYERS = [
   'eq-label',
@@ -203,15 +222,31 @@ function getFlightTrailCoordinates(f: MapEntity): Coordinates[] | null {
   ];
 }
 
-function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightClick, onViewStateChange, flyToLocation, projection = 'globe', mapStyle = 'dark', sweepData, scanTargets = [] }: AegisMapProps) {
+function takeTopEntities<T>(items: T[] | undefined, limit: number, score: (item: T) => number): T[] {
+  if (!Array.isArray(items) || items.length === 0) return [];
+  if (items.length <= limit) return items;
+  return [...items].sort((a, b) => score(b) - score(a)).slice(0, limit);
+}
+
+function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightClick, onViewStateChange, flyToLocation, projection = 'globe', mapStyle = 'dark', sweepData, scanTargets = [], currentLocation = null, routeDestination = null, routePath = [], navigationActive = false, navigationBearing = null }: AegisMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const popupRef = useRef<maplibregl.Popup | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const [adaptiveZoom, setAdaptiveZoom] = useState(projection === 'globe' ? 2.05 : 3.2);
   const prevStyleRef = useRef(mapStyle);
+  const initialProjectionRef = useRef(projection);
+  const initialMapStyleRef = useRef(mapStyle);
+  const lastAdaptiveZoomRef = useRef(projection === 'globe' ? 2.05 : 3.2);
+  const lastNavCameraUpdateRef = useRef(0);
+  const lastViewStateEmitRef = useRef(0);
+  const lastViewStateRef = useRef<{ zoom: number; latitude: number } | null>(null);
+  const lastNavCameraCenterRef = useRef<{ lat: number; lng: number } | null>(null);
+  const lastNavCameraBearingRef = useRef<number | null>(null);
+  const globeSpinPauseUntilRef = useRef(0);
+  const isOverviewMode = projection === 'globe' && adaptiveZoom <= GLOBE_OVERVIEW_ZOOM;
 
-  // Create aircraft icon on canvas (for WebGL symbol layer)
+
   const createIcon = useCallback((map: maplibregl.Map, id: string, color: string, size: number) => {
     if (map.hasImage(id)) return;
     const canvas = document.createElement('canvas');
@@ -256,10 +291,10 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       fogApi.setFog?.(
         isGlobe
           ? {
-              color: isDark ? 'rgba(16, 24, 34, 0.08)' : 'rgba(16, 24, 34, 0.12)',
-              'high-color': isDark ? 'rgba(40, 80, 120, 0.05)' : 'rgba(20, 30, 42, 0.06)',
-              'space-color': isDark ? 'rgba(3, 8, 16, 0.45)' : 'rgba(8, 12, 18, 0.52)',
-              'horizon-blend': 0.04,
+              color: isDark ? 'rgba(18, 28, 42, 0.12)' : 'rgba(16, 24, 34, 0.14)',
+              'high-color': isDark ? 'rgba(54, 112, 168, 0.12)' : 'rgba(28, 42, 56, 0.09)',
+              'space-color': isDark ? 'rgba(2, 6, 14, 0.62)' : 'rgba(8, 12, 18, 0.58)',
+              'horizon-blend': 0.08,
               'star-intensity': 0,
             }
           : {
@@ -277,12 +312,12 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       skyApi.setSky?.(
         isGlobe
           ? {
-              'sky-color': isDark ? '#07111d' : '#101923',
-              'sky-horizon-blend': isDark ? 0.12 : 0.03,
-              'horizon-color': isDark ? '#1a4264' : '#223244',
-              'horizon-fog-blend': isDark ? 0.08 : 0.04,
-              'fog-color': isDark ? '#0a1625' : '#182433',
-              'fog-ground-blend': isDark ? 0.12 : 0.18,
+              'sky-color': isDark ? '#06101a' : '#101923',
+              'sky-horizon-blend': isDark ? 0.18 : 0.05,
+              'horizon-color': isDark ? '#2a6f9f' : '#223244',
+              'horizon-fog-blend': isDark ? 0.14 : 0.05,
+              'fog-color': isDark ? '#091523' : '#182433',
+              'fog-ground-blend': isDark ? 0.18 : 0.18,
             }
           : {
               'sky-color': isDark ? '#07101a' : '#121d28',
@@ -296,10 +331,10 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
     if (map.getLayer('satellite-layer')) {
       try {
         map.setPaintProperty('satellite-layer', 'raster-opacity', isGlobe ? 1 : 0.82);
-        map.setPaintProperty('satellite-layer', 'raster-saturation', isGlobe ? 0.15 : 0);
-        map.setPaintProperty('satellite-layer', 'raster-contrast', isGlobe ? 0.1 : 0);
-        map.setPaintProperty('satellite-layer', 'raster-brightness-min', isGlobe ? 0.2 : 0);
-        map.setPaintProperty('satellite-layer', 'raster-brightness-max', isGlobe ? 1 : 1);
+        map.setPaintProperty('satellite-layer', 'raster-saturation', isGlobe ? 0.22 : 0);
+        map.setPaintProperty('satellite-layer', 'raster-contrast', isGlobe ? 0.14 : 0);
+        map.setPaintProperty('satellite-layer', 'raster-brightness-min', isGlobe ? 0.16 : 0);
+        map.setPaintProperty('satellite-layer', 'raster-brightness-max', isGlobe ? 1.04 : 1);
       } catch {}
     }
 
@@ -318,21 +353,21 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       container: containerRef.current,
       style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
       center: [0, 20],
-      zoom: projection === 'globe' ? 2.05 : 3.2,
+      zoom: initialProjectionRef.current === 'globe' ? 2.05 : 3.2,
       minZoom: 1.5,
       maxZoom: 18,
-      pitch: projection === 'globe' ? 14 : 0,
+      pitch: initialProjectionRef.current === 'globe' ? 14 : 0,
       attributionControl: false,
     });
 
     map.on('load', () => {
       mapRef.current = map;
       try {
-        (map as maplibregl.Map & { setProjection?: (projection: { type: 'mercator' | 'globe' }) => void }).setProjection({ type: projection });
+        (map as maplibregl.Map & { setProjection?: (projection: { type: 'mercator' | 'globe' }) => void }).setProjection({ type: initialProjectionRef.current });
       } catch {}
 
-      applyAegisGlobeStyling(map, projection, mapStyle);
-      // Create icons
+      applyAegisGlobeStyling(map, initialProjectionRef.current, initialMapStyleRef.current);
+
       createIcon(map, 'plane-cyan', '#00E5FF', 24);
       createIcon(map, 'plane-green', '#00E676', 24);
       createIcon(map, 'plane-pink', '#FF69B4', 24);
@@ -346,8 +381,9 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       createDot(map, 'dot-cctv', '#39FF14', 10);
 
       // Sources
-      const sources = ['flights','military','jets','private-fl','flight-trails','military-trails','jet-trails','private-trails','satellites','earthquakes','gdelt','gdelt-hotspots','gps-jamming','day-night','cctv','fires','weather','infrastructure','maritime','maritime-choke','maritime-ships','live-news','sigint-news','conflict-zones', 'war-alerts-targets', 'war-alerts-lines', 'balloons', 'radiation', 'ip-sweep-devices', 'ip-sweep-pulse', 'ip-sweep-connections', 'scan-targets', 'sdk-entities', 'sdk-links'];
+      const sources = ['flights','military','jets','private-fl','flight-trails','military-trails','jet-trails','private-trails','satellites','earthquakes','gdelt','gdelt-hotspots','gps-jamming','day-night','cctv','fires','weather','infrastructure','maritime','maritime-choke','maritime-ships','live-news','sigint-news','conflict-zones', 'war-alerts-targets', 'war-alerts-lines', 'balloons', 'radiation', 'ip-sweep-devices', 'ip-sweep-pulse', 'ip-sweep-connections', 'scan-targets', 'sdk-entities', 'sdk-links', 'user-route', 'route-markers'];
       sources.forEach(s => map.addSource(s, { type: 'geojson', data: EMPTY_FC }));
+
 
       // Warning icon generator (parameterized — eliminates 3x copy-paste)
       const createWarningIcon = (id: string, color: string) => {
@@ -390,13 +426,87 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       // Day/Night
       map.addLayer({ id: 'day-night-fill', type: 'fill', source: 'day-night', paint: { 'fill-color': '#000022', 'fill-opacity': 0.35 }});
 
+
+      // User route overlay (additive only — high contrast, does not affect Earth logic)
+      map.addLayer({ id: 'user-route-glow', type: 'line', source: 'user-route', paint: {
+        'line-color': ['match', ['get', 'mode'], 'follow', '#67E8F9', '#22D3EE'],
+        'line-width': ['interpolate', ['linear'], ['zoom'], 2, 8, 5, 12, 10, 18, 15, 22],
+        'line-opacity': ['interpolate', ['linear'], ['zoom'], 2, 0.24, 8, 0.18],
+        'line-blur': 1.1,
+      }});
+      map.addLayer({ id: 'user-route-casing', type: 'line', source: 'user-route', paint: {
+        'line-color': 'rgba(2, 7, 18, 0.94)',
+        'line-width': ['interpolate', ['linear'], ['zoom'], 2, 5.2, 5, 7.2, 10, 10.4, 15, 13],
+        'line-opacity': 0.78,
+        'line-blur': 0.05,
+      }});
+      map.addLayer({ id: 'user-route-line', type: 'line', source: 'user-route', paint: {
+        'line-color': ['match', ['get', 'mode'], 'follow', '#F8FAFC', '#22D3EE'],
+        'line-width': ['interpolate', ['linear'], ['zoom'], 2, 2.9, 5, 4.5, 10, 6.8, 15, 8.5],
+        'line-opacity': 0.96,
+        'line-blur': 0,
+      }});
+      map.addLayer({
+        id: 'user-route-arrows',
+        type: 'symbol',
+        source: 'user-route',
+        minzoom: 3.2,
+        layout: {
+          'symbol-placement': 'line',
+          'text-field': '▶',
+          'text-size': ['interpolate', ['linear'], ['zoom'], 4, 12, 10, 16, 15, 20],
+          'symbol-spacing': ['interpolate', ['linear'], ['zoom'], 4, 58, 10, 72, 15, 92],
+          'text-keep-upright': false,
+          'text-allow-overlap': true,
+        },
+        paint: {
+          'text-color': '#ECFEFF',
+          'text-halo-color': 'rgba(2, 7, 18, 0.98)',
+          'text-halo-width': 1.4,
+          'text-opacity': ['interpolate', ['linear'], ['zoom'], 3.2, 0.45, 6, 0.92],
+        },
+      });
+      map.addLayer({ id: 'route-markers-glow', type: 'circle', source: 'route-markers', paint: {
+        'circle-radius': ['interpolate', ['linear'], ['zoom'], 2, 13, 6, 18, 10, 25, 15, 32],
+        'circle-color': ['match', ['get', 'role'], 'origin', '#34D399', '#F97316'],
+        'circle-opacity': 0.24,
+        'circle-blur': 0.95,
+      }});
+      map.addLayer({ id: 'route-markers-rings', type: 'circle', source: 'route-markers', paint: {
+        'circle-radius': ['interpolate', ['linear'], ['zoom'], 2, 7, 6, 10, 10, 14, 15, 18],
+        'circle-color': 'rgba(2, 7, 18, 0.18)',
+        'circle-opacity': 0.72,
+        'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 2, 1.5, 8, 2.5],
+        'circle-stroke-color': ['match', ['get', 'role'], 'origin', '#86EFAC', '#FDBA74'],
+        'circle-stroke-opacity': 0.92,
+      }});
+      map.addLayer({ id: 'route-markers-dots', type: 'circle', source: 'route-markers', paint: {
+        'circle-radius': ['interpolate', ['linear'], ['zoom'], 2, 4.5, 6, 6.5, 10, 9.5, 15, 12],
+        'circle-color': ['match', ['get', 'role'], 'origin', '#34D399', '#F97316'],
+        'circle-opacity': 1,
+        'circle-stroke-width': 2.4,
+        'circle-stroke-color': '#F8FAFC',
+        'circle-stroke-opacity': 0.84,
+      }});
+      map.addLayer({ id: 'route-markers-label', type: 'symbol', source: 'route-markers', minzoom: 3.4, layout: {
+        'text-field': ['get', 'label'],
+        'text-size': ['interpolate', ['linear'], ['zoom'], 3.4, 9, 8, 11, 14, 13],
+        'text-font': ['Open Sans Bold'],
+        'text-offset': [0, 1.9],
+        'text-allow-overlap': true,
+      }, paint: {
+        'text-color': ['match', ['get', 'role'], 'origin', '#BBF7D0', '#FED7AA'],
+        'text-halo-color': '#020712',
+        'text-halo-width': 1.7,
+      }});
+
       // Earthquakes
       map.addLayer({ id: 'eq-circles', type: 'circle', source: 'earthquakes', paint: {
         'circle-radius': ['interpolate',['linear'],['get','magnitude'], 2.5,4, 5,12, 7,24],
         'circle-color': ['interpolate',['linear'],['get','magnitude'], 2.5,'#FFD700', 4,'#FF9500', 6,'#FF1744'],
         'circle-opacity': 0.6, 'circle-blur': 0.3, 'circle-stroke-width': 1, 'circle-stroke-color': '#FFD700', 'circle-stroke-opacity': 0.3,
       }});
-      map.addLayer({ id: 'eq-label', type: 'symbol', source: 'earthquakes', minzoom: 3, filter: ['>=',['get','magnitude'],4.5], layout: {
+      map.addLayer({ id: 'eq-label', type: 'symbol', source: 'earthquakes', minzoom: 5, filter: ['>=',['get','magnitude'],4.5], layout: {
         'text-field': ['concat','M',['to-string',['get','magnitude']]], 'text-size': 9, 'text-font': ['Open Sans Regular'], 'text-offset': [0,1.5],
       }, paint: { 'text-color': '#FFD700', 'text-halo-color': '#000', 'text-halo-width': 1 }});
 
@@ -446,7 +556,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
         'circle-stroke-color': '#F8FAFC',
         'circle-stroke-opacity': 0.78,
       }});
-      map.addLayer({ id: 'gdelt-hotspot-label', type: 'symbol', source: 'gdelt-hotspots', minzoom: 2, layout: {
+      map.addLayer({ id: 'gdelt-hotspot-label', type: 'symbol', source: 'gdelt-hotspots', minzoom: 5.5, layout: {
         'text-field': ['concat', 'HOT ', ['to-string',['get','priorityRank']], ' • ', ['get','hotspotLabel']],
         'text-size': ['interpolate',['linear'],['zoom'], 2,9, 5,10, 8,12],
         'text-font': ['Open Sans Bold'],
@@ -462,7 +572,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
 
       // GPS Jamming
       map.addLayer({ id: 'jam-fill', type: 'circle', source: 'gps-jamming', paint: { 'circle-radius': 30, 'circle-color': '#FF0000', 'circle-opacity': 0.15, 'circle-blur': 1 }});
-      map.addLayer({ id: 'jam-label', type: 'symbol', source: 'gps-jamming', minzoom: 4, layout: {
+      map.addLayer({ id: 'jam-label', type: 'symbol', source: 'gps-jamming', minzoom: 5.5, layout: {
         'text-field': ['concat','GPS JAM ',['to-string',['get','severity']],'%'], 'text-size': 10, 'text-font': ['Open Sans Bold'], 'text-allow-overlap': true,
       }, paint: { 'text-color': '#FF4444', 'text-halo-color': '#000', 'text-halo-width': 1 }});
 
@@ -477,7 +587,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
         'circle-opacity': 0.8,
         'circle-stroke-width': 2, 'circle-stroke-color': '#E040FB', 'circle-stroke-opacity': 0.4,
       }});
-      map.addLayer({ id: 'weather-label', type: 'symbol', source: 'weather', minzoom: 4, layout: {
+      map.addLayer({ id: 'weather-label', type: 'symbol', source: 'weather', minzoom: 6, layout: {
         'text-field': ['get','title'], 'text-size': 9, 'text-font': ['Open Sans Regular'],
         'text-offset': [0, 2], 'text-max-width': 14, 'text-allow-overlap': false,
       }, paint: { 'text-color': '#E040FB', 'text-halo-color': '#000', 'text-halo-width': 1, 'text-opacity': 0.8 }});
@@ -499,7 +609,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
         'circle-opacity': 0.8,
         'circle-stroke-width': 2, 'circle-stroke-color': ['case', ['in', 'SEISMIC RISK', ['get', 'status']], '#FF9500', '#76FF03'], 'circle-stroke-opacity': 0.4,
       }});
-      map.addLayer({ id: 'infra-label', type: 'symbol', source: 'infrastructure', minzoom: 5, layout: {
+      map.addLayer({ id: 'infra-label', type: 'symbol', source: 'infrastructure', minzoom: 6.5, layout: {
         'text-field': ['get','name'], 'text-size': 9, 'text-font': ['Open Sans Regular'],
         'text-offset': [0, 2], 'text-max-width': 14, 'text-allow-overlap': false,
       }, paint: { 'text-color': ['case', ['in', 'SEISMIC RISK', ['get', 'status']], '#FF9500', '#76FF03'], 'text-halo-color': '#000', 'text-halo-width': 1, 'text-opacity': 0.7 }});
@@ -524,7 +634,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
         'circle-opacity': 0.85,
         'circle-stroke-width': 2, 'circle-stroke-color': ['match', ['get','type'], 'naval','#FF3D3D', 'energy','#FF9500', '#00BCD4'], 'circle-stroke-opacity': 0.4,
       }});
-      map.addLayer({ id: 'maritime-label', type: 'symbol', source: 'maritime', minzoom: 4, layout: {
+      map.addLayer({ id: 'maritime-label', type: 'symbol', source: 'maritime', minzoom: 6, layout: {
         'text-field': ['get','name'], 'text-size': 9, 'text-font': ['Open Sans Regular'],
         'text-offset': [0, 1.8], 'text-max-width': 12, 'text-allow-overlap': false,
       }, paint: { 'text-color': '#00BCD4', 'text-halo-color': '#000', 'text-halo-width': 1, 'text-opacity': 0.7 }});
@@ -540,7 +650,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
         'circle-opacity': 0.9,
         'circle-stroke-width': 2, 'circle-stroke-color': '#FF9500', 'circle-stroke-opacity': 0.5,
       }});
-      map.addLayer({ id: 'choke-label', type: 'symbol', source: 'maritime-choke', minzoom: 3, layout: {
+      map.addLayer({ id: 'choke-label', type: 'symbol', source: 'maritime-choke', minzoom: 5.5, layout: {
         'text-field': ['get','name'], 'text-size': 10, 'text-font': ['Open Sans Bold'],
         'text-offset': [0, 2], 'text-max-width': 14, 'text-allow-overlap': false,
       }, paint: { 'text-color': '#FF9500', 'text-halo-color': '#000', 'text-halo-width': 1, 'text-opacity': 0.9 }});
@@ -555,7 +665,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
         'circle-color': '#FF4081', 'circle-opacity': 0.85,
         'circle-stroke-width': 2, 'circle-stroke-color': '#FF4081', 'circle-stroke-opacity': 0.5,
       }});
-      map.addLayer({ id: 'news-label', type: 'symbol', source: 'live-news', minzoom: 4, layout: {
+      map.addLayer({ id: 'news-label', type: 'symbol', source: 'live-news', minzoom: 6, layout: {
         'text-field': ['get','name'], 'text-size': 9, 'text-font': ['Open Sans Regular'],
         'text-offset': [0, 1.8], 'text-max-width': 12, 'text-allow-overlap': false,
       }, paint: { 'text-color': '#FF4081', 'text-halo-color': '#000', 'text-halo-width': 1, 'text-opacity': 0.8 }});
@@ -627,8 +737,8 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
         map.addLayer({ id: l.id, type: 'line', source: l.src, paint: {
           'line-color': l.color,
           'line-width': ['interpolate',['linear'],['zoom'], 2.6,0.35, 5,0.75, 9,1.3],
-          'line-opacity': ['interpolate',['linear'],['zoom'], 2.6,0.12, 5,0.26, 9,0.42],
-          'line-blur': ['interpolate',['linear'],['zoom'], 2.6,0.2, 9,0.8],
+          'line-opacity': ['interpolate',['linear'],['zoom'], 2.6,0.08, 5,0.18, 9,0.28],
+          'line-blur': ['interpolate',['linear'],['zoom'], 2.6,0.08, 9,0.35],
         }});
       });
 
@@ -653,7 +763,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
         'circle-opacity': 0.8,
         'circle-stroke-width': 1, 'circle-stroke-color': '#fff', 'circle-stroke-opacity': 0.5,
       }});
-      map.addLayer({ id: 'balloon-label', type: 'symbol', source: 'balloons', minzoom: 4, layout: {
+      map.addLayer({ id: 'balloon-label', type: 'symbol', source: 'balloons', minzoom: 6, layout: {
         'text-field': ['get','callsign'], 'text-size': 9, 'text-font': ['Open Sans Regular'],
         'text-offset': [0, 1.2], 'text-max-width': 12, 'text-allow-overlap': false,
       }, paint: { 'text-color': ['get', 'color'], 'text-halo-color': '#000', 'text-halo-width': 1 }});
@@ -670,7 +780,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
         'circle-opacity': 0.9,
         'circle-stroke-width': 2, 'circle-stroke-color': ['match', ['get','status'], 'DANGER','#FF1744', 'WARNING','#FF9500', '#AB47BC'], 'circle-stroke-opacity': 0.4,
       }});
-      map.addLayer({ id: 'rad-label', type: 'symbol', source: 'radiation', minzoom: 5, layout: {
+      map.addLayer({ id: 'rad-label', type: 'symbol', source: 'radiation', minzoom: 6.5, layout: {
         'text-field': ['concat', ['to-string', ['get','reading']], ' nSv/h'], 'text-size': 9, 'text-font': ['Open Sans Bold'],
         'text-offset': [0, 1.5], 'text-allow-overlap': false,
       }, paint: { 'text-color': ['match', ['get','status'], 'DANGER','#FF1744', 'WARNING','#FF9500', '#AB47BC'], 'text-halo-color': '#000', 'text-halo-width': 1 }});
@@ -680,21 +790,21 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       // -- GLOW LAYERS --
       map.addLayer({ id: 'sdk-sea-glow', type: 'line', source: 'sdk-links', filter: ['==',['get','domain'],'SEA'], paint: {
         'line-color': '#4FC3F7',
-        'line-width': ['interpolate',['linear'],['zoom'], 1, 2, 5, 4, 10, 7],
-        'line-opacity': ['interpolate',['linear'],['zoom'], 1, 0.08, 5, 0.16, 10, 0.24],
-        'line-blur': 2,
+        'line-width': ['interpolate',['linear'],['zoom'], 1, 1.2, 5, 2.4, 10, 4.4],
+        'line-opacity': ['interpolate',['linear'],['zoom'], 1, 0.04, 5, 0.09, 10, 0.14],
+        'line-blur': 1.1,
       }});
       map.addLayer({ id: 'sdk-air-glow', type: 'line', source: 'sdk-links', filter: ['==',['get','domain'],'AIR'], paint: {
         'line-color': '#B3E5FC',
-        'line-width': ['interpolate',['linear'],['zoom'], 1, 1.5, 5, 3, 10, 5],
-        'line-opacity': ['interpolate',['linear'],['zoom'], 1, 0.06, 5, 0.1, 10, 0.14],
-        'line-blur': 1.5,
+        'line-width': ['interpolate',['linear'],['zoom'], 1, 0.9, 5, 1.8, 10, 3.2],
+        'line-opacity': ['interpolate',['linear'],['zoom'], 1, 0.03, 5, 0.07, 10, 0.1],
+        'line-blur': 0.9,
       }});
       map.addLayer({ id: 'sdk-intel-glow', type: 'line', source: 'sdk-links', filter: ['==',['get','domain'],'INTEL'], paint: {
         'line-color': '#81D4FA',
-        'line-width': ['interpolate',['linear'],['zoom'], 1, 1.25, 5, 2.5, 10, 4],
-        'line-opacity': ['interpolate',['linear'],['zoom'], 1, 0.05, 5, 0.08, 10, 0.12],
-        'line-blur': 1,
+        'line-width': ['interpolate',['linear'],['zoom'], 1, 0.75, 5, 1.6, 10, 2.8],
+        'line-opacity': ['interpolate',['linear'],['zoom'], 1, 0.03, 5, 0.06, 10, 0.09],
+        'line-blur': 0.7,
       }});
 
       // -- CORE LINES --
@@ -725,7 +835,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
         'circle-color': ['match', ['get','type'], 'military','#FF1744', 'tanker','#FF9500', 'cargo','#00BCD4', '#fff'],
         'circle-opacity': 0.8,
       }});
-      map.addLayer({ id: 'ship-label', type: 'symbol', source: 'maritime-ships', minzoom: 5, layout: {
+      map.addLayer({ id: 'ship-label', type: 'symbol', source: 'maritime-ships', minzoom: 6.5, layout: {
         'text-field': ['get','name'], 'text-size': 9, 'text-font': ['Open Sans Regular'],
         'text-offset': [0, 1.2], 'text-allow-overlap': false,
       }, paint: { 'text-color': ['match', ['get','type'], 'military','#FF1744', 'tanker','#FF9500', 'cargo','#00BCD4', '#fff'], 'text-halo-color': '#000', 'text-halo-width': 1 }});
@@ -746,15 +856,48 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       });
     });
     map.on('contextmenu', e => { e.preventDefault(); onRightClick?.({ lat: e.lngLat.lat, lng: e.lngLat.lng }); });
+    const syncAdaptiveZoom = () => {
+      const nextZoom = map.getZoom();
+      if (Math.abs(lastAdaptiveZoomRef.current - nextZoom) >= 0.08) {
+        lastAdaptiveZoomRef.current = nextZoom;
+        setAdaptiveZoom(nextZoom);
+      }
+      return nextZoom;
+    };
+
     map.on('moveend', () => {
       const c = map.getCenter();
-      const nextZoom = map.getZoom();
-      setAdaptiveZoom(nextZoom);
-      onViewStateChange?.({ zoom: nextZoom, latitude: c.lat });
+      const nextZoom = syncAdaptiveZoom();
+      const nextViewState = { zoom: nextZoom, latitude: c.lat };
+      const lastViewState = lastViewStateRef.current;
+      const now = Date.now();
+
+      if (
+        lastViewState
+        && Math.abs(lastViewState.zoom - nextViewState.zoom) < 0.04
+        && Math.abs(lastViewState.latitude - nextViewState.latitude) < 0.12
+        && now - lastViewStateEmitRef.current < 220
+      ) {
+        return;
+      }
+
+      lastViewStateEmitRef.current = now;
+      lastViewStateRef.current = nextViewState;
+      onViewStateChange?.(nextViewState);
     });
+
     map.on('zoomend', () => {
-      setAdaptiveZoom(map.getZoom());
+      syncAdaptiveZoom();
     });
+    const pauseGlobeSpin = () => {
+      globeSpinPauseUntilRef.current = Date.now() + 5000;
+    };
+    map.on('mousedown', pauseGlobeSpin);
+    map.on('touchstart', pauseGlobeSpin);
+    map.on('dragstart', pauseGlobeSpin);
+    map.on('rotatestart', pauseGlobeSpin);
+    map.on('pitchstart', pauseGlobeSpin);
+    map.on('zoomstart', pauseGlobeSpin);
 
     // ── POPUP HELPER ──
     const popup = (coords: Coordinates, html: string) => {
@@ -1169,10 +1312,12 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
 
     return () => {
       if (mouseFrame) window.cancelAnimationFrame(mouseFrame);
+      popupRef.current?.remove();
       map.remove();
       mapRef.current = null;
+      setMapReady(false);
     };
-  }, [applyAegisGlobeStyling, createDot, createIcon, mapStyle, onEntityClick, onMouseCoords, onRightClick, onViewStateChange, projection]);
+  }, [applyAegisGlobeStyling, createDot, createIcon, onEntityClick, onMouseCoords, onRightClick, onViewStateChange]);
 
   // Day/Night
   useEffect(() => {
@@ -1339,8 +1484,11 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
 
   useEffect(() => {
     if (!mapReady) return;
-    setGeo('cctv', activeLayers.cctv && data.cameras ? data.cameras.map((c: MapEntity) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [c.lng, c.lat] }, properties: { id: c.id, name: c.name, city: c.city, country: c.country, source: c.source, feed_url: c.feed_url, stream_url: c.stream_url, stream_type: c.stream_type, external_url: c.external_url } })) : []);
-  }, [mapReady, data.cameras, activeLayers.cctv, setGeo]);
+    const cameras = isOverviewMode
+      ? takeTopEntities(data.cameras, OVERVIEW_ENTITY_LIMITS.cctv, (c: MapEntity) => Number(c.priority ?? c.rank ?? 0))
+      : (data.cameras || []);
+    setGeo('cctv', activeLayers.cctv && cameras ? cameras.map((c: MapEntity) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [c.lng, c.lat] }, properties: { id: c.id, name: c.name, city: c.city, country: c.country, source: c.source, feed_url: c.feed_url, stream_url: c.stream_url, stream_type: c.stream_type, external_url: c.external_url } })) : []);
+  }, [mapReady, data.cameras, activeLayers.cctv, isOverviewMode, setGeo]);
 
   useEffect(() => {
     if (!mapReady) return;
@@ -1349,30 +1497,54 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
 
   useEffect(() => {
     if (!mapReady) return;
-    setGeo('weather', activeLayers.weather && data.weather_events ? data.weather_events.map((w: MapEntity) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [w.lng, w.lat] }, properties: { title: w.title, type: w.type, icon: w.icon, severity: w.severity, source: w.source, id: w.id } })) : []);
-  }, [mapReady, data.weather_events, activeLayers.weather, setGeo]);
+    const weatherEvents = isOverviewMode
+      ? takeTopEntities(data.weather_events, OVERVIEW_ENTITY_LIMITS.weather, (w: MapEntity) => getSeverityWeight(w.severity))
+      : (data.weather_events || []);
+    setGeo('weather', activeLayers.weather && weatherEvents ? weatherEvents.map((w: MapEntity) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [w.lng, w.lat] }, properties: { title: w.title, type: w.type, icon: w.icon, severity: w.severity, source: w.source, id: w.id } })) : []);
+  }, [mapReady, data.weather_events, activeLayers.weather, isOverviewMode, setGeo]);
 
   useEffect(() => {
     if (!mapReady) return;
-    setGeo('infrastructure', activeLayers.infrastructure && data.infrastructure ? data.infrastructure.map((i: MapEntity) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [i.lng, i.lat] }, properties: { name: i.name, city: i.city, country: i.country, status: i.status, reactors: i.reactors, capacityMW: i.capacityMW, owner: i.owner } })) : []);
-  }, [mapReady, data.infrastructure, activeLayers.infrastructure, setGeo]);
+    const infrastructureItems = isOverviewMode
+      ? takeTopEntities(data.infrastructure, OVERVIEW_ENTITY_LIMITS.infrastructure, (i: MapEntity) => Number(i.capacityMW ?? 0) + (Number(i.reactors ?? 0) * 2000))
+      : (data.infrastructure || []);
+    setGeo('infrastructure', activeLayers.infrastructure && infrastructureItems ? infrastructureItems.map((i: MapEntity) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [i.lng, i.lat] }, properties: { name: i.name, city: i.city, country: i.country, status: i.status, reactors: i.reactors, capacityMW: i.capacityMW, owner: i.owner } })) : []);
+  }, [mapReady, data.infrastructure, activeLayers.infrastructure, isOverviewMode, setGeo]);
 
   useEffect(() => {
     if (!mapReady) return;
-    setGeo('maritime', activeLayers.maritime && data.maritime_ports ? data.maritime_ports.map((p: MapEntity) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [p.lng, p.lat] }, properties: { name: p.name, country: p.country, type: p.type, volume: p.volume, fleet: p.fleet, rank: p.rank } })) : []);
-    setGeo('maritime-choke', activeLayers.maritime && data.maritime_chokepoints ? data.maritime_chokepoints.map((c: MapEntity) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [c.lng, c.lat] }, properties: { name: c.name, traffic: c.traffic, risk: c.risk } })) : []);
-    setGeo('maritime-ships', activeLayers.maritime && data.maritime_ships ? data.maritime_ships.map((s: MapEntity) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [s.lng, s.lat] }, properties: { name: s.name || s.mmsi?.toString(), type: s.type || 'cargo', speed: s.speed, heading: s.heading, destination: s.destination, flag: s.flag } })) : []);
-  }, [mapReady, data.maritime_ports, data.maritime_chokepoints, data.maritime_ships, activeLayers.maritime, setGeo]);
+    const ports = isOverviewMode
+      ? takeTopEntities(data.maritime_ports, OVERVIEW_ENTITY_LIMITS.maritimePorts, (p: MapEntity) => Number(p.rank ?? p.volume ?? 0))
+      : (data.maritime_ports || []);
+    const chokepoints = isOverviewMode
+      ? takeTopEntities(data.maritime_chokepoints, OVERVIEW_ENTITY_LIMITS.maritimeChokepoints, (c: MapEntity) => getSeverityWeight(c.risk))
+      : (data.maritime_chokepoints || []);
+    const ships = isOverviewMode
+      ? takeTopEntities(data.maritime_ships, OVERVIEW_ENTITY_LIMITS.maritimeShips, (s: MapEntity) => {
+          const typeWeight = String(s.type || '').toLowerCase() === 'military' ? 300 : String(s.type || '').toLowerCase() === 'tanker' ? 180 : 90;
+          return typeWeight + Number(s.speed ?? 0);
+        })
+      : (data.maritime_ships || []);
+    setGeo('maritime', activeLayers.maritime && ports ? ports.map((p: MapEntity) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [p.lng, p.lat] }, properties: { name: p.name, country: p.country, type: p.type, volume: p.volume, fleet: p.fleet, rank: p.rank } })) : []);
+    setGeo('maritime-choke', activeLayers.maritime && chokepoints ? chokepoints.map((c: MapEntity) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [c.lng, c.lat] }, properties: { name: c.name, traffic: c.traffic, risk: c.risk } })) : []);
+    setGeo('maritime-ships', activeLayers.maritime && ships ? ships.map((s: MapEntity) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [s.lng, s.lat] }, properties: { name: s.name || s.mmsi?.toString(), type: s.type || 'cargo', speed: s.speed, heading: s.heading, destination: s.destination, flag: s.flag } })) : []);
+  }, [mapReady, data.maritime_ports, data.maritime_chokepoints, data.maritime_ships, activeLayers.maritime, isOverviewMode, setGeo]);
 
   useEffect(() => {
     if (!mapReady) return;
-    setGeo('balloons', activeLayers.balloons && data.balloons ? data.balloons.map((b: MapEntity) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [b.lng, b.lat] }, properties: { callsign: b.callsign, type: b.type, status: b.status, altitude: b.altitude, speed: b.speed, verticalRate: b.verticalRate, temperature: b.temperature, color: b.color } })) : []);
-  }, [mapReady, data.balloons, activeLayers.balloons, setGeo]);
+    const balloons = isOverviewMode
+      ? takeTopEntities(data.balloons, OVERVIEW_ENTITY_LIMITS.balloons, (b: MapEntity) => Number(b.altitude ?? 0) + Number(b.speed ?? 0))
+      : (data.balloons || []);
+    setGeo('balloons', activeLayers.balloons && balloons ? balloons.map((b: MapEntity) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [b.lng, b.lat] }, properties: { callsign: b.callsign, type: b.type, status: b.status, altitude: b.altitude, speed: b.speed, verticalRate: b.verticalRate, temperature: b.temperature, color: b.color } })) : []);
+  }, [mapReady, data.balloons, activeLayers.balloons, isOverviewMode, setGeo]);
 
   useEffect(() => {
     if (!mapReady) return;
-    setGeo('radiation', activeLayers.radiation && data.radiation ? data.radiation.map((r: MapEntity) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [r.lng, r.lat] }, properties: { name: r.name, city: r.city, country: r.country, reading: r.reading, status: r.status, network: r.network } })) : []);
-  }, [mapReady, data.radiation, activeLayers.radiation, setGeo]);
+    const radiationStations = isOverviewMode
+      ? takeTopEntities(data.radiation, OVERVIEW_ENTITY_LIMITS.radiation, (r: MapEntity) => Number(r.reading ?? 0) + getSeverityWeight(r.status))
+      : (data.radiation || []);
+    setGeo('radiation', activeLayers.radiation && radiationStations ? radiationStations.map((r: MapEntity) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [r.lng, r.lat] }, properties: { name: r.name, city: r.city, country: r.country, reading: r.reading, status: r.status, network: r.network } })) : []);
+  }, [mapReady, data.radiation, activeLayers.radiation, isOverviewMode, setGeo]);
 
   // ══ AEGIS SDK — Lattice Sensor Mesh ══
   // Multi-waypoint routes tracing real-world shipping lanes, air corridors, and intel lines
@@ -1639,17 +1811,22 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       [127.6,26.2], [123.0,24.0], [118.0,20.0], [114.0,15.0], [112.0,10.0]
     ], { fromName:'Okinawa', toName:'South China Sea', domain:'INTEL', source:'Naval Intelligence', url:'https://www.odni.gov' }));
 
-    setGeo('sdk-links', links);
-  }, [mapReady, activeLayers.sdk_stream, setGeo]);
+    setGeo('sdk-links', isOverviewMode ? links.slice(0, OVERVIEW_ENTITY_LIMITS.sdkLinks) : links);
+  }, [mapReady, activeLayers.sdk_stream, isOverviewMode, setGeo]);
 
   useEffect(() => {
     if (!mapReady) return;
-    setGeo('live-news', activeLayers.live_news && data.live_feeds ? data.live_feeds.map((f: MapEntity) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [f.lng, f.lat] }, properties: { name: f.name, city: f.city, country: f.country, url: f.url, category: f.category, embed_allowed: f.embed_allowed !== false } })) : []);
-  }, [mapReady, data.live_feeds, activeLayers.live_news, setGeo]);
+    const liveFeeds = isOverviewMode
+      ? takeTopEntities(data.live_feeds, OVERVIEW_ENTITY_LIMITS.liveNews, (f: MapEntity) => Number(f.priority ?? f.rank ?? f.score ?? 0))
+      : (data.live_feeds || []);
+    setGeo('live-news', activeLayers.live_news && liveFeeds ? liveFeeds.map((f: MapEntity) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [f.lng, f.lat] }, properties: { name: f.name, city: f.city, country: f.country, url: f.url, category: f.category, embed_allowed: f.embed_allowed !== false } })) : []);
+  }, [mapReady, data.live_feeds, activeLayers.live_news, isOverviewMode, setGeo]);
 
   useEffect(() => {
     if (!mapReady) return;
-    const items = data.news || [];
+    const items = isOverviewMode
+      ? takeTopEntities(data.news, OVERVIEW_ENTITY_LIMITS.sigintNews, (n: MapEntity) => Number(n.risk_score ?? 0) + getRecencyWeight(n.published_at ?? n.date))
+      : (data.news || []);
     setGeo('sigint-news', activeLayers.news_intel && items.length > 0
       ? items.filter((n: MapEntity) => n.coords?.length === 2).map((n: MapEntity) => ({
           type: 'Feature',
@@ -1657,7 +1834,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
           properties: { title: n.title, source: n.source, risk_score: n.risk_score, link: n.link }
         }))
       : []);
-  }, [mapReady, data.news, activeLayers.news_intel, setGeo]);
+  }, [mapReady, data.news, activeLayers.news_intel, isOverviewMode, setGeo]);
 
   useEffect(() => {
     if (!mapReady) return;
@@ -1808,11 +1985,117 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
     if (src) src.setData({ type: 'FeatureCollection', features });
   }, [scanTargets, mapReady]);
 
+  useEffect(() => {
+    if (!mapReady || !mapRef.current) return;
+    const map = mapRef.current;
+    const routeSource = map.getSource('user-route') as maplibregl.GeoJSONSource;
+    const markerSource = map.getSource('route-markers') as maplibregl.GeoJSONSource;
+
+    if (routeSource) {
+      routeSource.setData({
+        type: 'FeatureCollection',
+        features: routePath.length >= 2
+          ? [{
+              type: 'Feature',
+              geometry: { type: 'LineString', coordinates: routePath },
+              properties: { label: 'AEGIS VECTOR', mode: navigationActive ? 'follow' : 'ready' },
+            }]
+          : [],
+      });
+    }
+
+    if (markerSource) {
+      const markerFeatures: GeoJsonFeature[] = [];
+      if (currentLocation) {
+        markerFeatures.push({
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: [currentLocation.lng, currentLocation.lat] },
+          properties: { role: 'origin', label: 'FROM GPS' },
+        });
+      }
+      if (routeDestination) {
+        markerFeatures.push({
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: [routeDestination.lng, routeDestination.lat] },
+          properties: { role: 'destination', label: 'DEST' },
+        });
+      }
+      markerSource.setData({ type: 'FeatureCollection', features: markerFeatures });
+    }
+  }, [currentLocation, mapReady, navigationActive, routeDestination, routePath]);
+
+  useEffect(() => {
+    if (!mapReady || !mapRef.current || !currentLocation || !navigationActive) return;
+    const map = mapRef.current;
+    const now = Date.now();
+    const lastCenter = lastNavCameraCenterRef.current;
+    const nextBearing = navigationBearing ?? map.getBearing();
+    const lastBearing = lastNavCameraBearingRef.current;
+    const movementDelta = lastCenter
+      ? Math.abs(lastCenter.lat - currentLocation.lat) + Math.abs(lastCenter.lng - currentLocation.lng)
+      : Number.POSITIVE_INFINITY;
+    const bearingDelta = lastBearing === null
+      ? Number.POSITIVE_INFINITY
+      : Math.abs((((nextBearing - lastBearing) % 360) + 540) % 360 - 180);
+
+    if (movementDelta < 0.00025 && bearingDelta < 3) return;
+    if (movementDelta < 0.0009 && bearingDelta < 8 && now - lastNavCameraUpdateRef.current < 850) return;
+
+    lastNavCameraUpdateRef.current = now;
+    lastNavCameraCenterRef.current = currentLocation;
+    lastNavCameraBearingRef.current = nextBearing;
+
+    map.easeTo({
+      center: [currentLocation.lng, currentLocation.lat + 0.0035],
+      zoom: Math.max(map.getZoom(), 15.7),
+      pitch: 54,
+      bearing: nextBearing,
+      padding: { top: 108, bottom: 156, left: 64, right: 64 },
+      duration: 720,
+      essential: true,
+    });
+  }, [currentLocation, mapReady, navigationActive, navigationBearing]);
+
+  useEffect(() => {
+    if (!mapReady || !mapRef.current || projection !== 'globe' || navigationActive) return;
+
+    const map = mapRef.current;
+    let frame = 0;
+    let lastTime = performance.now();
+    const MAX_IDLE_SPIN_ZOOM = 2.4;
+
+    const spin = (timestamp: number) => {
+      if (!mapRef.current) return;
+      frame = window.requestAnimationFrame(spin);
+
+      if (
+        adaptiveZoom > MAX_IDLE_SPIN_ZOOM
+        || Date.now() < globeSpinPauseUntilRef.current
+        || map.isMoving()
+      ) {
+        lastTime = timestamp;
+        return;
+      }
+
+      const deltaMs = Math.max(0, timestamp - lastTime);
+      if (deltaMs < 32) return;
+      const deltaSeconds = deltaMs / 1000;
+      lastTime = timestamp;
+      if (deltaSeconds <= 0) return;
+
+      const center = map.getCenter();
+      map.jumpTo({ center: [normalizeLongitude(center.lng - deltaSeconds * 1.35), center.lat] });
+    };
+
+    frame = window.requestAnimationFrame(spin);
+    return () => window.cancelAnimationFrame(frame);
+  }, [adaptiveZoom, mapReady, navigationActive, projection]);
+
   // Fly-to
   useEffect(() => {
     if (!mapReady || !mapRef.current || !flyToLocation) return;
     const map = mapRef.current;
-    const targetZoom = flyToLocation.zoom ?? (projection === 'globe' ? 6.5 : 10);
+    const targetZoom = flyToLocation.zoom ?? (projection === 'globe' ? 7.2 : 10);
 
     if (flyToLocation.bbox) {
       const [west, south, east, north] = flyToLocation.bbox;
@@ -1830,8 +2113,8 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
     map.flyTo({
       center: [flyToLocation.lng, flyToLocation.lat],
       zoom: targetZoom,
-      pitch: projection === 'globe' ? 22 : 0,
-      duration: 2000,
+      pitch: projection === 'globe' ? 42 : 0,
+      duration: 2400,
       essential: true,
     });
   }, [mapReady, flyToLocation, projection]);
@@ -1844,14 +2127,16 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       (map as maplibregl.Map & { setProjection?: (projection: { type: 'mercator' | 'globe' }) => void }).setProjection({ type: projection });
       applyAegisGlobeStyling(map, projection, mapStyle);
       if (projection === 'globe') {
-        map.easeTo({ center: [0, 20], zoom: Math.min(map.getZoom(), 2.05), pitch: 14, duration: 1200 });
+        if (!navigationActive && !currentLocation) {
+          map.easeTo({ center: [0, 31], zoom: Math.min(map.getZoom(), 1.82), pitch: 12, duration: 1200 });
+        }
       } else {
         map.easeTo({ pitch: 0, duration: 800 });
       }
     } catch (e) {
       console.warn('Projection switch failed:', e);
     }
-  }, [applyAegisGlobeStyling, mapReady, projection, mapStyle]);
+  }, [applyAegisGlobeStyling, currentLocation, mapReady, projection, mapStyle, navigationActive]);
 
   // Satellite / globe presentation switching
   useEffect(() => {
@@ -1878,11 +2163,11 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
               type: 'raster',
               source: 'satellite-tiles',
               paint: {
-                'raster-opacity': projection === 'globe' ? 1 : 0.85,
-                'raster-saturation': projection === 'globe' ? 0.15 : 0,
-                'raster-contrast': projection === 'globe' ? 0.1 : 0,
-                'raster-brightness-min': projection === 'globe' ? 0.2 : 0,
-                'raster-brightness-max': projection === 'globe' ? 1 : 1,
+                'raster-opacity': 0.86,
+                'raster-saturation': 0.04,
+                'raster-contrast': 0.08,
+                'raster-brightness-min': 0.06,
+                'raster-brightness-max': 1.02,
               },
             },
             'day-night-fill',

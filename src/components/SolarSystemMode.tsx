@@ -535,6 +535,9 @@ function DesktopPlanetSlider({ selected, activeBody, onSelect, onReturnEarth, lo
             <div className="mt-1 text-[10px] font-semibold tracking-[0.22em] text-[var(--text-primary)]">
               {selected === 'earth' ? 'EARTH OPERATIONS ACTIVE' : `${activeBody.name.toUpperCase()} VISUAL VISTA`}
             </div>
+            <div className="mt-1 text-[7px] font-mono uppercase tracking-[0.18em] text-[var(--text-muted)]">
+              Click planets · drag surface · zoom vista
+            </div>
           </div>
           <button
             onClick={() => onSelect(getAdjacentBody(selected, 1))}
@@ -601,6 +604,9 @@ function MobilePlanetRail({
             <div className="text-[7px] font-mono tracking-[0.28em] text-[var(--text-secondary)]">{copy.solar.mode}</div>
             <div className="mt-1 text-[9px] font-semibold tracking-[0.16em] text-[var(--text-primary)]">
               {selected === 'earth' ? 'EARTH OPS' : `${activeBody.name.toUpperCase()} VISTA`}
+            </div>
+            <div className="mt-1 text-[6px] font-mono uppercase tracking-[0.16em] text-[var(--text-muted)]">
+              Swipe planets · drag globe
             </div>
           </div>
           <button
