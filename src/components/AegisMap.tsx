@@ -334,7 +334,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
         map.setPaintProperty('satellite-layer', 'raster-saturation', isGlobe ? 0.72 : 0.18);
         map.setPaintProperty('satellite-layer', 'raster-contrast', isGlobe ? 0.2 : 0.08);
         map.setPaintProperty('satellite-layer', 'raster-brightness-min', isGlobe ? 0.28 : 0.12);
-        map.setPaintProperty('satellite-layer', 'raster-brightness-max', isGlobe ? 1.22 : 1.08);
+        map.setPaintProperty('satellite-layer', 'raster-brightness-max', isGlobe ? 1 : 1);
       } catch {}
     }
 

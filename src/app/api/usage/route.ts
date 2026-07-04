@@ -12,6 +12,7 @@ type UsageStore = {
 };
 
 let writeQueue: Promise<UsageStore> = Promise.resolve({ totalUsers: 0, sessions: {} });
+let memoryStore: UsageStore = { totalUsers: 0, sessions: {} };
 
 async function ensureStoreFile() {
   await fs.mkdir(path.dirname(METRICS_PATH), { recursive: true });
@@ -22,17 +23,26 @@ async function ensureStoreFile() {
   }
 }
 
+function cloneStore(store: UsageStore): UsageStore {
+  return {
+    totalUsers: store.totalUsers,
+    sessions: { ...store.sessions },
+  };
+}
+
 async function readStore(): Promise<UsageStore> {
-  await ensureStoreFile();
   try {
+    await ensureStoreFile();
     const raw = await fs.readFile(METRICS_PATH, 'utf8');
     const parsed = JSON.parse(raw) as Partial<UsageStore>;
-    return {
+    const store = {
       totalUsers: typeof parsed.totalUsers === 'number' ? parsed.totalUsers : 0,
       sessions: parsed.sessions && typeof parsed.sessions === 'object' ? parsed.sessions : {},
     };
+    memoryStore = cloneStore(store);
+    return store;
   } catch {
-    return { totalUsers: 0, sessions: {} };
+    return cloneStore(memoryStore);
   }
 }
 
@@ -48,8 +58,13 @@ function pruneSessions(store: UsageStore, now: number) {
 }
 
 async function writeStore(store: UsageStore) {
-  await ensureStoreFile();
-  await fs.writeFile(METRICS_PATH, JSON.stringify(store, null, 2), 'utf8');
+  memoryStore = cloneStore(store);
+  try {
+    await ensureStoreFile();
+    await fs.writeFile(METRICS_PATH, JSON.stringify(store, null, 2), 'utf8');
+  } catch {
+    // Serverless/read-only fallback: keep the latest snapshot in memory for this runtime instance.
+  }
 }
 
 function toResponse(store: UsageStore, now: number) {
@@ -93,23 +108,26 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  let sessionId = '';
+
   try {
-    const body = (await req.json()) as { sessionId?: string };
-    const sessionId = typeof body.sessionId === 'string' ? body.sessionId.trim() : '';
-
-    if (!sessionId) {
-      return NextResponse.json({ error: 'sessionId is required' }, { status: 400 });
-    }
-
-    const now = Date.now();
-    const current = await mutateStore(sessionId);
-
-    return NextResponse.json(toResponse(current, now), {
-      headers: {
-        'Cache-Control': 'no-store, max-age=0',
-      },
-    });
+    const raw = await req.text();
+    const body = raw ? (JSON.parse(raw) as { sessionId?: string }) : {};
+    sessionId = typeof body.sessionId === 'string' ? body.sessionId.trim() : '';
   } catch {
     return NextResponse.json({ error: 'invalid request body' }, { status: 400 });
   }
+
+  if (!sessionId) {
+    return NextResponse.json({ error: 'sessionId is required' }, { status: 400 });
+  }
+
+  const now = Date.now();
+  const current = await mutateStore(sessionId);
+
+  return NextResponse.json(toResponse(current, now), {
+    headers: {
+      'Cache-Control': 'no-store, max-age=0',
+    },
+  });
 }
