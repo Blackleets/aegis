@@ -47,8 +47,9 @@ def health_ok(port: int) -> tuple[bool, str]:
     try:
         with urllib.request.urlopen(url, timeout=4) as resp:
             payload = json.loads(resp.read().decode('utf-8', errors='replace'))
-            if resp.status == 200 and payload.get('status') == 'operational':
-                return True, f"health OK | uptime={payload.get('uptime')}s"
+            status = payload.get('status')
+            if resp.status == 200 and status in {'ok', 'degraded'}:
+                return True, f"health {status} | uptime={payload.get('uptime')}s"
             return False, f"health unexpected | http={resp.status} payload={payload}"
     except urllib.error.HTTPError as e:
         return False, f"health HTTP {e.code}"
