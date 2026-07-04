@@ -977,6 +977,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
         </div>
         <a href="${p.source === 'NIGGG-BAS' ? 'https://ndc.niggg.bas.bg/' : `https://earthquake.usgs.gov/earthquakes/eventpage/${p.id||''}`}" target="_blank" style="${linkStyle}color:#FF9500;border:1px solid rgba(255,149,0,0.4);background:rgba(255,149,0,0.1);">📊 ${p.source === 'NIGGG-BAS' ? 'NIGGG-BAS' : 'USGS DETAILS'}</a>
       </div>`);
+      onEntityClick?.({ type: 'earthquake', lat: coords[1], lng: coords[0], magnitude: p.magnitude, place: p.place, source: p.source, id: p.id });
     });
 
     // ── Satellites (SatNOGS powered) ──
@@ -1008,6 +1009,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
         </div>
         <a href="https://firms.modaps.eosdis.nasa.gov/map/#d:24hrs;l:noaa20-viirs,viirs,modis_a,modis_t;@${coords[0]},${coords[1]},10z" target="_blank" style="${linkStyle}color:#FF6B00;border:1px solid rgba(255,107,0,0.4);background:rgba(255,107,0,0.1);">🛰️ NASA FIRMS MAP</a>
       </div>`);
+      onEntityClick?.({ type: 'fire', lat: coords[1], lng: coords[0], brightness: p.brightness });
     });
 
     const openGdeltPopup = (coords: Coordinates, props: EntityProperties) => {
@@ -1040,6 +1042,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
         const p = e.features[0].properties as EntityProperties;
         const coords = (e.features[0].geometry).coordinates;
         openGdeltPopup(coords, p);
+        onEntityClick?.({ type: 'incident', lat: coords[1], lng: coords[0], title: p.title, severity: p.severity, source: p.source, url: p.url });
       });
     });
 
@@ -1234,6 +1237,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
           <a href="https://eonet.gsfc.nasa.gov/api/v3/events/${p.id || ''}" target="_blank" style="${linkStyle}color:#D4AF37;border:1px solid rgba(212,175,55,0.4);background:rgba(212,175,55,0.1);">🛰️ NASA EONET</a>
         </div>
       </div>`);
+      onEntityClick?.({ type: 'weather_event', lat: coords[1], lng: coords[0], title: p.title, severity: p.severity, source: p.source, id: p.id });
     });
 
     // ── Nuclear Infrastructure ──
@@ -1254,6 +1258,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
         </div>
         <a href="https://www.google.com/maps/@${coords[1]},${coords[0]},14z/data=!3m1!1e3" target="_blank" style="${linkStyle}color:#76FF03;border:1px solid rgba(118,255,3,0.4);background:rgba(118,255,3,0.1);">SATELLITE VIEW</a>
       </div>`);
+      onEntityClick?.({ type: 'infrastructure', lat: coords[1], lng: coords[0], name: p.name, status: p.status, country: p.country });
     });
 
     // ── Maritime Ports & Naval Bases ──

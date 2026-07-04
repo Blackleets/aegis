@@ -541,9 +541,37 @@ interface RegionDossier {
     region?: string;
     languages?: string[];
     area?: number;
+    timezones?: string[];
   };
   head_of_state?: { name?: string; position?: string };
   wikipedia?: { thumbnail?: string; extract?: string };
+  live_context?: {
+    local_time?: string;
+    timezone?: string;
+    timezone_abbr?: string;
+    weather?: {
+      temperature_c?: number;
+      feels_like_c?: number;
+      wind_kmh?: number;
+      summary?: string;
+      is_day?: boolean;
+    };
+    nearby_cameras?: {
+      count?: number;
+      countries?: string[];
+      closest?: {
+        name?: string;
+        city?: string;
+        country?: string;
+        source?: string;
+        distance_km?: number;
+      };
+    };
+    nearby_weather?: {
+      count?: number;
+      radius_km?: number;
+    };
+  };
 }
 
 interface SpaceWeather {
@@ -882,14 +910,23 @@ export default function Dashboard() {
     };
   }, []);
 
-  // Region dossier (right-click)
-  const handleRightClick = useCallback(async (coords: Coordinate) => {
-    setDossierLoading(true); setRegionDossier(null);
+  const loadRegionDossier = useCallback(async (coords: Coordinate) => {
+    setDossierLoading(true);
+    setRegionDossier(null);
     try {
-      const res = await fetch(`/api/region-dossier?lat=${coords.lat}&lng=${coords.lng}`);
+      const res = await fetch(`/api/region-dossier?lat=${coords.lat}&lng=${coords.lng}`, { cache: 'no-store' });
       if (res.ok) setRegionDossier(await res.json() as RegionDossier);
-    } catch (e) { console.warn('[AEGIS] Suppressed error:', e instanceof Error ? e.message : e); } finally { setDossierLoading(false); }
+    } catch (e) {
+      console.warn('[AEGIS] Suppressed error:', e instanceof Error ? e.message : e);
+    } finally {
+      setDossierLoading(false);
+    }
   }, []);
+
+  // Region dossier (right-click)
+  const handleRightClick = useCallback((coords: Coordinate) => {
+    void loadRegionDossier(coords);
+  }, [loadRegionDossier]);
 
   // Entity click handler (hoisted from JSX to comply with Rules of Hooks — Fixes #113)
   const handleEntityClick = useCallback((entity: ActiveCamera) => {
@@ -899,7 +936,16 @@ export default function Dashboard() {
       setLiveFeedName(entity.name);
       setLiveFeedEmbedAllowed(entity.embed_allowed !== false);
     }
-  }, []);
+
+    const contextualTypes = new Set(['weather_event', 'incident', 'fire', 'earthquake', 'infrastructure', 'radiation']);
+    if (
+      contextualTypes.has(String(entity?.type || ''))
+      && typeof entity?.lat === 'number'
+      && typeof entity?.lng === 'number'
+    ) {
+      void loadRegionDossier({ lat: entity.lat, lng: entity.lng });
+    }
+  }, [loadRegionDossier]);
 
   const handleRouteRequest = useCallback(async ({ origin, destination, mode, waypoints }: RouteRequest) => {
     setRouteError(null);
@@ -2689,6 +2735,59 @@ export default function Dashboard() {
                     <div><div className="hud-label mb-0.5">REGION</div><div className="text-xs text-[var(--text-primary)]">{regionDossier.country.subregion || regionDossier.country.region}</div></div>
                     <div><div className="hud-label mb-0.5">LANGUAGES</div><div className="text-xs text-[var(--text-primary)]">{regionDossier.country.languages?.join(', ')}</div></div>
                     <div><div className="hud-label mb-0.5">AREA</div><div className="text-xs text-[var(--text-primary)]">{regionDossier.country.area?.toLocaleString()} km²</div></div>
+                  </div>
+                )}
+                {regionDossier.live_context && (
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3 space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <div className="hud-label mb-0.5">LIVE TERRITORY CONTEXT</div>
+                        <div className="text-[8px] text-[var(--text-muted)] tracking-[0.2em]">WEATHER • CLOCK • CAMERAS</div>
+                      </div>
+                      {regionDossier.live_context.local_time && (
+                        <div className="text-right">
+                          <div className="text-xs font-mono text-[var(--text-primary)]">{regionDossier.live_context.local_time}</div>
+                          <div className="text-[8px] text-[var(--text-muted)]">{regionDossier.live_context.timezone_abbr || regionDossier.live_context.timezone}</div>
+                        </div>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="rounded-xl border border-white/8 bg-black/20 p-2">
+                        <div className="hud-label mb-1">SURFACE WEATHER</div>
+                        <div className="text-xs text-[var(--text-primary)]">{regionDossier.live_context.weather?.summary || 'Unavailable'}</div>
+                        <div className="text-[8px] text-[var(--text-muted)] mt-1">
+                          {typeof regionDossier.live_context.weather?.temperature_c === 'number' ? `${Math.round(regionDossier.live_context.weather.temperature_c)}°C` : '—'}
+                          {typeof regionDossier.live_context.weather?.feels_like_c === 'number' ? ` • feels ${Math.round(regionDossier.live_context.weather.feels_like_c)}°C` : ''}
+                        </div>
+                        <div className="text-[8px] text-[var(--text-muted)] mt-0.5">
+                          {typeof regionDossier.live_context.weather?.wind_kmh === 'number' ? `Wind ${Math.round(regionDossier.live_context.weather.wind_kmh)} km/h` : 'No wind telemetry'}
+                        </div>
+                      </div>
+                      <div className="rounded-xl border border-white/8 bg-black/20 p-2">
+                        <div className="hud-label mb-1">NEARBY CAMERAS</div>
+                        <div className="text-xs text-[var(--text-primary)]">{regionDossier.live_context.nearby_cameras?.count ?? 0} live feeds</div>
+                        <div className="text-[8px] text-[var(--text-muted)] mt-1">
+                          {regionDossier.live_context.nearby_cameras?.countries?.length ? regionDossier.live_context.nearby_cameras.countries.join(', ') : 'No regional feed clusters'}
+                        </div>
+                        <div className="text-[8px] text-[var(--text-muted)] mt-0.5">
+                          {regionDossier.live_context.nearby_cameras?.closest?.name
+                            ? `${regionDossier.live_context.nearby_cameras.closest.name} • ${regionDossier.live_context.nearby_cameras.closest.distance_km?.toFixed?.(1) ?? regionDossier.live_context.nearby_cameras.closest.distance_km} km`
+                            : 'No close camera selected'}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="rounded-xl border border-white/8 bg-black/20 p-2">
+                        <div className="hud-label mb-1">NEARBY WEATHER EVENTS</div>
+                        <div className="text-xs text-[var(--text-primary)]">{regionDossier.live_context.nearby_weather?.count ?? 0} open markers</div>
+                        <div className="text-[8px] text-[var(--text-muted)] mt-1">Within {regionDossier.live_context.nearby_weather?.radius_km ?? 0} km of the selected territory</div>
+                      </div>
+                      <div className="rounded-xl border border-white/8 bg-black/20 p-2">
+                        <div className="hud-label mb-1">TIME ZONE</div>
+                        <div className="text-xs text-[var(--text-primary)]">{regionDossier.live_context.timezone_abbr || regionDossier.live_context.timezone || 'Unavailable'}</div>
+                        <div className="text-[8px] text-[var(--text-muted)] mt-1">Live context updates when you right-click or tap supported events.</div>
+                      </div>
+                    </div>
                   </div>
                 )}
                 {regionDossier.head_of_state && (<div><div className="hud-label mb-0.5">HEAD OF STATE</div><div className="text-xs text-[var(--gold-primary)]">{regionDossier.head_of_state.name}</div><div className="text-[8px] text-[var(--text-muted)]">{regionDossier.head_of_state.position}</div></div>)}
