@@ -2,9 +2,8 @@
 
 import { useEffect, useState, useRef, useCallback, useMemo, type ComponentType, type ReactNode } from 'react';
 import dynamic from 'next/dynamic';
-import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Layers, BarChart3, X, Globe, MapPinned, Satellite, Moon, ExternalLink, AlertTriangle, Activity, Database, Wifi } from 'lucide-react';
+import { X, Globe, MapPinned, Satellite, Moon } from 'lucide-react';
 import IntelFeed from '@/components/IntelFeed';
 import MarketsPanel from '@/components/MarketsPanel';
 import ScmPanel from '@/components/ScmPanel';
@@ -20,9 +19,19 @@ import AiAnalyst from '@/components/AiAnalyst';
 import SolarSystemMode, { type CelestialBodyId } from '@/components/SolarSystemMode';
 import ModeDock from '@/components/dashboard/ModeDock';
 import FocusModeOverlay from '@/components/dashboard/FocusModeOverlay';
+import BottomDesktopHud from '@/components/dashboard/BottomDesktopHud';
+import DesktopOpsRails from '@/components/dashboard/DesktopOpsRails';
+import LiveFeedOverlay from '@/components/dashboard/LiveFeedOverlay';
+import RegionDossierOverlay, { type RegionDossierData } from '@/components/dashboard/RegionDossierOverlay';
 import IncidentFusionStrip from '@/components/dashboard/IncidentFusionStrip';
 import NasaMissionStrip, { type NasaEventItem } from '@/components/dashboard/NasaMissionStrip';
+import MobileCommandDrawer from '@/components/dashboard/MobileCommandDrawer';
+import RouteCockpitDesktop from '@/components/dashboard/RouteCockpitDesktop';
+import RouteCockpitMobile from '@/components/dashboard/RouteCockpitMobile';
+import SplashScreen from '@/components/dashboard/SplashScreen';
+import TopHudOverlays from '@/components/dashboard/TopHudOverlays';
 import { DEFAULT_LOCALE, getDashboardCopy, isLocale, type Locale } from '@/lib/i18n';
+import { type ActiveLayers, type BoundingBox, type Coordinate, type FlyToLocation, type MapView, type RouteOption, type RouteRiskSummary, type RouteSnapshot, type RouteStep, computeBearing, countSignalsNearRoute, formatEtaLabel, formatProgressLabel, getClosestStepIndex, getYouTubeWatchUrl } from '@/lib/routing-shell';
 
 const AegisMap = dynamic(() => import('@/components/AegisMap'), { ssr: false });
 const LayerPanel = dynamic(() => import('@/components/LayerPanel'));
@@ -143,6 +152,13 @@ function AegisAnalystDockButton() {
             className="rounded-full border border-amber-300/25 bg-amber-300/10 px-2.5 py-1.5 text-[7px] font-mono uppercase tracking-[0.16em] text-amber-100"
           >
             Fusion
+          </button>
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new CustomEvent('aegis:ai-analyst', { detail: { action: 'hermes' } }))}
+            className="rounded-full border border-emerald-300/25 bg-emerald-300/10 px-2.5 py-1.5 text-[7px] font-mono uppercase tracking-[0.16em] text-emerald-100"
+          >
+            Hermes
           </button>
         </div>
       </div>
@@ -311,186 +327,6 @@ const ActiveEntityCount = ({ data }: { data: Record<string, unknown[]> }) => {
   return <span className="text-[var(--alert-green)] font-bold tabular-nums">{count.toLocaleString()}</span>;
 };
 
-/** Extracts a watchable YouTube URL from embed/channel URLs */
-function getYouTubeWatchUrl(url: string): string {
-  if (url.includes('channel=')) return `https://www.youtube.com/channel/${url.split('channel=')[1].split('&')[0]}/live`;
-  if (url.includes('/embed/')) return `https://www.youtube.com/watch?v=${url.split('/embed/')[1].split('?')[0]}`;
-  return url;
-}
-
-function formatRouteDistance(distanceMeters: number) {
-  return distanceMeters >= 1000 ? `${(distanceMeters / 1000).toFixed(1)} km` : `${distanceMeters} m`;
-}
-
-function formatRouteDuration(durationSeconds: number) {
-  const hours = Math.floor(durationSeconds / 3600);
-  const minutes = Math.max(1, Math.round((durationSeconds % 3600) / 60));
-  return hours > 0 ? `${hours}h ${minutes}m` : `${minutes} min`;
-}
-
-function formatCoordinateLabel(coordinate: Coordinate) {
-  return `${coordinate.lat.toFixed(3)}, ${coordinate.lng.toFixed(3)}`;
-}
-
-function formatStepDistance(distanceMeters: number) {
-  return distanceMeters >= 1000 ? `${(distanceMeters / 1000).toFixed(1)} km` : `${Math.max(1, Math.round(distanceMeters))} m`;
-}
-
-function formatRouteModeLabel(mode: 'driving' | 'walking' | 'cycling') {
-  if (mode === 'walking') return 'WALK';
-  if (mode === 'cycling') return 'CYCLE';
-  return 'DRIVE';
-}
-
-function formatEtaLabel(durationSeconds: number) {
-  const eta = new Date(Date.now() + durationSeconds * 1000);
-  return eta.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-}
-
-function formatProgressLabel(completedDistance: number, totalDistance: number) {
-  if (totalDistance <= 0) return '0%';
-  const ratio = Math.max(0, Math.min(1, completedDistance / totalDistance));
-  return `${Math.round(ratio * 100)}%`;
-}
-
-function computeBearing(from: Coordinate, to: Coordinate) {
-  const lat1 = from.lat * Math.PI / 180;
-  const lat2 = to.lat * Math.PI / 180;
-  const dLng = (to.lng - from.lng) * Math.PI / 180;
-  const y = Math.sin(dLng) * Math.cos(lat2);
-  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
-  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
-}
-
-function distanceMetersBetween(a: Coordinate, b: Coordinate) {
-  const R = 6371000;
-  const lat1 = a.lat * Math.PI / 180;
-  const lat2 = b.lat * Math.PI / 180;
-  const dLat = (b.lat - a.lat) * Math.PI / 180;
-  const dLng = (b.lng - a.lng) * Math.PI / 180;
-  const sinDLat = Math.sin(dLat / 2);
-  const sinDLng = Math.sin(dLng / 2);
-  const h = sinDLat * sinDLat + Math.cos(lat1) * Math.cos(lat2) * sinDLng * sinDLng;
-  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
-}
-
-function distanceToRouteStep(position: Coordinate, step: RouteStep) {
-  const points = step.geometry.length > 0
-    ? step.geometry.map(([lng, lat]) => ({ lat, lng }))
-    : step.maneuver.location
-      ? [{ lat: step.maneuver.location[1], lng: step.maneuver.location[0] }]
-      : [];
-  if (!points.length) return Number.POSITIVE_INFINITY;
-  return Math.min(...points.map((point) => distanceMetersBetween(position, point)));
-}
-
-function getClosestStepIndex(position: Coordinate, steps: RouteStep[]) {
-  let bestIndex = 0;
-  let bestDistance = Number.POSITIVE_INFINITY;
-  steps.forEach((step, index) => {
-    const distance = distanceToRouteStep(position, step);
-    if (distance < bestDistance) {
-      bestDistance = distance;
-      bestIndex = index;
-    }
-  });
-  return bestIndex;
-}
-
-function distanceToRoutePath(position: Coordinate, coordinates: [number, number][]) {
-  if (!coordinates.length) return Number.POSITIVE_INFINITY;
-  let bestDistance = Number.POSITIVE_INFINITY;
-  const stride = coordinates.length > 180 ? 3 : 1;
-  for (let index = 0; index < coordinates.length; index += stride) {
-    const [lng, lat] = coordinates[index];
-    const distance = distanceMetersBetween(position, { lat, lng });
-    if (distance < bestDistance) bestDistance = distance;
-  }
-  return bestDistance;
-}
-
-function getItemCoordinate(item: unknown): Coordinate | null {
-  if (!item || typeof item !== 'object') return null;
-  const candidate = item as { lat?: unknown; lng?: unknown; coords?: unknown };
-  if (typeof candidate.lat === 'number' && typeof candidate.lng === 'number') {
-    return { lat: candidate.lat, lng: candidate.lng };
-  }
-  if (Array.isArray(candidate.coords) && candidate.coords.length >= 2 && typeof candidate.coords[0] === 'number' && typeof candidate.coords[1] === 'number') {
-    return { lng: candidate.coords[0], lat: candidate.coords[1] };
-  }
-  return null;
-}
-
-function countSignalsNearRoute(items: unknown[] | undefined, routeCoordinates: [number, number][], thresholdMeters: number) {
-  if (!Array.isArray(items) || !items.length || routeCoordinates.length < 2) return 0;
-  return items.reduce((count, item) => {
-    const coordinate = getItemCoordinate(item);
-    if (!coordinate) return count;
-    return distanceToRoutePath(coordinate, routeCoordinates) <= thresholdMeters ? count + 1 : count;
-  }, 0);
-}
-
-type Coordinate = { lat: number; lng: number };
-type BoundingBox = [west: number, south: number, east: number, north: number];
-type FlyToLocation = Coordinate & { ts: number; zoom?: number; bbox?: BoundingBox | null; label?: string };
-type MapView = { zoom: number; latitude: number };
-type ActiveLayers = Record<string, boolean>;
-
-interface RouteStep {
-  index: number;
-  instruction: string;
-  distanceMeters: number;
-  durationSeconds: number;
-  name: string;
-  mode: string;
-  maneuver: {
-    type: string;
-    modifier: string | null;
-    location: [number, number] | null;
-    bearingAfter: number | null;
-    bearingBefore: number | null;
-    exit: number | null;
-  };
-  geometry: [number, number][];
-}
-
-interface RouteOption {
-  id: string;
-  label: string;
-  coordinates: [number, number][];
-  bbox?: BoundingBox | null;
-  distanceMeters: number;
-  durationSeconds: number;
-  steps: RouteStep[];
-}
-
-interface RouteRiskSummary {
-  score: number;
-  level: 'low' | 'elevated' | 'high';
-  nearbySignals: number;
-  counts: {
-    incidents: number;
-    earthquakes: number;
-    weather: number;
-    fires: number;
-    jamming: number;
-  };
-}
-
-interface RouteSnapshot {
-  origin: Coordinate;
-  destination: FlyToLocation;
-  waypoints: FlyToLocation[];
-  mode: 'driving' | 'walking' | 'cycling';
-  activeRouteId: string;
-  coordinates: [number, number][];
-  bbox?: BoundingBox | null;
-  distanceMeters: number;
-  durationSeconds: number;
-  steps: RouteStep[];
-  alternatives: RouteOption[];
-}
-
 interface DashboardEntity extends Partial<Coordinate> {
   [key: string]: unknown;
 }
@@ -530,49 +366,7 @@ interface UsageMetrics {
   updatedAt?: string;
 }
 
-interface RegionDossier {
-  location?: { display_name?: string };
-  country?: {
-    flag?: string;
-    name?: string;
-    capital?: string;
-    population?: number;
-    subregion?: string;
-    region?: string;
-    languages?: string[];
-    area?: number;
-    timezones?: string[];
-  };
-  head_of_state?: { name?: string; position?: string };
-  wikipedia?: { thumbnail?: string; extract?: string };
-  live_context?: {
-    local_time?: string;
-    timezone?: string;
-    timezone_abbr?: string;
-    weather?: {
-      temperature_c?: number;
-      feels_like_c?: number;
-      wind_kmh?: number;
-      summary?: string;
-      is_day?: boolean;
-    };
-    nearby_cameras?: {
-      count?: number;
-      countries?: string[];
-      closest?: {
-        name?: string;
-        city?: string;
-        country?: string;
-        source?: string;
-        distance_km?: number;
-      };
-    };
-    nearby_weather?: {
-      count?: number;
-      radius_km?: number;
-    };
-  };
-}
+type RegionDossier = RegionDossierData;
 
 interface SpaceWeather {
   storm_color?: string;
@@ -1540,198 +1334,7 @@ export default function Dashboard() {
 
   return (
     <main className="fixed inset-0 w-full h-full bg-[var(--bg-void)] overflow-hidden">
-      {/* ── SPLASH ── */}
-      <AnimatePresence>
-        {showSplash && (
-          <motion.div
-            initial={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.8, ease: 'easeInOut' }}
-            className="absolute inset-0 z-[999] flex flex-col items-center justify-center overflow-hidden"
-            style={{ background: 'radial-gradient(ellipse at center, #0a0a14 0%, var(--bg-void) 70%)' }}
-          >
-
-            <div className="absolute inset-0 pointer-events-none z-[1]" style={{
-              backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(212,175,55,0.015) 2px, rgba(212,175,55,0.015) 4px)',
-              animation: 'splashScanDrift 8s linear infinite',
-            }} />
-
-            {/* ── V4.2 badge — top-left ── */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 0.6 }}
-              transition={{ delay: 0.8, duration: 0.5 }}
-              className="absolute top-6 left-6 z-[2] font-mono text-[10px] tracking-[0.3em] text-[var(--gold-primary)]"
-            >
-              V4.2
-            </motion.div>
-
-
-
-            {/* ── AEGIS tactical identity block ── */}
-            <div className="relative w-[18rem] max-w-[82vw] mb-7 flex flex-col items-center z-[2]">
-              <motion.div
-                initial={{ opacity: 0, y: 22, scale: 0.96 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                transition={{ duration: 0.75, ease: 'easeOut' }}
-                className="w-full rounded-[24px] border border-[rgba(34,211,238,0.16)] bg-[linear-gradient(180deg,rgba(6,14,24,0.96)_0%,rgba(7,11,18,0.92)_100%)] p-3 shadow-[0_20px_60px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.03)]"
-              >
-                <div className="mb-3 flex items-center justify-between text-[9px] font-mono tracking-[0.28em] text-[var(--text-muted)]">
-                  <span>AEGIS</span>
-                  <span className="text-[var(--cyan-primary)]">WORLD MODEL</span>
-                </div>
-
-                <div className="relative h-[92px] overflow-hidden rounded-[16px] border border-[rgba(34,211,238,0.12)] bg-[linear-gradient(180deg,rgba(8,16,28,0.96)_0%,rgba(5,10,18,0.84)_100%)]">
-                  <div className="absolute inset-0 opacity-40" style={{ backgroundImage: 'linear-gradient(rgba(34,211,238,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(34,211,238,0.07) 1px, transparent 1px)', backgroundSize: '26px 26px' }} />
-                  <div className="absolute left-0 right-0 top-1/2 h-[1px] -translate-y-1/2 bg-gradient-to-r from-transparent via-[rgba(34,211,238,0.38)] to-transparent" />
-                  <div className="absolute bottom-0 left-[18%] top-0 w-[1px] bg-gradient-to-b from-transparent via-[rgba(212,175,55,0.2)] to-transparent" />
-                  <div className="absolute bottom-0 right-[22%] top-0 w-[1px] bg-gradient-to-b from-transparent via-[rgba(34,211,238,0.16)] to-transparent" />
-
-                  <motion.div
-                    initial={{ opacity: 0, x: -30 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.35, duration: 0.6 }}
-                    className="absolute left-3 top-3 rounded-full border border-[rgba(212,175,55,0.26)] bg-[rgba(212,175,55,0.08)] px-2 py-[3px] text-[8px] font-mono tracking-[0.2em] text-[var(--gold-primary)]"
-                  >
-                    GRID LOCK
-                  </motion.div>
-
-                  <motion.div
-                    initial={{ opacity: 0, scaleX: 0 }}
-                    animate={{ opacity: 1, scaleX: 1 }}
-                    transition={{ delay: 0.45, duration: 0.8, ease: 'easeOut' }}
-                    className="absolute left-4 right-4 top-1/2 h-[2px] origin-left rounded-full bg-gradient-to-r from-[rgba(34,211,238,0.12)] via-[rgba(191,219,254,0.92)] to-[rgba(212,175,55,0.4)] shadow-[0_0_16px_rgba(34,211,238,0.24)]"
-                  />
-
-                  {[
-                    { left: '22%', top: '50%', delay: 0.8, color: 'rgba(34,211,238,0.95)' },
-                    { left: '46%', top: '50%', delay: 1.0, color: 'rgba(191,219,254,0.95)' },
-                    { left: '71%', top: '50%', delay: 1.2, color: 'rgba(212,175,55,0.95)' },
-                  ].map((node, i) => (
-                    <motion.div
-                      key={i}
-                      initial={{ opacity: 0, scale: 0.7 }}
-                      animate={{ opacity: [0.55, 1, 0.55], scale: [0.9, 1.08, 0.9] }}
-                      transition={{ delay: node.delay, duration: 1.7, repeat: Infinity, ease: 'easeInOut' }}
-                      className="absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full"
-                      style={{ left: node.left, top: node.top, background: node.color, boxShadow: `0 0 14px ${node.color}` }}
-                    />
-                  ))}
-
-                  <motion.div
-                    initial={{ opacity: 0, x: 22 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.6, duration: 0.55 }}
-                    className="absolute right-3 top-3 text-right text-[8px] font-mono tracking-[0.22em] text-[var(--text-secondary)]"
-                  >
-                    <div>SYNC 3/3</div>
-                    <div className="mt-1 text-[var(--cyan-primary)]">VERIFIED FEEDS</div>
-                  </motion.div>
-
-                  <div className="absolute bottom-3 left-3 text-[8px] font-mono tracking-[0.22em] text-[rgba(212,175,55,0.72)]">COMMAND SURFACE</div>
-                  <div className="absolute right-3 bottom-3 text-[8px] font-mono tracking-[0.22em] text-[rgba(34,211,238,0.72)]">LIVE MODEL</div>
-                </div>
-              </motion.div>
-            </div>
-
-            {/* ── Title / identity ── */}
-            <div className="flex flex-col items-center mb-7 z-[2] px-4 text-center">
-              <motion.h1
-                initial={{ opacity: 0, y: 16, filter: 'blur(6px)' }}
-                animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                transition={{ delay: 0.55, duration: 0.65, ease: 'easeOut' }}
-                className="text-[2.15rem] md:text-[3.2rem] font-bold tracking-[0.36em] md:tracking-[0.42em] font-mono text-[var(--text-heading)]"
-                style={{ textShadow: '0 0 26px rgba(212,175,55,0.14)' }}
-              >
-                AEGIS
-              </motion.h1>
-              <motion.p
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 0.92 }}
-                transition={{ delay: 0.95, duration: 0.5 }}
-                className="mt-2 text-[10px] md:text-[11px] font-mono tracking-[0.44em] text-[var(--gold-primary)]"
-              >
-                LIVE WORLD MODEL
-              </motion.p>
-              <motion.p
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 0.72 }}
-                transition={{ delay: 1.1, duration: 0.5 }}
-                className="mt-2 max-w-[24rem] text-[8px] md:text-[9px] font-mono uppercase tracking-[0.22em] text-[var(--text-secondary)]"
-              >
-                VERIFIED GLOBAL INTELLIGENCE • COMMAND SURFACE ONLINE
-              </motion.p>
-            </div>
-
-            {/* ── Progress / status ── */}
-            <div className="w-64 md:w-80 z-[2]">
-              <div className="mb-2 flex items-center justify-between text-[8px] font-mono tracking-[0.22em] text-[var(--text-muted)]">
-                <span>BOOTSTRAP</span>
-                <span className="text-[var(--gold-primary)]">V4.2</span>
-              </div>
-              <div className="relative w-full h-[3px] rounded-full overflow-hidden" style={{ background: 'rgba(148,163,184,0.12)' }}>
-                <motion.div
-                  initial={{ width: '0%' }}
-                  animate={{ width: ['0%', '22%', '48%', '74%', '100%'] }}
-                  transition={{ duration: 2.2, delay: 0.45, times: [0, 0.22, 0.5, 0.78, 1], ease: 'easeInOut' }}
-                  className="absolute inset-y-0 left-0 rounded-full"
-                  style={{ background: 'linear-gradient(90deg, rgba(34,211,238,0.88), rgba(191,219,254,0.95), rgba(212,175,55,0.9))', boxShadow: '0 0 12px rgba(34,211,238,0.32)' }}
-                />
-              </div>
-
-              <div className="mt-3 h-4 flex items-center justify-center">
-                {[
-                  { text: 'LOCKING WORLD GRID...', delay: 0.5 },
-                  { text: 'SYNCING VERIFIED FEEDS...', delay: 1.1 },
-                  { text: 'ALIGNING COMMAND SURFACE...', delay: 1.7 },
-                  { text: 'AEGIS READY', delay: 2.2 },
-                ].map((stage, i) => (
-                  <motion.span
-                    key={i}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: [0, 1, 1, 0] }}
-                    transition={{ delay: stage.delay, duration: 0.62, times: [0, 0.1, 0.72, 1] }}
-                    className="absolute text-[9px] font-mono tracking-[0.24em]"
-                    style={{ color: i === 3 ? 'var(--cyan-primary)' : 'var(--text-muted)' }}
-                  >
-                    {stage.text}
-                  </motion.span>
-                ))}
-              </div>
-            </div>
-
-            {/* ── Decorative grid lines ── */}
-            <div className="absolute inset-0 pointer-events-none z-[0]" style={{ opacity: 0.03 }}>
-              <div className="absolute inset-0" style={{
-                backgroundImage: 'linear-gradient(rgba(212,175,55,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(212,175,55,0.5) 1px, transparent 1px)',
-                backgroundSize: '60px 60px',
-              }} />
-            </div>
-
-            {/* ── Corner frame accents ── */}
-            {[
-              { t: '10px', l: '10px', bw: '2px 0 0 2px' },
-              { t: '10px', r: '10px', bw: '2px 2px 0 0' },
-              { b: '10px', l: '10px', bw: '0 0 2px 2px' },
-              { b: '10px', r: '10px', bw: '0 2px 2px 0' },
-            ].map((pos, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 0.3 }}
-                transition={{ delay: 0.8 + i * 0.1, duration: 0.5 }}
-                className="absolute w-8 h-8 z-[2]"
-                style={{ top: pos.t, bottom: pos.b, left: pos.l, right: pos.r, borderWidth: pos.bw, borderStyle: 'solid', borderColor: 'var(--gold-primary)' }}
-              />
-            ))}
-
-
-
-            {/* ── Inline keyframe for scanline drift ── */}
-
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <SplashScreen showSplash={showSplash} />
 
 
 
@@ -1932,871 +1535,220 @@ export default function Dashboard() {
       </motion.div>
 
       {!isMobile && earthNavigationMode && routeSnapshot && (
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.12, duration: 0.35 }}
-          className="absolute right-4 top-[6.25rem] z-[210] w-[min(24rem,calc(100vw-3rem))] pointer-events-auto md:right-5"
-        >
-          <div className="rounded-[1.35rem] border border-cyan-400/18 bg-[rgba(8,18,28,0.88)] px-3.5 py-3 shadow-[0_18px_52px_rgba(0,0,0,0.24)] backdrop-blur-lg">
-            <div className="flex items-start justify-between gap-4">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <div className="relative h-8 w-8 shrink-0 rounded-xl border border-cyan-400/20 bg-[radial-gradient(circle_at_center,rgba(34,211,238,0.18),rgba(8,18,28,0.08)_55%,rgba(8,18,28,0.02)_78%)]">
-                    <div className="absolute inset-[5px] rounded-full border border-cyan-400/18" />
-                    <div className="absolute left-1/2 top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-cyan-300" />
-                  </div>
-                  <div className="text-[8px] font-mono uppercase tracking-[0.26em] text-cyan-300">VECTOR MODE</div>
-                </div>
-                <div className="mt-1 text-sm font-semibold tracking-[0.06em] text-white">{routeSnapshot.destination.label}</div>
-                <div className="mt-2 grid gap-2 text-[8px] font-mono uppercase tracking-[0.16em] text-[var(--text-secondary)] sm:grid-cols-2">
-                  <div className="rounded-xl border border-white/8 bg-black/20 px-2.5 py-2">
-                    <div className="text-[7px] tracking-[0.2em] text-cyan-300">From</div>
-                    <div className="mt-1 text-[10px] font-semibold tracking-[0.05em] text-white">Live position</div>
-                    <div className="mt-0.5 text-[8px] text-[var(--text-secondary)]">{formatCoordinateLabel(routeSnapshot.origin)}</div>
-                  </div>
-                  <div className="rounded-xl border border-white/8 bg-black/20 px-2.5 py-2">
-                    <div className="text-[7px] tracking-[0.2em] text-cyan-300">To</div>
-                    <div className="mt-1 truncate text-[10px] font-semibold tracking-[0.05em] text-white">{routeSnapshot.destination.label}</div>
-                    <div className="mt-0.5 text-[8px] text-[var(--text-secondary)]">{formatCoordinateLabel(routeSnapshot.destination)}</div>
-                  </div>
-                </div>
-                {routeSnapshot.waypoints.length > 0 && (
-                  <div className="mt-2 rounded-xl border border-[rgba(212,175,55,0.14)] bg-[rgba(212,175,55,0.06)] px-2.5 py-2">
-                    <div className="text-[7px] font-mono uppercase tracking-[0.18em] text-[var(--gold-primary)]">Stops</div>
-                    <div className="mt-1 flex flex-wrap gap-1.5 text-[7px] font-mono uppercase tracking-[0.14em] text-white/85">
-                      {routeSnapshot.waypoints.map((waypoint, index) => (
-                        <span key={`${waypoint.label}-${index}-${waypoint.lat}-${waypoint.lng}`} className="rounded-full border border-[rgba(212,175,55,0.18)] bg-[rgba(212,175,55,0.08)] px-2 py-1">
-                          S{index + 1} · {waypoint.label ?? formatCoordinateLabel(waypoint)}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                <div className="mt-2 grid grid-cols-2 gap-2 lg:grid-cols-4">
-                  <div className="rounded-xl border border-cyan-400/14 bg-cyan-400/[0.06] px-2.5 py-2">
-                    <div className="text-[7px] font-mono uppercase tracking-[0.18em] text-cyan-300">Mode</div>
-                    <div className="mt-1 text-[11px] font-semibold tracking-[0.05em] text-white">{formatRouteModeLabel(routeSnapshot.mode)}</div>
-                  </div>
-                  <div className="rounded-xl border border-white/8 bg-black/20 px-2.5 py-2">
-                    <div className="text-[7px] font-mono uppercase tracking-[0.18em] text-cyan-300">Remaining</div>
-                    <div className="mt-1 text-[11px] font-semibold tracking-[0.05em] text-white">{formatRouteDistance(remainingRouteDistance || routeSnapshot.distanceMeters)}</div>
-                  </div>
-                  <div className="rounded-xl border border-white/8 bg-black/20 px-2.5 py-2">
-                    <div className="text-[7px] font-mono uppercase tracking-[0.18em] text-cyan-300">ETA</div>
-                    <div className="mt-1 text-[11px] font-semibold tracking-[0.05em] text-white">{routeEtaLabel}</div>
-                  </div>
-                  <div className="rounded-xl border border-white/8 bg-black/20 px-2.5 py-2">
-                    <div className="text-[7px] font-mono uppercase tracking-[0.18em] text-cyan-300">Progress</div>
-                    <div className="mt-1 text-[11px] font-semibold tracking-[0.05em] text-white">{routeProgressLabel}</div>
-                  </div>
-                </div>
-                <div className="mt-2 flex flex-wrap gap-2 text-[10px] font-mono uppercase tracking-[0.16em] text-[var(--text-secondary)]">
-                  <span>{formatRouteDuration(routeSnapshot.durationSeconds)}</span>
-                  <span>•</span>
-                  <span>{navigationActive ? 'FOLLOW LIVE' : 'READY TO FOLLOW'}</span>
-                  {routeRiskSummary && (
-                    <>
-                      <span>•</span>
-                      <span className={routeRiskSummary.level === 'high' ? 'text-rose-300' : routeRiskSummary.level === 'elevated' ? 'text-amber-300' : 'text-emerald-300'}>
-                        RISK {routeRiskSummary.score}
-                      </span>
-                    </>
-                  )}
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={toggleNavigationFollow}
-                  className="rounded-full border border-cyan-400/25 bg-cyan-400/10 px-3 py-1.5 text-[10px] font-mono uppercase tracking-[0.16em] text-cyan-200 hover:bg-cyan-400/18"
-                >
-                  {navigationActive ? 'Pause Vector' : 'Start Vector'}
-                </button>
-                <button
-                  type="button"
-                  onClick={clearNavigationState}
-                  className="rounded-full border border-white/10 px-3 py-1.5 text-[10px] font-mono uppercase tracking-[0.16em] text-[var(--text-muted)] hover:text-white"
-                >
-                  Clear Route
-                </button>
-              </div>
-            </div>
-            {routeSnapshot.alternatives.length > 1 && (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {routeSnapshot.alternatives.map((option) => (
-                  <button
-                    key={option.id}
-                    type="button"
-                    onClick={() => selectRouteOption(option.id)}
-                    className={`rounded-full border px-2.5 py-1 text-[8px] font-mono uppercase tracking-[0.18em] transition-colors ${routeSnapshot.activeRouteId === option.id ? 'border-cyan-400/35 bg-cyan-400/14 text-cyan-200' : 'border-white/10 bg-white/[0.03] text-[var(--text-secondary)] hover:text-white'}`}
-                  >
-                    {option.label} · {formatRouteDuration(option.durationSeconds)}{option.id !== routeSnapshot.activeRouteId ? ` · ${option.durationSeconds >= routeSnapshot.durationSeconds ? '+' : '-'}${formatRouteDuration(Math.abs(option.durationSeconds - routeSnapshot.durationSeconds))}` : ''}
-                  </button>
-                ))}
-              </div>
-            )}
-            {routeRiskSummary && (
-              <div className="mt-3 rounded-2xl border border-white/8 bg-black/20 px-3 py-2.5">
-                <div className="flex flex-wrap items-center gap-2 text-[8px] font-mono uppercase tracking-[0.18em]">
-                  <span className="text-cyan-300">Route Threat Scan</span>
-                  <span className="text-[var(--text-secondary)]">{routeRiskSummary.nearbySignals} signals</span>
-                  <span className={routeRiskSummary.level === 'high' ? 'text-rose-300' : routeRiskSummary.level === 'elevated' ? 'text-amber-300' : 'text-emerald-300'}>{routeRiskSummary.level}</span>
-                </div>
-                <div className="mt-2 flex flex-wrap gap-2 text-[8px] font-mono uppercase tracking-[0.16em] text-[var(--text-secondary)]">
-                  <span>Intel {routeRiskSummary.counts.incidents}</span>
-                  <span>Quakes {routeRiskSummary.counts.earthquakes}</span>
-                  <span>Weather {routeRiskSummary.counts.weather}</span>
-                  <span>Fires {routeRiskSummary.counts.fires}</span>
-                  <span>GPS {routeRiskSummary.counts.jamming}</span>
-                </div>
-              </div>
-            )}
-            {!routeRiskSummary && currentRouteStep && (
-              <div className="mt-3 rounded-2xl border border-white/8 bg-black/20 px-3 py-2.5">
-                <div className="text-[8px] font-mono uppercase tracking-[0.18em] text-cyan-300">Next Turn</div>
-                <div className="mt-1.5 text-[13px] font-semibold leading-snug text-white">{currentRouteStep.instruction}</div>
-              </div>
-            )}
-            {routeRiskSummary && currentRouteStep && (
-              <div className="mt-3 rounded-2xl border border-white/8 bg-black/20 px-3 py-2.5">
-                <div className="text-[8px] font-mono uppercase tracking-[0.18em] text-cyan-300">Next Turn</div>
-                <div className="mt-1.5 text-[13px] font-semibold leading-snug text-white">{currentRouteStep.instruction}</div>
-              </div>
-            )}
-          </div>
-        </motion.div>
+        <RouteCockpitDesktop
+          routeSnapshot={routeSnapshot}
+          navigationActive={navigationActive}
+          remainingRouteDistance={remainingRouteDistance}
+          routeEtaLabel={routeEtaLabel}
+          routeProgressLabel={routeProgressLabel}
+          routeRiskSummary={routeRiskSummary}
+          currentRouteStep={currentRouteStep}
+          onToggleNavigationFollow={toggleNavigationFollow}
+          onClearNavigationState={clearNavigationState}
+          onSelectRouteOption={selectRouteOption}
+        />
       )}
 
-      {/* ── HEADER ── */}
-      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, delay: 2.5 }} className={`absolute top-3 left-3 md:top-5 md:left-5 z-[200] pointer-events-none flex items-center gap-2 md:gap-3`}>
-        <div className="w-7 h-7 md:w-9 md:h-9 flex items-center justify-center relative">
-          {/* Ambient glow ring — slow rotating */}
-          <div className="absolute inset-[-4px] md:inset-[-5px] rounded-full border border-[var(--gold-primary)]/20" style={{ animation: 'aegis-rotate 12s linear infinite' }}>
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1 h-1 rounded-full bg-[var(--gold-primary)] shadow-[0_0_6px_var(--gold-primary)]" />
-          </div>
-          <div className="absolute inset-[-8px] md:inset-[-10px] rounded-full border border-[var(--gold-primary)]/10" style={{ animation: 'aegis-rotate 20s linear infinite reverse' }}>
-            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-0.5 h-0.5 rounded-full bg-[var(--gold-primary)]/60" />
-          </div>
-          <div className="w-5 h-5 md:w-7 md:h-7 rounded-full border-2 border-[var(--gold-primary)] flex items-center justify-center animate-glow-pulse">
-            <div className="w-2.5 h-2.5 md:w-3.5 md:h-3.5 rounded-full bg-[var(--gold-primary)]/30 border border-[var(--gold-primary)]/60" />
-          </div>
-          <div className="absolute w-[1px] h-full bg-[var(--gold-primary)]/30" />
-          <div className="absolute w-full h-[1px] bg-[var(--gold-primary)]/30" />
-        </div>
-        {/* Horizontal rule extending from logo */}
-        <div className="hidden md:block absolute top-1/2 left-[52px] w-[200px] h-[1px] bg-gradient-to-r from-[var(--gold-primary)]/40 via-[var(--gold-primary)]/15 to-transparent" />
-        <div className="flex flex-col">
-          <div className="flex items-center gap-2">
-            <h1 className="text-base md:text-xl font-bold tracking-[0.4em] md:tracking-[0.5em] text-[var(--text-heading)] font-mono">AEGIS</h1>
-            <span className="hidden md:inline-flex items-center gap-1 px-1.5 py-[1px] rounded-sm border border-[var(--cyan-primary)]/40 bg-[var(--cyan-primary)]/10 text-[7px] font-mono font-bold tracking-[0.15em] text-[var(--cyan-primary)] uppercase" style={{ lineHeight: '1.4' }}>
-              <Globe className="w-2.5 h-2.5" />
-              {copy.header.badge}
-            </span>
-          </div>
-          <span className="text-[8px] md:text-[9px] text-[var(--gold-primary)] font-mono tracking-[0.2em] md:tracking-[0.3em] opacity-80">{copy.header.subtitle}</span>
-        </div>
-      </motion.div>
-
-
-      {/* ── TOP-RIGHT STATUS (desktop) — C2 DISPLAY ── */}
-      {showAuxiliaryHud && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 3 }} className="status-bar-desktop absolute top-3 right-3 md:top-4 md:right-5 z-[200] pointer-events-none flex items-center gap-1.5 xl:gap-2.5 2xl:gap-3 text-[8px] xl:text-[9px] 2xl:text-[10px] font-mono tracking-[0.16em] xl:tracking-[0.2em] text-[var(--text-muted)]">
-
-        {/* Zulu Clock */}
-        <span className="hidden lg:inline-flex items-center gap-1.5 rounded-full border border-[var(--border-primary)]/70 bg-[rgba(15,23,32,0.82)] px-2.5 py-1 shadow-[0_10px_30px_rgba(0,0,0,0.16)]">
-          <ZuluClock />
-        </span>
-
-        <span className="hidden lg:inline text-[var(--border-primary)]">│</span>
-
-        <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-primary)]/70 bg-[rgba(15,23,32,0.82)] px-2 py-1 shadow-[0_10px_30px_rgba(0,0,0,0.16)]">{copy.status.sys} <span className={backendStatusAccentClass}>{backendStatusLabel}</span></span>
-
-        {spaceWeather && <span className="hidden xl:inline">SOLAR: <span style={{ color: spaceWeather.storm_color, fontWeight: 700 }}>Kp{spaceWeather.kp_index}</span></span>}
-
-        {/* Active Data Feeds */}
-        <span className="hidden 2xl:inline-flex items-center gap-1">
-          <Wifi className="w-3 h-3 text-[var(--cyan-primary)]" />
-          <span className="text-[var(--cyan-primary)] font-bold">{activeLayerCount}</span>
-          <span className="text-[var(--text-muted)]/60">{copy.status.feeds}</span>
-        </span>
-
-        {usageMetrics && (
-          <span className="hidden 2xl:inline-flex items-center gap-2 rounded-full border border-[var(--border-primary)]/70 bg-[rgba(15,23,32,0.82)] px-2.5 py-1 shadow-[0_10px_30px_rgba(0,0,0,0.16)]">
-            <Activity className="h-3 w-3 text-[var(--alert-green)]" />
-            <span className="text-[var(--text-secondary)]">{copy.status.live}</span>
-            <span className="font-bold text-[var(--text-primary)]">{usageMetrics.onlineUsers}</span>
-            <span className="text-[var(--border-primary)]">/</span>
-            <BarChart3 className="h-3 w-3 text-[var(--gold-primary)]" />
-            <span className="text-[var(--text-secondary)]">{copy.status.visits}</span>
-            <span className="font-bold text-[var(--text-primary)]">{usageMetrics.totalUsers.toLocaleString()}</span>
-          </span>
-        )}
-
-        <span className="hidden xl:inline-flex"><UptimeClock /></span>
-      </motion.div>}
-
-      {/* ── MOBILE: Compact top status ── */}
-      {isMobile && showAuxiliaryHud && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 2.5 }} className="absolute top-3 right-3 z-[200] pointer-events-auto flex flex-col items-end gap-1.5">
-          <div className="flex items-center gap-1.5 rounded-2xl border border-[var(--border-primary)]/70 bg-[rgba(15,23,32,0.92)] px-2.5 py-1.5 shadow-[0_10px_30px_rgba(0,0,0,0.18)] backdrop-blur-md">
-            <span className={`h-1.5 w-1.5 rounded-full ${backendStatus === 'connected' ? 'bg-[var(--alert-green)]' : backendStatus === 'error' ? 'bg-[var(--alert-red)]' : 'bg-[var(--gold-primary)]'} animate-aegis-pulse`} />
-            <span className="text-[7px] font-mono font-bold tracking-[0.18em] text-[var(--text-primary)]">{backendStatusLabel}</span>
-            <span className="text-[var(--border-primary)]/70">•</span>
-            <span className="text-[7px] font-mono tracking-[0.18em] text-[var(--text-muted)]">{copy.status.alerts}</span>
-            <span className="text-[9px] font-bold tabular-nums" style={{ color: activeIntelAlerts > 0 ? '#FF9500' : 'var(--alert-green)' }}>{activeIntelAlerts}</span>
-          </div>
-
-          <a href='https://ko-fi.com/M8D41ZYW4Z' target='_blank' className="glass-panel px-2.5 py-1.5 flex items-center gap-1.5 text-[7px] font-mono tracking-[0.18em] hover:opacity-80 transition-opacity border-[var(--border-primary)]/80 bg-[rgba(15,23,32,0.92)]">
-            <div className="w-1.5 h-1.5 rounded-full bg-[var(--gold-primary)] animate-aegis-pulse" />
-            <span className="text-[var(--text-primary)] font-bold">{copy.status.supportProjectCompact}</span>
-          </a>
-        </motion.div>
-      )}
+      <TopHudOverlays
+        showAuxiliaryHud={showAuxiliaryHud}
+        isMobile={isMobile}
+        headerBadge={copy.header.badge}
+        headerSubtitle={copy.header.subtitle}
+        systemLabel={copy.status.sys}
+        feedsLabel={copy.status.feeds}
+        liveLabel={copy.status.live}
+        visitsLabel={copy.status.visits}
+        alertsLabel={copy.status.alerts}
+        supportProjectCompactLabel={copy.status.supportProjectCompact}
+        backendStatus={backendStatus}
+        backendStatusLabel={backendStatusLabel}
+        backendStatusAccentClass={backendStatusAccentClass}
+        activeLayerCount={activeLayerCount}
+        activeIntelAlerts={activeIntelAlerts}
+        usageMetrics={usageMetrics}
+        spaceWeather={spaceWeather}
+        zuluClock={<ZuluClock />}
+        uptimeClock={<UptimeClock />}
+      />
 
 
 
-      {/* ── LEFT HUD (desktop): Layers + Stats + focused desk ── */}
-      {showDesktopRails && <div className="desktop-panel absolute left-3.5 xl:left-4 top-20 bottom-24 xl:bottom-24 w-[14.25rem] xl:w-[15rem] 2xl:w-[15.75rem] flex flex-col gap-2 z-[200] min-h-0 pointer-events-none overflow-y-auto styled-scrollbar pr-1">
-        {showLayers && (
+      <DesktopOpsRails
+        showDesktopRails={showDesktopRails}
+        showLayers={showLayers}
+        leftRailFocus={leftRailFocus}
+        rightRailFocus={rightRailFocus}
+        onLeftRailFocusChange={setLeftRailFocus}
+        onRightRailFocusChange={setRightRailFocus}
+        focusedDeskLabel={copy.status.focusedDesk}
+        focusedDeskHint={copy.status.focusedDeskHint}
+        commandRailLabel={copy.status.commandRail}
+        commandRailFocus={commandRailFocus}
+        searchShareReconLabel={copy.status.searchShareRecon}
+        searchRailHint={copy.status.searchRailHint}
+        deskStackLabel={copy.status.deskStack}
+        deskStackHint={copy.status.deskStackHint}
+        newswireLabel={copy.status.newswire}
+        reconLabel={copy.status.recon}
+        showScmPanel={showScmPanel}
+        showMarkets={showMarkets}
+        showIntel={showIntel}
+        leftLayersContent={(
           <>
             <LayerPanel data={dataWithSdk} activeLayers={activeLayers} setActiveLayers={setActiveLayers} locale={locale} />
             <ViewPresets locale={locale} onNavigate={(lat, lng, zoom) => { setFlyToLocation({ lat, lng, ts: Date.now() }); setMapView(v => ({ ...v, zoom })); }} />
           </>
         )}
-
-        <div className="glass-panel pointer-events-auto overflow-hidden border border-[var(--border-primary)]/70 bg-[linear-gradient(180deg,rgba(12,21,30,0.94),rgba(15,25,36,0.9))]">
-          <div className="flex items-center justify-between border-b border-[var(--border-primary)]/40 px-2.5 py-2">
-            <div>
-              <div className="text-[8px] font-mono tracking-[0.22em] text-[var(--text-secondary)]">{copy.status.focusedDesk}</div>
-              <div className="mt-1 text-[10px] font-semibold tracking-[0.14em] text-[var(--text-primary)]">{copy.status.focusedDeskHint}</div>
-            </div>
-          </div>
-          <div className="flex gap-1.5 p-1.5">
-            <button onClick={() => setLeftRailFocus('markets')} className={`flex-1 rounded-xl border px-2 py-1.5 text-[7px] font-mono tracking-[0.16em] transition-colors ${leftRailFocus === 'markets' ? 'border-[rgba(34,211,238,0.45)] bg-[rgba(34,211,238,0.12)] text-[var(--cyan-primary)]' : 'border-white/8 bg-white/[0.03] text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>MARKETS</button>
-            <button onClick={() => setLeftRailFocus('flow')} className={`flex-1 rounded-xl border px-2 py-1.5 text-[7px] font-mono tracking-[0.16em] transition-colors ${leftRailFocus === 'flow' ? 'border-[rgba(212,175,55,0.45)] bg-[rgba(212,175,55,0.12)] text-[var(--gold-primary)]' : 'border-white/8 bg-white/[0.03] text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>FLOW</button>
-            <button onClick={() => setLeftRailFocus('intel')} className={`flex-1 rounded-xl border px-2 py-1.5 text-[7px] font-mono tracking-[0.16em] transition-colors ${leftRailFocus === 'intel' ? 'border-[rgba(16,185,129,0.45)] bg-[rgba(16,185,129,0.12)] text-[var(--alert-green)]' : 'border-white/8 bg-white/[0.03] text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>INTEL</button>
-          </div>
-        </div>
-        {leftRailFocus === 'flow' && showScmPanel && <ScmPanel data={dataWithSdk} />}
-        {leftRailFocus === 'markets' && showMarkets && <MarketsPanel data={dataWithSdk} spaceWeather={spaceWeather} />}
-        {leftRailFocus === 'intel' && showIntel && <IntelFeed data={dataWithSdk} onLocate={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })} />}
-      </div>}
-
-      {/* ── RIGHT HUD (desktop): Search + focused desk ── */}
-      {showDesktopRails && <div className="desktop-panel absolute right-3.5 xl:right-4 top-20 bottom-24 xl:bottom-24 w-[14.75rem] xl:w-[15.5rem] 2xl:w-[16.25rem] flex flex-col gap-2 z-[200] min-h-0 pointer-events-auto overflow-y-auto styled-scrollbar pr-1">
-        <IncidentFusionStrip
-          backendStatus={backendStatus}
-          trackedEntityCount={trackedEntityCount}
-          activeIntelAlerts={activeIntelAlerts}
-          maritimePressure={maritimePressure}
-          newsCount={data.news?.length || 0}
-          earthquakeCount={data.earthquakes?.length || 0}
-          gdeltCount={data.gdelt?.length || 0}
-          operationalModeLabel={operationalModeLabel}
-          variant="rail"
-        />
-
-        <NasaMissionStrip
-          locale={locale}
-          events={nasaEventMesh?.events || []}
-          source={nasaEventMesh?.source}
-          updatedAt={nasaEventMesh?.fetched_at}
-          totalOpen={nasaEventMesh?.total_open}
-        />
-
-        <div className="glass-panel overflow-hidden border border-[var(--border-primary)]/80 bg-[linear-gradient(180deg,rgba(14,24,34,0.94),rgba(16,27,39,0.88))] shadow-[0_16px_40px_rgba(0,0,0,0.16)]">
-          <div className="flex items-center justify-between border-b border-[var(--border-primary)]/45 px-3 py-2">
-            <div>
-              <div className="text-[8px] font-mono tracking-[0.26em] text-[var(--text-secondary)]">{copy.status.commandRail}</div>
-              <div className="mt-1 text-[10px] font-semibold tracking-[0.16em] text-[var(--text-primary)]">{commandRailFocus}</div>
-            </div>
-            <div className="rounded-full border border-white/8 bg-white/[0.035] px-2 py-1 text-[7px] font-mono tracking-[0.16em] text-[var(--cyan-primary)]">
-              {copy.status.searchShareRecon}
-            </div>
-          </div>
-          <div className="space-y-2 p-2.5">
-            <div className="rounded-2xl border border-cyan-400/15 bg-[linear-gradient(180deg,rgba(34,211,238,0.08),rgba(7,15,24,0.38))] px-3 py-3 shadow-[0_12px_30px_rgba(0,0,0,0.14)]">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="text-[8px] font-mono tracking-[0.24em] text-cyan-300">AEGIS VECTOR PINNED</div>
-                  <div className="mt-1 text-[11px] font-semibold tracking-[0.08em] text-[var(--text-primary)]">
-                    {routeSnapshot ? 'Active route stays in the compact nav cockpit' : routeLoading ? 'Routing in progress from live GPS' : 'GPS route dock is reinforced at the Earth edge'}
-                  </div>
-                </div>
-                <div className={`rounded-full border px-2 py-1 text-[7px] font-mono tracking-[0.16em] ${routeSnapshot || routeLoading ? 'border-cyan-400/25 bg-cyan-400/10 text-cyan-200' : 'border-white/10 bg-white/[0.03] text-[var(--text-secondary)]'}`}>
-                  {routeSnapshot ? 'ACTIVE' : routeLoading ? 'ROUTING' : 'PINNED'}
-                </div>
-              </div>
-              <div className="mt-3 flex items-center justify-between gap-2">
-                <div className="text-[7px] font-mono uppercase tracking-[0.16em] text-[var(--text-secondary)]">
-                  Visible above the globe so it no longer gets buried in this rail.
-                </div>
-                <div className="relative shrink-0">
-                  <SharePanel mapView={mapView} activeLayers={activeLayers} mouseCoords={null} />
-                </div>
-              </div>
-            </div>
-            <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2 text-[7px] font-mono tracking-[0.16em] text-[var(--text-muted)]">
-              {copy.status.searchRailHint}
-            </div>
-            {(routeSnapshot || routeLoading) && (
-              <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/[0.06] px-3 py-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-[8px] font-mono tracking-[0.22em] text-cyan-300">NAV COCKPIT</div>
-                    <div className="mt-1 text-[11px] font-semibold text-[var(--text-primary)]">
-                      {routeLoading ? 'Calculando ruta…' : routeSnapshot?.destination.label}
-                    </div>
-                    {routeSnapshot && (
-                      <div className="mt-2 rounded-xl border border-[rgba(212,175,55,0.14)] bg-[rgba(212,175,55,0.06)] px-2.5 py-2">
-                        <div className="text-[7px] font-mono uppercase tracking-[0.18em] text-[var(--gold-primary)]">Stops</div>
-                        <div className="mt-1 flex flex-wrap gap-1.5 text-[7px] font-mono uppercase tracking-[0.14em] text-white/85">
-                          {routeSnapshot.waypoints.length > 0 ? routeSnapshot.waypoints.map((waypoint, index) => (
-                            <span key={`${waypoint.label}-${index}-${waypoint.lat}-${waypoint.lng}`} className="rounded-full border border-[rgba(212,175,55,0.18)] bg-[rgba(212,175,55,0.08)] px-2 py-1">
-                              S{index + 1}
-                            </span>
-                          )) : <span className="text-[var(--text-secondary)]">Direct route</span>}
-                        </div>
-                      </div>
-                    )}
-                    {routeSnapshot && (
-                      <div className="mt-2 grid grid-cols-2 gap-2 text-[8px] font-mono uppercase tracking-[0.14em] text-[var(--text-secondary)]">
-                        <div className="rounded-xl border border-white/8 bg-black/20 px-2.5 py-2">
-                          <div className="text-cyan-300">Mode</div>
-                          <div className="mt-1 text-[10px] font-semibold text-white">{formatRouteModeLabel(routeSnapshot.mode)}</div>
-                        </div>
-                        <div className="rounded-xl border border-white/8 bg-black/20 px-2.5 py-2">
-                          <div className="text-cyan-300">ETA</div>
-                          <div className="mt-1 text-[10px] font-semibold text-white">{routeEtaLabel}</div>
-                        </div>
-                        <div className="rounded-xl border border-white/8 bg-black/20 px-2.5 py-2">
-                          <div className="text-cyan-300">Remaining</div>
-                          <div className="mt-1 text-[10px] font-semibold text-white">{formatRouteDistance(remainingRouteDistance || routeSnapshot.distanceMeters)}</div>
-                        </div>
-                        <div className="rounded-xl border border-white/8 bg-black/20 px-2.5 py-2">
-                          <div className="text-cyan-300">Progress</div>
-                          <div className="mt-1 text-[10px] font-semibold text-white">{routeProgressLabel}</div>
-                        </div>
-                      </div>
-                    )}
-                    {routeSnapshot && (
-                      <div className="mt-2 flex flex-wrap gap-2 text-[8px] font-mono uppercase tracking-[0.14em] text-[var(--text-secondary)]">
-                        <span>{formatRouteDuration(routeSnapshot.durationSeconds)}</span>
-                        <span>•</span>
-                        <span>{navigationActive ? '3D FOLLOW' : 'ROUTE LOCKED'}</span>
-                        {routeRiskSummary && (
-                          <>
-                            <span>•</span>
-                            <span className={routeRiskSummary.level === 'high' ? 'text-rose-300' : routeRiskSummary.level === 'elevated' ? 'text-amber-300' : 'text-emerald-300'}>RISK {routeRiskSummary.score}</span>
-                          </>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  {routeSnapshot && (
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={toggleNavigationFollow}
-                        className="rounded-full border border-cyan-400/25 px-2 py-1 text-[7px] font-mono uppercase tracking-[0.16em] text-cyan-200 hover:bg-cyan-400/10"
-                      >
-                        {navigationActive ? 'Pause Follow' : 'Start 3D Nav'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={clearNavigationState}
-                        className="rounded-full border border-white/10 px-2 py-1 text-[7px] font-mono uppercase tracking-[0.16em] text-[var(--text-muted)] hover:text-white"
-                      >
-                        Clear
-                      </button>
-                    </div>
-                  )}
-                </div>
-                {routeSnapshot?.alternatives.length ? (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {routeSnapshot.alternatives.map((option) => (
-                      <button
-                        key={option.id}
-                        type="button"
-                        onClick={() => selectRouteOption(option.id)}
-                        className={`rounded-full border px-2 py-1 text-[7px] font-mono uppercase tracking-[0.16em] ${routeSnapshot.activeRouteId === option.id ? 'border-cyan-400/30 bg-cyan-400/10 text-cyan-200' : 'border-white/10 bg-white/[0.03] text-[var(--text-secondary)] hover:text-white'}`}
-                      >
-                        {option.label} · {formatRouteDuration(option.durationSeconds)}{option.id !== routeSnapshot.activeRouteId ? ` · ${option.durationSeconds >= routeSnapshot.durationSeconds ? '+' : '-'}${formatRouteDuration(Math.abs(option.durationSeconds - routeSnapshot.durationSeconds))}` : ''}
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-                {routeRiskSummary && (
-                  <div className="mt-3 rounded-2xl border border-white/8 bg-black/20 px-3 py-2.5 text-[8px] font-mono uppercase tracking-[0.16em] text-[var(--text-secondary)]">
-                    Threat scan · intel {routeRiskSummary.counts.incidents} · quakes {routeRiskSummary.counts.earthquakes} · weather {routeRiskSummary.counts.weather} · fires {routeRiskSummary.counts.fires} · gps {routeRiskSummary.counts.jamming}
-                  </div>
-                )}
-                {routeSnapshot && currentRouteStep && (
-                  <div className="mt-3 rounded-2xl border border-white/8 bg-black/20 px-3 py-3">
-                    <div className="text-[7px] font-mono tracking-[0.18em] text-cyan-300">NEXT MANEUVER</div>
-                    <div className="mt-2 text-[12px] font-semibold leading-snug text-white">{currentRouteStep.instruction}</div>
-                    <div className="mt-2 flex flex-wrap gap-2 text-[8px] font-mono uppercase tracking-[0.16em] text-[var(--text-secondary)]">
-                      <span>{formatStepDistance(currentRouteStep.distanceMeters)}</span>
-                      <span>•</span>
-                      <span>{formatRouteDistance(remainingRouteDistance || routeSnapshot.distanceMeters)}</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="glass-panel overflow-hidden border border-[var(--border-primary)]/70 bg-[linear-gradient(180deg,rgba(12,21,30,0.94),rgba(15,25,36,0.9))] shadow-[0_16px_40px_rgba(0,0,0,0.16)]">
-          <div className="flex items-center justify-between border-b border-[var(--border-primary)]/40 px-3 py-2">
-            <div>
-              <div className="text-[8px] font-mono tracking-[0.22em] text-[var(--text-secondary)]">{copy.status.deskStack}</div>
-              <div className="mt-1 text-[10px] font-semibold tracking-[0.14em] text-[var(--text-primary)]">{copy.status.deskStackHint}</div>
-            </div>
-          </div>
-          <div className="flex gap-1.5 p-2">
-            <button onClick={() => setRightRailFocus('alerts')} className={`flex-1 rounded-xl border px-2 py-1.5 text-[7px] font-mono tracking-[0.16em] transition-colors ${rightRailFocus === 'alerts' ? 'border-[rgba(16,185,129,0.45)] bg-[rgba(16,185,129,0.12)] text-[var(--alert-green)]' : 'border-white/8 bg-white/[0.03] text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>{copy.status.newswire}</button>
-            <button onClick={() => setRightRailFocus('recon')} className={`flex-1 rounded-xl border px-2 py-1.5 text-[7px] font-mono tracking-[0.16em] transition-colors ${rightRailFocus === 'recon' ? 'border-[rgba(34,211,238,0.45)] bg-[rgba(34,211,238,0.12)] text-[var(--cyan-primary)]' : 'border-white/8 bg-white/[0.03] text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>{copy.status.recon}</button>
-          </div>
-        </div>
-        {rightRailFocus === 'recon' && <OsintPanel onSweepVisualize={setSweepData} onScanGeolocate={(target: string, payload: OsintGeolocatePayload) => {
+        flowContent={<ScmPanel data={dataWithSdk} />}
+        marketsContent={<MarketsPanel data={dataWithSdk} spaceWeather={spaceWeather} />}
+        intelContent={<IntelFeed data={dataWithSdk} onLocate={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })} />}
+        incidentFusionStrip={(
+          <IncidentFusionStrip
+            backendStatus={backendStatus}
+            trackedEntityCount={trackedEntityCount}
+            activeIntelAlerts={activeIntelAlerts}
+            maritimePressure={maritimePressure}
+            newsCount={data.news?.length || 0}
+            earthquakeCount={data.earthquakes?.length || 0}
+            gdeltCount={data.gdelt?.length || 0}
+            operationalModeLabel={operationalModeLabel}
+            variant="rail"
+          />
+        )}
+        nasaMissionStrip={(
+          <NasaMissionStrip
+            locale={locale}
+            events={nasaEventMesh?.events || []}
+            source={nasaEventMesh?.source}
+            updatedAt={nasaEventMesh?.fetched_at}
+            totalOpen={nasaEventMesh?.total_open}
+          />
+        )}
+        sharePanel={<SharePanel mapView={mapView} activeLayers={activeLayers} mouseCoords={null} />}
+        alertsContent={<LiveAlerts data={dataWithSdk} onLocate={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })} onWatchFeed={(url, name) => { setLiveFeedUrl(url); setLiveFeedName(name); }} />}
+        reconContent={<OsintPanel onSweepVisualize={setSweepData} onScanGeolocate={(target: string, payload: OsintGeolocatePayload) => {
           setScanTargets(prev => {
             const existing = prev.filter(t => t.id !== target);
             return [{ id: target, timestamp: Date.now(), ...payload }, ...existing].slice(0, 10);
           });
           setFlyToLocation({ lat: payload.lat, lng: payload.lng, ts: Date.now() });
         }} />}
-        {rightRailFocus === 'alerts' && <LiveAlerts data={dataWithSdk} onLocate={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })} onWatchFeed={(url, name) => { setLiveFeedUrl(url); setLiveFeedName(name); }} />}
-      </div>}
+        routeSnapshot={routeSnapshot}
+        routeLoading={routeLoading}
+        navigationActive={navigationActive}
+        routeEtaLabel={routeEtaLabel}
+        routeProgressLabel={routeProgressLabel}
+        remainingRouteDistance={remainingRouteDistance}
+        routeRiskSummary={routeRiskSummary}
+        currentRouteStep={currentRouteStep}
+        onToggleNavigationFollow={toggleNavigationFollow}
+        onClearNavigationState={clearNavigationState}
+        onSelectRouteOption={selectRouteOption}
+      />
 
       {showAuxiliaryHud && <AiAnalyst data={dataWithSdk} hideMobileTrigger />}
 
-      {/* ── LIVE FEED VIEWER OVERLAY ── */}
-      <AnimatePresence>
-        {liveFeedUrl && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            className="fixed inset-0 z-[500] flex items-center justify-center bg-black/70 backdrop-blur-sm"
-            onClick={() => setLiveFeedUrl(null)}
-          >
-            <motion.div
-              initial={{ y: 20 }}
-              animate={{ y: 0 }}
-              className="w-[90vw] max-w-[900px] flex flex-col relative rounded-xl overflow-hidden border border-[var(--border-primary)] shadow-2xl bg-black"
-              onClick={e => e.stopPropagation()}
-            >
-              {/* Header */}
-              <div className="flex items-center justify-between px-4 py-2.5 bg-[#111] border-b border-[var(--border-primary)]">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-[#FF4081] animate-aegis-pulse" />
-                  <span className="text-[12px] font-mono font-bold text-white tracking-wider">{liveFeedName}</span>
-                  <span className="px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 font-mono text-[9px] font-bold">{copy.status.liveStream}</span>
-                  {!liveFeedEmbedAllowed && (
-                    <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 font-mono text-[9px]">{copy.status.externalOnly}</span>
-                  )}
-                </div>
-                <div className="flex items-center gap-3">
-                  <a
-                    href={getYouTubeWatchUrl(liveFeedUrl)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[var(--border-primary)] hover:bg-[var(--gold-primary)] hover:text-black text-white transition-colors text-[11px] font-mono"
-                  >
-                    <span>{copy.status.openInYouTube}</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                  <button onClick={() => setLiveFeedUrl(null)} className="text-white/70 hover:text-white transition-colors p-1">
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Body — iframe or external card */}
-              {liveFeedEmbedAllowed ? (
-                <div className="w-full aspect-video relative bg-black">
-                  <iframe
-                    src={liveFeedUrl}
-                    className="w-full h-full absolute inset-0"
-                    allow="autoplay; encrypted-media"
-                    allowFullScreen
-                  />
-                </div>
-              ) : (
-                <div className="w-full aspect-video flex items-center justify-center bg-black/95">
-                  <div className="text-center px-8">
-                    <div className="w-14 h-14 rounded-full bg-[#39FF14]/10 border border-[#39FF14]/20 flex items-center justify-center mx-auto mb-4">
-                      <ExternalLink className="w-6 h-6 text-[#39FF14]" />
-                    </div>
-                    <p className="text-[13px] font-mono font-bold text-white tracking-widest mb-2">EMBED RESTRICTED</p>
-                    <p className="text-[11px] font-mono text-white/50 mb-6 max-w-xs">
-                      {liveFeedName} does not allow third-party embedding. Click below to open the live stream directly.
-                    </p>
-                    <a
-                      href={getYouTubeWatchUrl(liveFeedUrl)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 px-6 py-2.5 rounded border border-[#39FF14]/40 text-[#39FF14] font-mono text-[12px] hover:bg-[#39FF14]/10 transition-colors tracking-wider"
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                      OPEN {copy.status.liveStream}
-                    </a>
-                  </div>
-                </div>
-              )}
-
-              {/* Footer — only show for embeddable feeds */}
-              {liveFeedEmbedAllowed && (
-                <div className="bg-[#111]/90 px-4 py-2.5 border-t border-[var(--border-primary)] flex items-center gap-2.5">
-                  <AlertTriangle className="w-4 h-4 text-[var(--gold-primary)] shrink-0" />
-                  <span className="text-[11px] font-mono text-white/70 leading-relaxed">
-                    If you see &ldquo;Video unavailable&rdquo;, use <strong className="text-[var(--gold-primary)]">{copy.status.openInYouTube}</strong> above.
-                  </span>
-                </div>
-              )}
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <LiveFeedOverlay
+        liveFeedUrl={liveFeedUrl}
+        liveFeedName={liveFeedName}
+        liveFeedEmbedAllowed={liveFeedEmbedAllowed}
+        liveStreamLabel={copy.status.liveStream}
+        externalOnlyLabel={copy.status.externalOnly}
+        openInYouTubeLabel={copy.status.openInYouTube}
+        watchUrl={liveFeedUrl ? getYouTubeWatchUrl(liveFeedUrl) : ''}
+        onClose={() => setLiveFeedUrl(null)}
+      />
 
       {/* ═══ MOBILE UI ═══ */}
       {isMobile && isEarthOps && (
         <>
           {(routeSnapshot || routeLoading) && (
-            <motion.div
-              initial={{ opacity: 0, y: 18 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 18 }}
-              transition={{ duration: 0.24 }}
-              className="fixed bottom-[4.35rem] left-2 right-2 z-[360] pointer-events-auto"
-            >
-              <div className="overflow-hidden rounded-[1.15rem] border border-cyan-300/24 bg-[rgba(5,13,22,0.88)] shadow-[0_14px_40px_rgba(0,0,0,0.30),0_0_18px_rgba(34,211,238,0.10)] backdrop-blur-lg">
-                <div className="flex items-center gap-2 px-2.5 py-2">
-                  <div className="relative h-8 w-8 shrink-0 rounded-full border border-cyan-300/28 bg-cyan-400/10">
-                    <div className="absolute inset-[6px] rounded-full border border-cyan-200/30" />
-                    <div className="absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-cyan-200 shadow-[0_0_12px_rgba(34,211,238,0.9)]" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5 text-[6px] font-mono uppercase tracking-[0.22em] text-cyan-300">
-                      <span>AEGIS VECTOR MODE</span>
-                      <span className={`rounded-full border px-1.5 py-0.5 text-[5px] ${navigationActive ? 'border-emerald-300/25 bg-emerald-300/10 text-emerald-200' : routeSnapshot ? 'border-cyan-300/20 bg-cyan-300/10 text-cyan-100/80' : 'border-amber-300/25 bg-amber-300/10 text-amber-200'}`}>{mobileVectorStatusLabel}</span>
-                      <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-1.5 py-0.5 text-[5px] text-emerald-100/75">FROM GPS</span>
-                      <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-1.5 py-0.5 text-[5px] text-cyan-100/75">Map clear</span>
-                    </div>
-                    <div className="mt-0.5 truncate text-[10px] font-semibold tracking-[0.04em] text-white">
-                      {routeLoading ? 'Calculando ruta desde tu GPS…' : routeSnapshot?.destination.label}
-                    </div>
-                    {routeSnapshot && (
-                      <div className="mt-1 rounded-xl border border-[rgba(212,175,55,0.14)] bg-[rgba(212,175,55,0.06)] px-2 py-1.5">
-                        <div className="text-[6px] font-mono uppercase tracking-[0.18em] text-[var(--gold-primary)]">Stops</div>
-                        <div className="mt-1 flex flex-wrap gap-1 text-[6px] font-mono uppercase tracking-[0.12em] text-white/85">
-                          {routeSnapshot.waypoints.length > 0 ? routeSnapshot.waypoints.map((waypoint, index) => (
-                            <span key={`${waypoint.label}-${index}-${waypoint.lat}-${waypoint.lng}`} className="rounded-full border border-[rgba(212,175,55,0.18)] bg-[rgba(212,175,55,0.08)] px-1.5 py-0.5">
-                              S{index + 1}
-                            </span>
-                          )) : <span className="text-[var(--text-secondary)]">Direct route</span>}
-                        </div>
-                      </div>
-                    )}
-                    {routeSnapshot && (
-                      <div className="mt-1 grid grid-cols-2 gap-1.5 text-[6px] font-mono uppercase tracking-[0.14em] text-[var(--text-secondary)]">
-                        <div className="rounded-xl border border-white/8 bg-black/20 px-2 py-1.5">
-                          <div className="text-cyan-300">From</div>
-                          <div className="mt-0.5 truncate text-[8px] font-semibold text-white">Live GPS</div>
-                          <div className="mt-0.5 text-[6px] text-[var(--text-secondary)]">{formatCoordinateLabel(routeSnapshot.origin)}</div>
-                        </div>
-                        <div className="rounded-xl border border-white/8 bg-black/20 px-2 py-1.5">
-                          <div className="text-cyan-300">To</div>
-                          <div className="mt-0.5 truncate text-[8px] font-semibold text-white">{routeSnapshot.destination.label}</div>
-                          <div className="mt-0.5 text-[6px] text-[var(--text-secondary)]">{formatCoordinateLabel(routeSnapshot.destination)}</div>
-                        </div>
-                      </div>
-                    )}
-                    {routeSnapshot && (
-                      <div className="mt-1 grid grid-cols-2 gap-1.5 text-[6px] font-mono uppercase tracking-[0.14em] text-[var(--text-secondary)]">
-                        <div className="rounded-xl border border-white/8 bg-black/20 px-2 py-1.5">
-                          <div className="text-cyan-300">Mode</div>
-                          <div className="mt-0.5 text-[8px] font-semibold text-white">{formatRouteModeLabel(routeSnapshot.mode)}</div>
-                        </div>
-                        <div className="rounded-xl border border-white/8 bg-black/20 px-2 py-1.5">
-                          <div className="text-cyan-300">ETA</div>
-                          <div className="mt-0.5 text-[8px] font-semibold text-white">{routeEtaLabel}</div>
-                        </div>
-                        <div className="rounded-xl border border-white/8 bg-black/20 px-2 py-1.5">
-                          <div className="text-cyan-300">Remain</div>
-                          <div className="mt-0.5 text-[8px] font-semibold text-white">{formatRouteDistance(remainingRouteDistance || routeSnapshot.distanceMeters)}</div>
-                        </div>
-                        <div className="rounded-xl border border-white/8 bg-black/20 px-2 py-1.5">
-                          <div className="text-cyan-300">Progress</div>
-                          <div className="mt-0.5 text-[8px] font-semibold text-white">{routeProgressLabel}</div>
-                        </div>
-                      </div>
-                    )}
-                    {routeSnapshot && (
-                      <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[7px] font-mono uppercase tracking-[0.13em] text-[var(--text-secondary)]">
-                        <span>{formatRouteDuration(routeSnapshot.durationSeconds)}</span>
-                        <span>•</span>
-                        <span className={navigationActive ? 'text-emerald-300' : 'text-cyan-200'}>{navigationActive ? 'FOLLOW LIVE' : 'READY'}</span>
-                        {routeRiskSummary && <span className={routeRiskSummary.level === 'high' ? 'text-rose-300' : routeRiskSummary.level === 'elevated' ? 'text-amber-300' : 'text-emerald-300'}>RISK {routeRiskSummary.score}</span>}
-                      </div>
-                    )}
-                  </div>
-                  {routeSnapshot && (
-                    <div className="flex shrink-0 flex-col gap-1">
-                      <button
-                        type="button"
-                        onClick={toggleNavigationFollow}
-                        className="rounded-full border border-cyan-300/25 bg-cyan-300/10 px-2.5 py-1 text-[6px] font-mono uppercase tracking-[0.16em] text-cyan-100"
-                      >
-                        {navigationActive ? 'Pause' : 'Go'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={clearNavigationState}
-                        className="rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[6px] font-mono uppercase tracking-[0.16em] text-[var(--text-muted)]"
-                      >
-                        Clear
-                      </button>
-                    </div>
-                  )}
-                </div>
-                {routeSnapshot && currentRouteStep && (
-                  <div className="border-t border-cyan-300/12 bg-cyan-400/[0.045] px-3 py-2">
-                    <div className="text-[6px] font-mono uppercase tracking-[0.22em] text-cyan-300">Next maneuver</div>
-                    <div className="mt-0.5 line-clamp-2 text-[9px] font-semibold leading-snug text-white/90">{currentRouteStep.instruction}</div>
-                  </div>
-                )}
-              </div>
-            </motion.div>
+            <RouteCockpitMobile
+              routeLoading={routeLoading}
+              routeSnapshot={routeSnapshot}
+              navigationActive={navigationActive}
+              mobileVectorStatusLabel={mobileVectorStatusLabel}
+              routeEtaLabel={routeEtaLabel}
+              routeProgressLabel={routeProgressLabel}
+              remainingRouteDistance={remainingRouteDistance}
+              routeRiskSummary={routeRiskSummary}
+              currentRouteStep={currentRouteStep}
+              onToggleNavigationFollow={toggleNavigationFollow}
+              onClearNavigationState={clearNavigationState}
+            />
           )}
 
-          {/* Mobile Bottom Navigation */}
-          <div className="mobile-nav">
-            <div className="glass-panel mobile-nav-inner">
-              {mobileNavTabs.map(tab => (
-                <button key={tab.id} onClick={() => setMobilePanel(mobilePanel === tab.id ? null : tab.id)}
-                  className={`mobile-nav-btn ${mobilePanel === tab.id ? 'active' : ''}`}>
-                  <tab.icon className={`w-4 h-4 ${tab.accent ? 'text-[var(--cyan-primary)]' : ''}`} />
-                  <span className={tab.accent ? 'text-[var(--cyan-primary)]' : ''}>{tab.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Mobile Drawer */}
-          <AnimatePresence>
-            {mobilePanel && (
-              <motion.div
-                initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
-                transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-                className="fixed bottom-[52px] left-0 right-0 z-[400] glass-panel rounded-b-none overflow-y-auto styled-scrollbar"
-                style={{ maxHeight: mobilePanel === 'search' ? 'min(42vh, calc(100dvh - 130px))' : 'min(55vh, calc(100dvh - 100px))', paddingBottom: 'env(safe-area-inset-bottom, 4px)' }}
-              >
-                <div className="mobile-drawer-handle" />
-                <div className="px-3 pb-3">
-                  <MobileDrawerHeaderSummary
-                    commandPanelLabel={copy.status.mobileCommandPanel}
-                    panelTitle={mobilePanelTitle}
-                    backendStatusLabel={backendStatusLabel}
-                    modeLabel={copy.status.mode}
-                    alertsLabel={copy.status.alerts}
-                    trackedLabel={copy.status.tracked}
-                    operationalModeLabel={operationalModeLabel}
-                    activeIntelAlerts={activeIntelAlerts}
-                    trackedEntityCount={trackedEntityCount}
-                    onClose={() => setMobilePanel(null)}
-                  />
-                  {mobilePanel === 'layers' && (
-                    <MobileLayersPanel
-                      metrics={(
-                        <MobileLayersMetrics
-                          totalFlights={totalFlights}
-                          satelliteCount={data.satellites?.length || 0}
-                          cameraCount={data.cameras?.length || 0}
-                          weatherEventCount={data.weather_events?.length || 0}
-                          infrastructureCount={data.infrastructure?.length || 0}
-                        />
-                      )}
-                      layerPanel={<LayerPanel data={data} activeLayers={activeLayers} setActiveLayers={setActiveLayers} locale={locale} />}
-                      presets={<ViewPresets locale={locale} onNavigate={(lat, lng, zoom) => { setFlyToLocation({ lat, lng, ts: Date.now() }); setMapView(v => ({ ...v, zoom })); setMobilePanel(null); }} />}
-                    />
-                  )}
-                  {mobilePanel === 'markets' && <MarketsPanel data={data} spaceWeather={spaceWeather} />}
-                  {mobilePanel === 'intel' && <IntelFeed data={data} onLocate={(lat, lng) => { setFlyToLocation({ lat, lng, ts: Date.now() }); setMobilePanel(null); }} />}
-                  {mobilePanel === 'search' && (
-                    <MobileSearchPanel
-                      routeError={routeError}
-                      searchBar={<SearchBar defaultOpen onLocate={(result) => { setFlyToLocation({ lat: result.lat, lng: result.lng, zoom: result.zoom, bbox: result.bbox, label: result.label, ts: Date.now() }); setMobilePanel(null); }} onRoute={async (request) => { await handleRouteRequest(request); setMobilePanel(null); }} />}
-                      sharePanel={<SharePanel mapView={mapView} activeLayers={activeLayers} mouseCoords={null} />}
-                    />
-                  )}
-                  {mobilePanel === 'recon' && (
-                    <MobileReconPanel
-                      osintPanel={(
-                        <>
-                          <AegisAnalystDockButton />
-                          <OsintPanel isOpen={true} onClose={() => setMobilePanel(null)} isMobile={true} onSweepVisualize={setSweepData} />
-                        </>
-                      )}
-                    />
-                  )}
-                </div>
-              </motion.div>
+          <MobileCommandDrawer
+            mobileNavTabs={mobileNavTabs}
+            mobilePanel={mobilePanel}
+            onTogglePanel={(panel) => setMobilePanel(mobilePanel === panel ? null : panel)}
+            headerSummary={(
+              <MobileDrawerHeaderSummary
+                commandPanelLabel={copy.status.mobileCommandPanel}
+                panelTitle={mobilePanelTitle}
+                backendStatusLabel={backendStatusLabel}
+                modeLabel={copy.status.mode}
+                alertsLabel={copy.status.alerts}
+                trackedLabel={copy.status.tracked}
+                operationalModeLabel={operationalModeLabel}
+                activeIntelAlerts={activeIntelAlerts}
+                trackedEntityCount={trackedEntityCount}
+                onClose={() => setMobilePanel(null)}
+              />
             )}
-          </AnimatePresence>
+            layersContent={(
+              <MobileLayersPanel
+                metrics={(
+                  <MobileLayersMetrics
+                    totalFlights={totalFlights}
+                    satelliteCount={data.satellites?.length || 0}
+                    cameraCount={data.cameras?.length || 0}
+                    weatherEventCount={data.weather_events?.length || 0}
+                    infrastructureCount={data.infrastructure?.length || 0}
+                  />
+                )}
+                layerPanel={<LayerPanel data={data} activeLayers={activeLayers} setActiveLayers={setActiveLayers} locale={locale} />}
+                presets={<ViewPresets locale={locale} onNavigate={(lat, lng, zoom) => { setFlyToLocation({ lat, lng, ts: Date.now() }); setMapView(v => ({ ...v, zoom })); setMobilePanel(null); }} />}
+              />
+            )}
+            marketsContent={<MarketsPanel data={data} spaceWeather={spaceWeather} />}
+            intelContent={<IntelFeed data={data} onLocate={(lat, lng) => { setFlyToLocation({ lat, lng, ts: Date.now() }); setMobilePanel(null); }} />}
+            searchContent={(
+              <MobileSearchPanel
+                routeError={routeError}
+                searchBar={<SearchBar defaultOpen onLocate={(result) => { setFlyToLocation({ lat: result.lat, lng: result.lng, zoom: result.zoom, bbox: result.bbox, label: result.label, ts: Date.now() }); setMobilePanel(null); }} onRoute={async (request) => { await handleRouteRequest(request); setMobilePanel(null); }} />}
+                sharePanel={<SharePanel mapView={mapView} activeLayers={activeLayers} mouseCoords={null} />}
+              />
+            )}
+            reconContent={(
+              <MobileReconPanel
+                osintPanel={(
+                  <>
+                    <AegisAnalystDockButton />
+                    <OsintPanel isOpen={true} onClose={() => setMobilePanel(null)} isMobile={true} onSweepVisualize={setSweepData} />
+                  </>
+                )}
+              />
+            )}
+          />
         </>
       )}
 
-      {/* ── BOTTOM CENTER (desktop) ── */}
-      {showDesktopBottomBar && (
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 3, duration: 0.8 }} className="desktop-only absolute bottom-5 left-1/2 -translate-x-1/2 z-[200] pointer-events-auto">
-          <div className="glass-panel px-5 py-2.5 flex items-center gap-0 aegis-glow relative overflow-hidden" style={{ borderImage: 'linear-gradient(90deg, rgba(212,175,55,0.05), rgba(212,175,55,0.2), rgba(212,175,55,0.05)) 1', borderImageSlice: 1, borderWidth: '1px', borderStyle: 'solid' }}>
+      <BottomDesktopHud
+        showDesktopBottomBar={showDesktopBottomBar}
+        coordsDisplayRef={coordsDisplayRef}
+        locationLabel={locationLabel}
+        zoom={mapView.zoom}
+        activeLayerCount={activeLayerCount}
+        entityCount={<ActiveEntityCount data={data} />}
+        scaleBar={<ScaleBar zoom={mapView.zoom} latitude={mapView.latitude} />}
+      />
 
-            {/* Animated scan line sweeping across the bar */}
-            <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden="true">
-              <div className="absolute top-0 bottom-0 w-[60px] bg-gradient-to-r from-transparent via-[var(--gold-primary)]/[0.07] to-transparent" style={{ animation: 'hud-scanline 4s ease-in-out infinite' }} />
-            </div>
-
-            {/* COORDINATES */}
-            <div className="flex flex-col items-center min-w-[110px] px-3">
-              <div className="hud-label">COORDINATES</div>
-              <div ref={coordsDisplayRef} className="text-[10px] font-mono font-bold text-[var(--gold-primary)] tracking-wide tabular-nums">—</div>
-            </div>
-
-            <div className="w-px h-8 bg-gradient-to-b from-transparent via-[var(--border-primary)] to-transparent flex-shrink-0" />
-
-            {/* LOCATION */}
-            <div className="flex flex-col items-center min-w-[160px] max-w-[280px] px-3">
-              <div className="hud-label">LOCATION</div>
-              <div className="text-[9px] text-[var(--text-secondary)] font-mono truncate max-w-[280px]">{locationLabel || 'Hover over map...'}</div>
-            </div>
-
-            <div className="w-px h-8 bg-gradient-to-b from-transparent via-[var(--border-primary)] to-transparent flex-shrink-0" />
-
-            {/* ZOOM */}
-            <div className="flex flex-col items-center px-3">
-              <div className="hud-label">ZOOM</div>
-              <div className="text-[10px] font-mono font-bold text-[var(--gold-primary)] tabular-nums">{mapView.zoom.toFixed(1)}</div>
-            </div>
-
-            <div className="w-px h-8 bg-gradient-to-b from-transparent via-[var(--border-primary)] to-transparent flex-shrink-0" />
-
-            {/* ACTIVE LAYERS */}
-            <div className="flex flex-col items-center px-3 min-w-[60px]">
-              <div className="hud-label">ACTIVE LAYERS</div>
-              <div className="flex items-center gap-1">
-                <Layers className="w-3 h-3 text-[var(--gold-primary)]" />
-                <span className="text-[10px] font-mono font-bold text-[var(--gold-primary)] tabular-nums">{activeLayerCount}</span>
-              </div>
-            </div>
-
-            <div className="w-px h-8 bg-gradient-to-b from-transparent via-[var(--border-primary)] to-transparent flex-shrink-0" />
-
-            {/* ENTITIES */}
-            <div className="flex flex-col items-center px-3 min-w-[70px]">
-              <div className="hud-label">ENTITIES</div>
-              <div className="flex items-center gap-1">
-                <Database className="w-3 h-3 text-[var(--alert-green)]" />
-                <ActiveEntityCount data={data} />
-              </div>
-            </div>
-
-          </div>
-        </motion.div>
-      )}
-
-      {/* ── Scale Bar (desktop) ── */}
-      {showDesktopBottomBar && <div className="desktop-only absolute bottom-[4.5rem] left-[18.5rem] xl:left-[20rem] z-[201] pointer-events-none">
-        <ScaleBar zoom={mapView.zoom} latitude={mapView.latitude} />
-      </div>}
-
-      {/* ── Region Dossier ── */}
-      {(regionDossier || dossierLoading) && (
-        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="absolute top-16 md:top-20 left-2 right-2 md:left-1/2 md:right-auto md:-translate-x-1/2 z-[300] md:w-[480px] max-h-[65vh] overflow-y-auto styled-scrollbar">
-          <div className="glass-panel p-5 aegis-glow">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-mono font-bold text-[var(--gold-primary)] tracking-wider">REGION DOSSIER</h2>
-              <button onClick={() => { setRegionDossier(null); setDossierLoading(false); }} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] text-xs">✕</button>
-            </div>
-            {dossierLoading ? (
-              <div className="text-center py-8">
-                <div className="w-5 h-5 border-2 border-[var(--gold-primary)] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-                <span className="text-[8px] font-mono text-[var(--text-muted)] tracking-widest">COMPILING INTEL...</span>
-              </div>
-            ) : regionDossier && (
-              <div className="space-y-3">
-                <div><div className="hud-label mb-0.5">LOCATION</div><div className="text-xs text-[var(--text-primary)]">{regionDossier.location?.display_name}</div></div>
-                {regionDossier.country && (
-                  <div className="grid grid-cols-2 gap-2">
-                    <div><div className="hud-label mb-0.5">COUNTRY</div><div className="text-xs text-[var(--text-primary)]">{regionDossier.country.flag} {regionDossier.country.name}</div></div>
-                    <div><div className="hud-label mb-0.5">CAPITAL</div><div className="text-xs text-[var(--text-primary)]">{regionDossier.country.capital}</div></div>
-                    <div><div className="hud-label mb-0.5">POPULATION</div><div className="text-xs text-[var(--text-primary)]">{regionDossier.country.population?.toLocaleString()}</div></div>
-                    <div><div className="hud-label mb-0.5">REGION</div><div className="text-xs text-[var(--text-primary)]">{regionDossier.country.subregion || regionDossier.country.region}</div></div>
-                    <div><div className="hud-label mb-0.5">LANGUAGES</div><div className="text-xs text-[var(--text-primary)]">{regionDossier.country.languages?.join(', ')}</div></div>
-                    <div><div className="hud-label mb-0.5">AREA</div><div className="text-xs text-[var(--text-primary)]">{regionDossier.country.area?.toLocaleString()} km²</div></div>
-                  </div>
-                )}
-                {regionDossier.live_context && (
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3 space-y-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <div className="hud-label mb-0.5">LIVE TERRITORY CONTEXT</div>
-                        <div className="text-[8px] text-[var(--text-muted)] tracking-[0.2em]">WEATHER • CLOCK • CAMERAS</div>
-                      </div>
-                      {regionDossier.live_context.local_time && (
-                        <div className="text-right">
-                          <div className="text-xs font-mono text-[var(--text-primary)]">{regionDossier.live_context.local_time}</div>
-                          <div className="text-[8px] text-[var(--text-muted)]">{regionDossier.live_context.timezone_abbr || regionDossier.live_context.timezone}</div>
-                        </div>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="rounded-xl border border-white/8 bg-black/20 p-2">
-                        <div className="hud-label mb-1">SURFACE WEATHER</div>
-                        <div className="text-xs text-[var(--text-primary)]">{regionDossier.live_context.weather?.summary || 'Unavailable'}</div>
-                        <div className="text-[8px] text-[var(--text-muted)] mt-1">
-                          {typeof regionDossier.live_context.weather?.temperature_c === 'number' ? `${Math.round(regionDossier.live_context.weather.temperature_c)}°C` : '—'}
-                          {typeof regionDossier.live_context.weather?.feels_like_c === 'number' ? ` • feels ${Math.round(regionDossier.live_context.weather.feels_like_c)}°C` : ''}
-                        </div>
-                        <div className="text-[8px] text-[var(--text-muted)] mt-0.5">
-                          {typeof regionDossier.live_context.weather?.wind_kmh === 'number' ? `Wind ${Math.round(regionDossier.live_context.weather.wind_kmh)} km/h` : 'No wind telemetry'}
-                        </div>
-                      </div>
-                      <div className="rounded-xl border border-white/8 bg-black/20 p-2">
-                        <div className="hud-label mb-1">NEARBY CAMERAS</div>
-                        <div className="text-xs text-[var(--text-primary)]">{regionDossier.live_context.nearby_cameras?.count ?? 0} live feeds</div>
-                        <div className="text-[8px] text-[var(--text-muted)] mt-1">
-                          {regionDossier.live_context.nearby_cameras?.countries?.length ? regionDossier.live_context.nearby_cameras.countries.join(', ') : 'No regional feed clusters'}
-                        </div>
-                        <div className="text-[8px] text-[var(--text-muted)] mt-0.5">
-                          {regionDossier.live_context.nearby_cameras?.closest?.name
-                            ? `${regionDossier.live_context.nearby_cameras.closest.name} • ${regionDossier.live_context.nearby_cameras.closest.distance_km?.toFixed?.(1) ?? regionDossier.live_context.nearby_cameras.closest.distance_km} km`
-                            : 'No close camera selected'}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="rounded-xl border border-white/8 bg-black/20 p-2">
-                        <div className="hud-label mb-1">NEARBY WEATHER EVENTS</div>
-                        <div className="text-xs text-[var(--text-primary)]">{regionDossier.live_context.nearby_weather?.count ?? 0} open markers</div>
-                        <div className="text-[8px] text-[var(--text-muted)] mt-1">Within {regionDossier.live_context.nearby_weather?.radius_km ?? 0} km of the selected territory</div>
-                      </div>
-                      <div className="rounded-xl border border-white/8 bg-black/20 p-2">
-                        <div className="hud-label mb-1">TIME ZONE</div>
-                        <div className="text-xs text-[var(--text-primary)]">{regionDossier.live_context.timezone_abbr || regionDossier.live_context.timezone || 'Unavailable'}</div>
-                        <div className="text-[8px] text-[var(--text-muted)] mt-1">Live context updates when you right-click or tap supported events.</div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                {regionDossier.head_of_state && (<div><div className="hud-label mb-0.5">HEAD OF STATE</div><div className="text-xs text-[var(--gold-primary)]">{regionDossier.head_of_state.name}</div><div className="text-[8px] text-[var(--text-muted)]">{regionDossier.head_of_state.position}</div></div>)}
-                {regionDossier.wikipedia && (<div><div className="hud-label mb-1">INTELLIGENCE BRIEF</div><div className="flex gap-3">{regionDossier.wikipedia.thumbnail && <Image src={regionDossier.wikipedia.thumbnail} alt="" width={56} height={56} unoptimized className="w-14 h-14 rounded object-cover flex-shrink-0" /> }<p className="text-[8px] text-[var(--text-secondary)] leading-relaxed">{regionDossier.wikipedia.extract}</p></div></div>)}
-              </div>
-            )}
-          </div>
-        </motion.div>
-      )}
+      <RegionDossierOverlay
+        regionDossier={regionDossier}
+        dossierLoading={dossierLoading}
+        onClose={() => { setRegionDossier(null); setDossierLoading(false); }}
+      />
 
       {/* ── Camera Viewer ── */}
       <CameraViewer
