@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import { motion } from 'framer-motion';
 import { ExternalLink, Orbit, Radio, TriangleAlert } from 'lucide-react';
 import type { Locale } from '@/lib/i18n';
@@ -37,7 +38,7 @@ function formatUtc(date: string | undefined, locale: Locale) {
   }
 }
 
-export default function NasaMissionStrip({ locale, events, source, updatedAt, totalOpen }: NasaMissionStripProps) {
+function NasaMissionStrip({ locale, events, source, updatedAt, totalOpen }: NasaMissionStripProps) {
   const copy = getDashboardCopy(locale).nasa;
   const topEvents = events.slice(0, 2);
 
@@ -109,3 +110,5 @@ export default function NasaMissionStrip({ locale, events, source, updatedAt, to
     </motion.div>
   );
 }
+
+export default memo(NasaMissionStrip);

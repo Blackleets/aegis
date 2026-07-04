@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronDown,
@@ -12,6 +12,8 @@ import {
   RadioTower,
   Maximize2,
   Minimize2,
+  ExternalLink,
+  RefreshCw,
 } from 'lucide-react';
 
 interface NewsItem {
@@ -52,6 +54,7 @@ interface LiveAlertsData {
 interface LiveAlertsProps {
   data: LiveAlertsData;
   onLocate: (lat: number, lng: number) => void;
+  onWatchFeed?: (url: string, name: string) => void;
 }
 
 const RISK_COLORS: Record<string, string> = {
@@ -71,21 +74,76 @@ function getTimeLabel(value?: string) {
   }
 }
 
+function getLastUpdatedLabel(value?: string) {
+  if (!value) return 'waiting';
+  const diffSeconds = Math.max(0, Math.floor((Date.now() - Date.parse(value)) / 1000));
+  if (diffSeconds < 60) return `${diffSeconds}s ago`;
+  const diffMinutes = Math.floor(diffSeconds / 60);
+  if (diffMinutes < 60) return `${diffMinutes}m ago`;
+  const diffHours = Math.floor(diffMinutes / 60);
+  return `${diffHours}h ago`;
+}
+
 function isBlockedSource(item: NewsItem) {
   const source = String(item.source || '').toLowerCase();
   const link = String(item.link || '').toLowerCase();
   return source.includes('t.me') || source.includes('telegram') || link.includes('t.me/') || link.includes('telegram.');
 }
 
-export default function LiveAlerts({ data, onLocate }: LiveAlertsProps) {
+export default function LiveAlerts({ data, onLocate, onWatchFeed }: LiveAlertsProps) {
   const [expanded, setExpanded] = useState(true);
   const [maximized, setMaximized] = useState(false);
   const [filter, setFilter] = useState<'all' | 'news' | 'quakes'>('all');
+  const [liveData, setLiveData] = useState<LiveAlertsData | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<string>(new Date().toISOString());
+  const [refreshing, setRefreshing] = useState(false);
+  const effectiveData = liveData ?? data;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const refresh = async () => {
+      setRefreshing(true);
+      try {
+        const [newsResponse, quakeResponse] = await Promise.all([
+          fetch('/api/news', { cache: 'no-store' }),
+          fetch('/api/earthquakes', { cache: 'no-store' }),
+        ]);
+
+        if (cancelled) return;
+
+        const nextNewsPayload = newsResponse.ok ? await newsResponse.json() as { news?: NewsItem[] } | NewsItem[] : undefined;
+        const nextQuakesPayload = quakeResponse.ok ? await quakeResponse.json() as { earthquakes?: EarthquakeItem[] } | EarthquakeItem[] : undefined;
+        const nextNews = Array.isArray(nextNewsPayload) ? nextNewsPayload : nextNewsPayload?.news;
+        const nextQuakes = Array.isArray(nextQuakesPayload) ? nextQuakesPayload : nextQuakesPayload?.earthquakes;
+
+        setLiveData((prev) => ({
+          news: nextNews ?? prev.news,
+          earthquakes: nextQuakes ?? prev.earthquakes,
+        }));
+        setLastUpdated(new Date().toISOString());
+      } catch {
+        // Keep last good payload.
+      } finally {
+        if (!cancelled) setRefreshing(false);
+      }
+    };
+
+    void refresh();
+    const interval = window.setInterval(() => {
+      void refresh();
+    }, 60000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, []);
 
   const alerts = useMemo(() => {
     const unified: AlertItem[] = [];
 
-    (data.news || [])
+    (effectiveData.news || [])
       .filter((item) => !isBlockedSource(item))
       .forEach((item) => {
         unified.push({
@@ -101,7 +159,7 @@ export default function LiveAlerts({ data, onLocate }: LiveAlertsProps) {
         });
       });
 
-    data.earthquakes?.slice(0, 5).forEach((quake) => {
+    effectiveData.earthquakes?.slice(0, 8).forEach((quake) => {
       unified.push({
         type: 'quake',
         title: `M${quake.magnitude} · ${quake.place}`,
@@ -113,8 +171,8 @@ export default function LiveAlerts({ data, onLocate }: LiveAlertsProps) {
       });
     });
 
-    return unified;
-  }, [data.earthquakes, data.news]);
+    return unified.sort((a, b) => Date.parse(b.time || '') - Date.parse(a.time || ''));
+  }, [effectiveData]);
 
   const filtered = filter === 'all'
     ? alerts
@@ -161,12 +219,16 @@ export default function LiveAlerts({ data, onLocate }: LiveAlertsProps) {
             <RadioTower className="h-4 w-4 text-[var(--cyan-primary)]" />
           </div>
           <div>
-            <div className="text-[8px] font-mono uppercase tracking-[0.3em] text-[var(--text-muted)]">Verified desk</div>
-            <div className="mt-1 text-[13px] font-semibold tracking-[0.08em] text-[var(--text-primary)]">Verified Newswire</div>
+            <div className="text-[8px] font-mono uppercase tracking-[0.3em] text-[var(--text-muted)]">Live incident desk</div>
+            <div className="mt-1 text-[13px] font-semibold tracking-[0.08em] text-[var(--text-primary)]">Realtime Newswire</div>
           </div>
         </div>
 
         <div className="flex items-center gap-2 text-[var(--text-muted)]">
+          <div className="inline-flex items-center gap-1.5 rounded-full border border-cyan-400/10 bg-cyan-400/8 px-2 py-1 text-[7px] font-mono uppercase tracking-[0.16em] text-cyan-300">
+            <RefreshCw className={`h-3 w-3 ${refreshing ? 'animate-spin' : ''}`} />
+            {getLastUpdatedLabel(lastUpdated)}
+          </div>
           <button
             type="button"
             onClick={(e) => {
@@ -208,7 +270,7 @@ export default function LiveAlerts({ data, onLocate }: LiveAlertsProps) {
             </div>
 
             <div className="mb-2 text-[8px] font-mono uppercase tracking-[0.18em] text-[var(--text-muted)]">
-              Real-source incident desk · news + seismic activity
+              Real-source incident desk · autorefresh 60s · news + seismic activity
             </div>
 
             <div className="mb-3 flex gap-1.5 overflow-x-auto">
@@ -272,15 +334,30 @@ export default function LiveAlerts({ data, onLocate }: LiveAlertsProps) {
                             </span>
                           )}
                           {alert.url && (
-                            <a
-                              href={alert.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 rounded-full border border-white/10 px-2 py-1 text-[8px] font-semibold uppercase tracking-[0.16em] text-[var(--cyan-primary)] hover:underline"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              Read source
-                            </a>
+                            <>
+                              <a
+                                href={alert.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 rounded-full border border-white/10 px-2 py-1 text-[8px] font-semibold uppercase tracking-[0.16em] text-[var(--cyan-primary)] hover:underline"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <ExternalLink className="h-3 w-3" />
+                                Read source
+                              </a>
+                              {onWatchFeed && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onWatchFeed(alert.url!, alert.source || alert.title);
+                                  }}
+                                  className="inline-flex items-center gap-1 rounded-full border border-white/10 px-2 py-1 text-[8px] font-semibold uppercase tracking-[0.16em] text-emerald-300"
+                                >
+                                  Live feed
+                                </button>
+                              )}
+                            </>
                           )}
                         </div>
                       </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { memo, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Keyboard, X } from 'lucide-react';
 
@@ -15,12 +15,16 @@ const SHORTCUTS = [
   { key: 'ESC', desc: 'Close panels / popups' },
 ];
 
-export default function KeyboardShortcuts() {
+function KeyboardShortcuts() {
   const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (['INPUT', 'TEXTAREA'].includes((e.target as Element)?.tagName)) return;
+      const target = e.target as HTMLElement | null;
+      const tagName = target?.tagName;
+      const isEditable = target?.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(tagName ?? '');
+      if (isEditable) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.key === '?' || (e.key === '/' && e.shiftKey)) setIsOpen(p => !p);
       if (e.key === 'Escape') setIsOpen(false);
     };
@@ -71,3 +75,5 @@ export default function KeyboardShortcuts() {
     </AnimatePresence>
   );
 }
+
+export default memo(KeyboardShortcuts);

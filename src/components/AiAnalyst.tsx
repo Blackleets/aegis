@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { memo, useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Brain,
@@ -114,6 +114,7 @@ interface FusionDossier {
 
 interface AiAnalystProps {
   data: DashboardData;
+  hideMobileTrigger?: boolean;
 }
 
 type AnalystBridgeAction = 'open' | 'briefing' | 'fusion';
@@ -216,10 +217,10 @@ ${bullets(dossier.watchlist)}`;
    Component
    ───────────────────────────────────────────────────────────── */
 
-export default function AiAnalyst({ data }: AiAnalystProps) {
+function AiAnalyst({ data, hideMobileTrigger = false }: AiAnalystProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [inputText, setInputText] = useState('');
+
   const [isLoading, setIsLoading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [apiKeyInput, setApiKeyInput] = useState(() => {
@@ -233,6 +234,10 @@ export default function AiAnalyst({ data }: AiAnalystProps) {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const focusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const settingsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const requestAbortRef = useRef<AbortController | null>(null);
+  const intelligenceContext = useMemo(() => buildContext(data), [data]);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -241,10 +246,21 @@ export default function AiAnalyst({ data }: AiAnalystProps) {
 
   // Focus input when opened
   useEffect(() => {
+    if (focusTimerRef.current) clearTimeout(focusTimerRef.current);
     if (isOpen && !showSettings) {
-      setTimeout(() => inputRef.current?.focus(), 300);
+      focusTimerRef.current = setTimeout(() => inputRef.current?.focus(), 300);
     }
+    return () => {
+      if (focusTimerRef.current) clearTimeout(focusTimerRef.current);
+    };
   }, [isOpen, showSettings]);
+
+  useEffect(() => {
+    return () => {
+      if (settingsTimerRef.current) clearTimeout(settingsTimerRef.current);
+      requestAbortRef.current?.abort();
+    };
+  }, []);
 
   const getHeaders = useCallback((): Record<string, string> => {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -270,11 +286,14 @@ export default function AiAnalyst({ data }: AiAnalystProps) {
     setIsLoading(true);
 
     try {
-      const context = buildContext(data);
+      requestAbortRef.current?.abort();
+      const controller = new AbortController();
+      requestAbortRef.current = controller;
       const res = await fetch('/api/ai/analyze', {
         method: 'POST',
         headers: getHeaders(),
-        body: JSON.stringify({ query, context }),
+        body: JSON.stringify({ query, context: intelligenceContext }),
+        signal: controller.signal,
       });
 
       const json = await res.json();
@@ -306,7 +325,7 @@ export default function AiAnalyst({ data }: AiAnalystProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [inputText, isLoading, data, getHeaders]);
+  }, [intelligenceContext, isLoading, getHeaders]);
 
   const handleBriefing = useCallback(async () => {
     if (isLoading) return;
@@ -321,11 +340,14 @@ export default function AiAnalyst({ data }: AiAnalystProps) {
     setIsLoading(true);
 
     try {
-      const context = buildContext(data);
+      requestAbortRef.current?.abort();
+      const controller = new AbortController();
+      requestAbortRef.current = controller;
       const res = await fetch('/api/ai/briefing', {
         method: 'POST',
         headers: getHeaders(),
-        body: JSON.stringify({ context }),
+        body: JSON.stringify({ context: intelligenceContext }),
+        signal: controller.signal,
       });
 
       const json = await res.json();
@@ -357,7 +379,7 @@ export default function AiAnalyst({ data }: AiAnalystProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [isLoading, data, getHeaders]);
+  }, [intelligenceContext, isLoading, getHeaders]);
 
   const handleFusionDossier = useCallback(async () => {
     if (isLoading) return;
@@ -372,11 +394,14 @@ export default function AiAnalyst({ data }: AiAnalystProps) {
     setIsLoading(true);
 
     try {
-      const context = buildContext(data);
+      requestAbortRef.current?.abort();
+      const controller = new AbortController();
+      requestAbortRef.current = controller;
       const res = await fetch('/api/ai/fusion', {
         method: 'POST',
         headers: getHeaders(),
-        body: JSON.stringify({ context }),
+        body: JSON.stringify({ context: intelligenceContext }),
+        signal: controller.signal,
       });
 
       const json = await res.json();
@@ -407,7 +432,7 @@ export default function AiAnalyst({ data }: AiAnalystProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [isLoading, data, getHeaders]);
+  }, [intelligenceContext, isLoading, getHeaders]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -425,7 +450,8 @@ export default function AiAnalyst({ data }: AiAnalystProps) {
       localStorage.setItem('worldwatch-ai-key', key);
       localStorage.removeItem('aegis-gemini-key');
       setKeySaved(true);
-      setTimeout(() => setShowSettings(false), 600);
+      if (settingsTimerRef.current) clearTimeout(settingsTimerRef.current);
+      settingsTimerRef.current = setTimeout(() => setShowSettings(false), 600);
     }
   }, [apiKeyInput]);
 
@@ -473,7 +499,7 @@ export default function AiAnalyst({ data }: AiAnalystProps) {
       whileHover={{ scale: 1.1 }}
       whileTap={{ scale: 0.95 }}
       onClick={() => setIsOpen(true)}
-      className="fixed bottom-[90px] right-5 md:bottom-8 md:right-8 z-[500] w-14 h-14 rounded-full flex items-center justify-center cursor-pointer border-0"
+      className={`fixed bottom-[90px] right-5 md:bottom-[6.25rem] md:right-6 z-[500] h-14 w-14 rounded-full items-center justify-center cursor-pointer border-0 ${hideMobileTrigger ? 'hidden md:flex' : 'flex'}`}
       style={{
         background: 'linear-gradient(135deg, rgba(212, 175, 55, 0.2) 0%, rgba(212, 175, 55, 0.08) 100%)',
         border: '1px solid rgba(212, 175, 55, 0.4)',
@@ -952,3 +978,5 @@ export default function AiAnalyst({ data }: AiAnalystProps) {
     </>
   );
 }
+
+export default memo(AiAnalyst);

@@ -1,8 +1,9 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ScrollText, ChevronDown, ChevronUp, ExternalLink, MapPin, Sparkles } from 'lucide-react';
+
 
 interface IntelFeedItem {
   id: string;
@@ -57,7 +58,7 @@ function feedTimeAgo(timestamp?: number): string {
   return `${hrs}h ago`;
 }
 
-export default function IntelFeed({ data, onLocate, feedFreshness }: IntelFeedProps) {
+function IntelFeed({ data, onLocate, feedFreshness }: IntelFeedProps) {
   const [expanded, setExpanded] = useState(true);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const news = useMemo(() => data.news || [], [data.news]);
@@ -228,3 +229,5 @@ export default function IntelFeed({ data, onLocate, feedFreshness }: IntelFeedPr
     </motion.div>
   );
 }
+
+export default memo(IntelFeed);

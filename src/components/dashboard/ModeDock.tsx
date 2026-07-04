@@ -93,10 +93,16 @@ export default function ModeDock({ mode, locale, onLocaleChange, onEarthOps, onS
           <button
             onClick={onSolarView}
             aria-label={`Switch to ${modeMeta.solar.label}`}
-            className={`group flex min-w-0 items-center justify-center gap-1.5 rounded-2xl border px-2.5 py-1.5 text-[8px] font-mono tracking-[0.16em] transition-colors ${modeButtonClass(mode === 'solar', 'solar')}`}
+            className={`group relative flex min-w-0 items-center justify-center gap-2 overflow-hidden rounded-2xl border px-2.5 py-2 text-[8px] font-mono tracking-[0.16em] transition-colors ${mode === 'solar' ? 'border-cyan-300/55 bg-cyan-400/[0.16] text-cyan-100 shadow-[0_0_30px_rgba(34,211,238,0.22)]' : 'border-cyan-300/28 bg-cyan-400/[0.075] text-cyan-200 hover:border-cyan-300/55 hover:bg-cyan-400/[0.13] hover:text-white'}`}
           >
-            <Globe className="h-3.5 w-3.5 shrink-0 transition-transform group-hover:scale-110" />
-            <span className="truncate">{modeMeta.solar.label}</span>
+            <span className="pointer-events-none absolute inset-y-0 left-0 w-10 bg-gradient-to-r from-cyan-300/16 to-transparent" />
+            <span className="relative flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-cyan-300/35 bg-cyan-300/10 shadow-[0_0_14px_rgba(34,211,238,0.2)]">
+              <Globe className="h-3.5 w-3.5 transition-transform group-hover:scale-110" />
+            </span>
+            <span className="relative min-w-0 text-left leading-tight">
+              <span className="block truncate text-[9px] font-semibold tracking-[0.18em]">SISTEMA SOLAR</span>
+              <span className="hidden truncate text-[6px] tracking-[0.22em] text-cyan-200/75 sm:block">3D PLANET MODE</span>
+            </span>
           </button>
           <button
             onClick={onFocus}

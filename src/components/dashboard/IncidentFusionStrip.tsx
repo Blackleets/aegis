@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import { motion } from 'framer-motion';
 import { Activity, AlertTriangle, Database, RadioTower } from 'lucide-react';
 
@@ -44,7 +45,7 @@ function primarySignal({ activeIntelAlerts, maritimePressure, gdeltCount, earthq
   return 'BASELINE MESH';
 }
 
-export default function IncidentFusionStrip({
+function IncidentFusionStrip({
   backendStatus,
   trackedEntityCount,
   activeIntelAlerts,
@@ -118,3 +119,5 @@ export default function IncidentFusionStrip({
     </motion.div>
   );
 }
+
+export default memo(IncidentFusionStrip);

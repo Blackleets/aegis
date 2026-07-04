@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { memo, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Share2, Copy, Check, Link2, X, Globe, MapPin } from 'lucide-react';
 
@@ -8,13 +8,17 @@ interface SharePanelProps {
   mapView: { zoom: number; latitude: number; longitude?: number };
   activeLayers: Record<string, boolean>;
   mouseCoords?: { lat: number; lng: number } | null;
+  enableShortcut?: boolean;
 }
 
-export default function SharePanel({ mapView, activeLayers, mouseCoords }: SharePanelProps) {
+function SharePanel({ mapView, activeLayers, mouseCoords, enableShortcut = false }: SharePanelProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
 
-  const generateShareUrl = useCallback(() => {
+  const [copied, setCopied] = useState(false);
+  const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const activeLayerCount = useMemo(() => Object.values(activeLayers).filter(Boolean).length, [activeLayers]);
+
+  const shareUrl = useMemo(() => {
     const params = new URLSearchParams();
     const lat = mouseCoords?.lat ?? mapView.latitude ?? 20;
     const lng = mouseCoords?.lng ?? mapView.longitude ?? 0;
@@ -22,7 +26,6 @@ export default function SharePanel({ mapView, activeLayers, mouseCoords }: Share
     params.set('lon', lng.toFixed(4));
     params.set('zoom', mapView.zoom.toFixed(2));
 
-    // Encode active layers as compact string
     const layerKeys = Object.entries(activeLayers)
       .filter(([, v]) => v)
       .map(([k]) => k)
@@ -31,37 +34,53 @@ export default function SharePanel({ mapView, activeLayers, mouseCoords }: Share
 
     const base = typeof window !== 'undefined' ? window.location.origin : 'https://aegis.blackleets.dev';
     return `${base}/?${params.toString()}`;
-  }, [mapView, activeLayers, mouseCoords]);
+  }, [activeLayers, mapView, mouseCoords]);
+
+  const scheduleCopiedReset = useCallback(() => {
+    if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+    copiedTimerRef.current = setTimeout(() => setCopied(false), 2000);
+  }, []);
 
   const copyToClipboard = useCallback(async () => {
-    const url = generateShareUrl();
     try {
-      await navigator.clipboard.writeText(url);
+      await navigator.clipboard.writeText(shareUrl);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      scheduleCopiedReset();
     } catch {
-      // Fallback
       const input = document.createElement('input');
-      input.value = url;
+      input.value = shareUrl;
       document.body.appendChild(input);
       input.select();
       document.execCommand('copy');
       document.body.removeChild(input);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      scheduleCopiedReset();
     }
-  }, [generateShareUrl]);
+  }, [scheduleCopiedReset, shareUrl]);
+
+  useEffect(() => {
+    return () => {
+      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+    };
+  }, []);
 
   // Keyboard shortcut
   useEffect(() => {
+    if (!enableShortcut || typeof window === 'undefined') return;
+
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 's' && !e.ctrlKey && !e.metaKey && !['INPUT', 'TEXTAREA'].includes((e.target as Element)?.tagName)) {
+      const target = e.target as HTMLElement | null;
+      const tagName = target?.tagName;
+      const isEditable = target?.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(tagName ?? '');
+      if (isEditable) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key === 's') {
         setIsOpen(p => !p);
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, []);
+  }, [enableShortcut]);
 
   return (
     <>
@@ -105,7 +124,7 @@ export default function SharePanel({ mapView, activeLayers, mouseCoords }: Share
                 {mouseCoords ? `${mouseCoords.lat.toFixed(4)}°, ${mouseCoords.lng.toFixed(4)}°` : '—'} · Zoom {mapView.zoom.toFixed(1)}
               </div>
               <div className="text-[7px] font-mono text-[var(--text-muted)] mt-1">
-                {Object.values(activeLayers).filter(Boolean).length} layers active
+                {activeLayerCount} layers active
               </div>
             </div>
 
@@ -117,7 +136,7 @@ export default function SharePanel({ mapView, activeLayers, mouseCoords }: Share
               </div>
               <div className="flex gap-1.5">
                 <div className="flex-1 p-1.5 rounded bg-[var(--bg-void)] border border-[var(--border-primary)] text-[7px] font-mono text-[var(--gold-primary)] truncate">
-                  {generateShareUrl()}
+                  {shareUrl}
                 </div>
                 <button
                   onClick={copyToClipboard}
@@ -131,22 +150,25 @@ export default function SharePanel({ mapView, activeLayers, mouseCoords }: Share
             {/* Quick Share */}
             <div className="flex gap-2">
               <a
-                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent('AEGIS — Verified Global Intelligence Surface')}&url=${encodeURIComponent(generateShareUrl())}`}
+                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent('AEGIS — Verified Global Intelligence Surface')}&url=${encodeURIComponent(shareUrl)}`}
                 target="_blank"
+                rel="noreferrer"
                 className="flex-1 text-center py-1.5 rounded text-[7px] font-mono tracking-wider text-[var(--text-muted)] border border-[var(--border-primary)] hover:border-[#1DA1F2] hover:text-[#1DA1F2] transition-colors"
               >
                 𝕏 POST
               </a>
               <a
-                href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(generateShareUrl())}`}
+                href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`}
                 target="_blank"
+                rel="noreferrer"
                 className="flex-1 text-center py-1.5 rounded text-[7px] font-mono tracking-wider text-[var(--text-muted)] border border-[var(--border-primary)] hover:border-[#0A66C2] hover:text-[#0A66C2] transition-colors"
               >
                 IN SHARE
               </a>
               <a
-                href={`https://reddit.com/submit?url=${encodeURIComponent(generateShareUrl())}&title=${encodeURIComponent('AEGIS — Verified Global Intelligence Surface')}`}
+                href={`https://reddit.com/submit?url=${encodeURIComponent(shareUrl)}&title=${encodeURIComponent('AEGIS — Verified Global Intelligence Surface')}`}
                 target="_blank"
+                rel="noreferrer"
                 className="flex-1 text-center py-1.5 rounded text-[7px] font-mono tracking-wider text-[var(--text-muted)] border border-[var(--border-primary)] hover:border-[#FF4500] hover:text-[#FF4500] transition-colors"
               >
                 REDDIT
@@ -162,3 +184,5 @@ export default function SharePanel({ mapView, activeLayers, mouseCoords }: Share
     </>
   );
 }
+
+export default memo(SharePanel);

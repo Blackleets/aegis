@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { memo, useState, useEffect, useRef, useMemo } from 'react';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ExternalLink, RefreshCw, MapPin, Camera, Maximize2, Play, Shield, Clock3, Radio } from 'lucide-react';
@@ -463,7 +463,7 @@ function CameraViewerContent({
   );
 }
 
-export default function CameraViewer({ camera, onClose, onLocate }: CameraViewerProps) {
+function CameraViewer({ camera, onClose, onLocate }: CameraViewerProps) {
   const [refreshKey, setRefreshKey] = useState(0);
   const streamType = camera?.stream_type || 'jpg';
   const refreshIntervalSeconds = inferRefreshIntervalSeconds(camera);
@@ -496,3 +496,5 @@ export default function CameraViewer({ camera, onClose, onLocate }: CameraViewer
     />
   );
 }
+
+export default memo(CameraViewer);
