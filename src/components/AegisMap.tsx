@@ -330,18 +330,18 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
 
     if (map.getLayer('satellite-layer')) {
       try {
-        map.setPaintProperty('satellite-layer', 'raster-opacity', isGlobe ? 1 : 0.82);
-        map.setPaintProperty('satellite-layer', 'raster-saturation', isGlobe ? 0.22 : 0);
-        map.setPaintProperty('satellite-layer', 'raster-contrast', isGlobe ? 0.14 : 0);
-        map.setPaintProperty('satellite-layer', 'raster-brightness-min', isGlobe ? 0.16 : 0);
-        map.setPaintProperty('satellite-layer', 'raster-brightness-max', isGlobe ? 1.04 : 1);
+        map.setPaintProperty('satellite-layer', 'raster-opacity', isGlobe ? 1 : 0.88);
+        map.setPaintProperty('satellite-layer', 'raster-saturation', isGlobe ? 0.72 : 0.18);
+        map.setPaintProperty('satellite-layer', 'raster-contrast', isGlobe ? 0.2 : 0.08);
+        map.setPaintProperty('satellite-layer', 'raster-brightness-min', isGlobe ? 0.28 : 0.12);
+        map.setPaintProperty('satellite-layer', 'raster-brightness-max', isGlobe ? 1.22 : 1.08);
       } catch {}
     }
 
     if (map.getLayer('day-night-fill')) {
       try {
         map.setPaintProperty('day-night-fill', 'fill-color', '#05101f');
-        map.setPaintProperty('day-night-fill', 'fill-opacity', isGlobe ? 0 : 0.16);
+        map.setPaintProperty('day-night-fill', 'fill-opacity', isGlobe ? 0 : 0.12);
       } catch {}
     }
   }, []);
@@ -2163,11 +2163,11 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
               type: 'raster',
               source: 'satellite-tiles',
               paint: {
-                'raster-opacity': 0.86,
-                'raster-saturation': 0.04,
-                'raster-contrast': 0.08,
-                'raster-brightness-min': 0.06,
-                'raster-brightness-max': 1.02,
+                'raster-opacity': 0.92,
+                'raster-saturation': 0.22,
+                'raster-contrast': 0.1,
+                'raster-brightness-min': 0.12,
+                'raster-brightness-max': 0.96,
               },
             },
             'day-night-fill',
