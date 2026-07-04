@@ -1,3 +1,5 @@
+import { getHermesRuntimeStatus } from '@/lib/hermes-ops';
+
 export type HealthStatus = 'ok' | 'degraded' | 'down';
 export type SubsystemProbe = 'http' | 'static' | 'config';
 export type SubsystemState = 'healthy' | 'degraded' | 'down';
@@ -30,8 +32,9 @@ export interface HealthPayload {
   timestamp: string;
   summary: HealthSummary;
   ai: {
-    mode: 'premium' | 'local-fallback';
+    mode: 'premium' | 'local-fallback' | 'hermes-hybrid';
     configuredServerKeys: number;
+    hermesAvailable: boolean;
   };
   subsystems: SubsystemStatus[];
   endpoints: string[];
@@ -92,7 +95,7 @@ function countConfiguredGeminiKeys(): number {
   return count;
 }
 
-function buildStaticSubsystems(configuredServerKeys: number): SubsystemStatus[] {
+function buildStaticSubsystems(configuredServerKeys: number, hermesAvailable: boolean): SubsystemStatus[] {
   return [
     {
       key: 'ai',
@@ -105,7 +108,22 @@ function buildStaticSubsystems(configuredServerKeys: number): SubsystemStatus[] 
       message:
         configuredServerKeys > 0
           ? `Premium mode ready with ${configuredServerKeys} server key${configuredServerKeys > 1 ? 's' : ''}`
-          : 'Local fallback mode active',
+          : hermesAvailable
+            ? 'Hybrid analyst mode active with Hermes command runtime available'
+            : 'Local fallback mode active',
+      probe: 'config',
+    },
+    {
+      key: 'hermes-ops',
+      label: 'Hermes Ops',
+      endpoint: '/api/ai/hermes',
+      critical: false,
+      status: hermesAvailable ? 'healthy' : 'degraded',
+      latencyMs: null,
+      httpStatus: null,
+      message: hermesAvailable
+        ? 'Hermes CLI detected for autonomous operator runs'
+        : 'Hermes CLI not present in runtime — hybrid fallback remains active',
       probe: 'config',
     },
     {
@@ -195,10 +213,11 @@ export async function collectHealthSnapshot(
   fetchImpl: typeof fetch = fetch
 ): Promise<HealthPayload> {
   const configuredServerKeys = countConfiguredGeminiKeys();
+  const hermesStatus = await getHermesRuntimeStatus();
   const httpSubsystems = await Promise.all(
     HTTP_SUBSYSTEMS.map((definition) => probeSubsystem(origin, definition, fetchImpl))
   );
-  const subsystems = [...httpSubsystems, ...buildStaticSubsystems(configuredServerKeys)];
+  const subsystems = [...httpSubsystems, ...buildStaticSubsystems(configuredServerKeys, hermesStatus.available)];
   const summary = summarizeSubsystems(subsystems);
 
   return {
@@ -209,10 +228,11 @@ export async function collectHealthSnapshot(
     timestamp: new Date().toISOString(),
     summary,
     ai: {
-      mode: configuredServerKeys > 0 ? 'premium' : 'local-fallback',
+      mode: hermesStatus.available ? 'hermes-hybrid' : configuredServerKeys > 0 ? 'premium' : 'local-fallback',
       configuredServerKeys,
+      hermesAvailable: hermesStatus.available,
     },
     subsystems,
-    endpoints: HTTP_SUBSYSTEMS.map((definition) => definition.endpoint).concat('/api/ai/analyze'),
+    endpoints: HTTP_SUBSYSTEMS.map((definition) => definition.endpoint).concat('/api/ai/analyze', '/api/ai/hermes', '/api/ai/hermes/status'),
   };
 }

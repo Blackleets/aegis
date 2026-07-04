@@ -101,6 +101,17 @@ interface ChatMessage {
   content: string;
   timestamp: string;
   isError?: boolean;
+  sourceLabel?: string;
+  runtimeLabel?: string;
+}
+
+interface HermesStatusPayload {
+  available: boolean;
+  command: string | null;
+  runtime: 'hermes-cli' | 'aegis-fallback';
+  mode: 'hermes-live' | 'hybrid-fallback';
+  reason?: string;
+  detectedAt: string;
 }
 
 interface FusionDossier {
@@ -117,7 +128,8 @@ interface AiAnalystProps {
   hideMobileTrigger?: boolean;
 }
 
-type AnalystBridgeAction = 'open' | 'briefing' | 'fusion';
+type AnalystBridgeAction = 'open' | 'briefing' | 'fusion' | 'hermes';
+type AnalystMode = 'aegis' | 'hermes';
 
 /* ─────────────────────────────────────────────────────────────
    Helpers
@@ -220,9 +232,16 @@ ${bullets(dossier.watchlist)}`;
 function AiAnalyst({ data, hideMobileTrigger = false }: AiAnalystProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [inputText, setInputText] = useState('');
+  const [analystMode, setAnalystMode] = useState<AnalystMode>(() => {
+    if (typeof window === 'undefined') return 'aegis';
+    return (localStorage.getItem('aegis-analyst-mode') as AnalystMode) || 'aegis';
+  });
 
   const [isLoading, setIsLoading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [hermesStatus, setHermesStatus] = useState<HermesStatusPayload | null>(null);
+  const [hermesStatusLoading, setHermesStatusLoading] = useState(false);
   const [apiKeyInput, setApiKeyInput] = useState(() => {
     if (typeof window === 'undefined') return '';
     return localStorage.getItem('worldwatch-ai-key') || localStorage.getItem('aegis-gemini-key') || '';
@@ -262,6 +281,11 @@ function AiAnalyst({ data, hideMobileTrigger = false }: AiAnalystProps) {
     };
   }, []);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem('aegis-analyst-mode', analystMode);
+  }, [analystMode]);
+
   const getHeaders = useCallback((): Record<string, string> => {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     const savedKey = localStorage.getItem('worldwatch-ai-key') || localStorage.getItem('aegis-gemini-key');
@@ -269,6 +293,26 @@ function AiAnalyst({ data, hideMobileTrigger = false }: AiAnalystProps) {
       headers['x-gemini-key'] = savedKey;
     }
     return headers;
+  }, []);
+
+  const refreshHermesStatus = useCallback(async () => {
+    setHermesStatusLoading(true);
+    try {
+      const response = await fetch('/api/ai/hermes/status', { cache: 'no-store' });
+      const payload = await response.json() as HermesStatusPayload;
+      setHermesStatus(payload);
+    } catch {
+      setHermesStatus({
+        available: false,
+        command: null,
+        runtime: 'aegis-fallback',
+        mode: 'hybrid-fallback',
+        reason: 'Runtime inspection unavailable — fallback analysis remains active.',
+        detectedAt: new Date().toISOString(),
+      });
+    } finally {
+      setHermesStatusLoading(false);
+    }
   }, []);
 
   const handleSend = useCallback(async () => {
@@ -280,6 +324,7 @@ function AiAnalyst({ data, hideMobileTrigger = false }: AiAnalystProps) {
       role: 'user',
       content: query,
       timestamp: new Date().toISOString(),
+      sourceLabel: analystMode === 'hermes' ? 'HERMES OPS' : 'OPERATOR',
     };
     setMessages((prev) => [...prev, userMsg]);
     setInputText('');
@@ -289,7 +334,8 @@ function AiAnalyst({ data, hideMobileTrigger = false }: AiAnalystProps) {
       requestAbortRef.current?.abort();
       const controller = new AbortController();
       requestAbortRef.current = controller;
-      const res = await fetch('/api/ai/analyze', {
+      const endpoint = analystMode === 'hermes' ? '/api/ai/hermes' : '/api/ai/analyze';
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: getHeaders(),
         body: JSON.stringify({ query, context: intelligenceContext }),
@@ -303,13 +349,25 @@ function AiAnalyst({ data, hideMobileTrigger = false }: AiAnalystProps) {
         throw new Error(errorBody.error || `HTTP ${res.status}`);
       }
 
-      const responseBody = json as { analysis: string; model: string; timestamp: string };
+      const responseBody = json as {
+        analysis: string;
+        model: string;
+        timestamp: string;
+        mode?: 'hermes' | 'fallback';
+        runtime?: 'hermes-cli' | 'aegis-fallback';
+      };
 
       const analystMsg: ChatMessage = {
         id: generateId(),
         role: 'analyst',
         content: responseBody.analysis,
         timestamp: responseBody.timestamp,
+        sourceLabel: analystMode === 'hermes' ? 'HERMES OPS' : 'WORLDWATCH ANALYST',
+        runtimeLabel: analystMode === 'hermes'
+          ? responseBody.runtime === 'hermes-cli'
+            ? 'LIVE HERMES RUNTIME'
+            : 'HYBRID FALLBACK'
+          : responseBody.model,
       };
       setMessages((prev) => [...prev, analystMsg]);
     } catch (err: unknown) {
@@ -325,7 +383,7 @@ function AiAnalyst({ data, hideMobileTrigger = false }: AiAnalystProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [intelligenceContext, isLoading, getHeaders]);
+  }, [analystMode, intelligenceContext, inputText, isLoading, getHeaders]);
 
   const handleBriefing = useCallback(async () => {
     if (isLoading) return;
@@ -434,6 +492,13 @@ function AiAnalyst({ data, hideMobileTrigger = false }: AiAnalystProps) {
     }
   }, [intelligenceContext, isLoading, getHeaders]);
 
+  const handleHermesSweep = useCallback(() => {
+    setAnalystMode('hermes');
+    void refreshHermesStatus();
+    setInputText('Run an autonomous command sweep over the live AEGIS feeds. Prioritize the strongest risk cluster, state the operator judgment, and propose the next autonomous moves in real time.');
+    setTimeout(() => inputRef.current?.focus(), 50);
+  }, [refreshHermesStatus]);
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       if (e.key === 'Enter' && !e.shiftKey) {
@@ -475,12 +540,24 @@ function AiAnalyst({ data, hideMobileTrigger = false }: AiAnalystProps) {
       setShowSettings(false);
 
       if (action === 'briefing') {
+        if (analystMode === 'hermes') void refreshHermesStatus();
         void handleBriefing();
         return;
       }
 
       if (action === 'fusion') {
+        if (analystMode === 'hermes') void refreshHermesStatus();
         void handleFusionDossier();
+        return;
+      }
+
+      if (action === 'hermes') {
+        handleHermesSweep();
+        return;
+      }
+
+      if (analystMode === 'hermes') {
+        void refreshHermesStatus();
       }
     };
 
@@ -488,7 +565,7 @@ function AiAnalyst({ data, hideMobileTrigger = false }: AiAnalystProps) {
     return () => {
       window.removeEventListener('aegis:ai-analyst', handler as EventListener);
     };
-  }, [handleBriefing, handleFusionDossier]);
+  }, [analystMode, handleBriefing, handleFusionDossier, handleHermesSweep, refreshHermesStatus]);
 
   /* ── Floating Trigger Button ── */
   const triggerButton = (
@@ -498,7 +575,10 @@ function AiAnalyst({ data, hideMobileTrigger = false }: AiAnalystProps) {
       transition={{ delay: 3, type: 'spring', stiffness: 200, damping: 15 }}
       whileHover={{ scale: 1.1 }}
       whileTap={{ scale: 0.95 }}
-      onClick={() => setIsOpen(true)}
+      onClick={() => {
+        setIsOpen(true);
+        if (analystMode === 'hermes') void refreshHermesStatus();
+      }}
       className={`fixed bottom-[90px] right-5 md:bottom-[6.25rem] md:right-6 z-[500] h-14 w-14 rounded-full items-center justify-center cursor-pointer border-0 ${hideMobileTrigger ? 'hidden md:flex' : 'flex'}`}
       style={{
         background: 'linear-gradient(135deg, rgba(212, 175, 55, 0.2) 0%, rgba(212, 175, 55, 0.08) 100%)',
@@ -576,11 +656,37 @@ function AiAnalyst({ data, hideMobileTrigger = false }: AiAnalystProps) {
                     <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-[var(--alert-green)] animate-aegis-pulse" />
                   </div>
                   <div className="flex flex-col">
-                    <span className="hud-text text-[11px] text-[var(--text-heading)]">WORLDWATCH ANALYST</span>
+                    <span className="hud-text text-[11px] text-[var(--text-heading)]">
+                      {analystMode === 'hermes' ? 'HERMES OPS' : 'WORLDWATCH ANALYST'}
+                    </span>
                     <span className="text-[7px] font-mono tracking-[0.2em] text-[var(--text-muted)]">
-                      LOCAL FREE MODE • BYOK OPTIONAL
+                      {analystMode === 'hermes'
+                        ? hermesStatusLoading
+                          ? 'INSPECTING RUNTIME'
+                          : hermesStatus?.available
+                            ? 'AUTONOMOUS COMMAND MODE • LIVE RUNTIME'
+                            : 'AUTONOMOUS COMMAND MODE • HYBRID FALLBACK'
+                        : 'LOCAL FREE MODE • BYOK OPTIONAL'}
                     </span>
                   </div>
+                </div>
+
+                <div className="flex items-center gap-1 rounded-xl border border-white/8 bg-black/20 p-1">
+                  <button
+                    onClick={() => setAnalystMode('aegis')}
+                    className={`px-2.5 py-1 rounded-lg text-[8px] font-mono tracking-[0.16em] transition-colors ${analystMode === 'aegis' ? 'text-[var(--gold-primary)] bg-[rgba(212,175,55,0.12)]' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}
+                  >
+                    AEGIS
+                  </button>
+                  <button
+                    onClick={() => {
+                      setAnalystMode('hermes');
+                      void refreshHermesStatus();
+                    }}
+                    className={`px-2.5 py-1 rounded-lg text-[8px] font-mono tracking-[0.16em] transition-colors ${analystMode === 'hermes' ? 'text-[var(--cyan-primary)] bg-[rgba(0,229,255,0.10)]' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}
+                  >
+                    HERMES
+                  </button>
                 </div>
 
                 <div className="flex items-center gap-1">
@@ -631,6 +737,34 @@ function AiAnalyst({ data, hideMobileTrigger = false }: AiAnalystProps) {
                         borderBottom: '1px solid rgba(212, 175, 55, 0.1)',
                       }}
                     >
+                      {analystMode === 'hermes' && (
+                        <div className="rounded-xl border border-cyan-400/15 bg-cyan-400/6 px-3 py-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <div>
+                              <div className="text-[8px] font-mono uppercase tracking-[0.18em] text-cyan-200">Hermes runtime</div>
+                              <div className="mt-1 text-[10px] font-mono text-white">
+                                {hermesStatusLoading
+                                  ? 'Inspecting runtime…'
+                                  : hermesStatus?.available
+                                    ? `Live via ${hermesStatus.command ?? 'hermes'}`
+                                    : 'Hybrid fallback active'}
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => void refreshHermesStatus()}
+                              className="rounded-lg border border-cyan-300/20 bg-cyan-300/10 px-2 py-1 text-[8px] font-mono uppercase tracking-[0.16em] text-cyan-100"
+                              type="button"
+                            >
+                              Refresh
+                            </button>
+                          </div>
+                          {hermesStatus?.reason && (
+                            <p className="mt-2 text-[8px] font-mono leading-relaxed text-[var(--text-muted)]">
+                              {hermesStatus.reason}
+                            </p>
+                          )}
+                        </div>
+                      )}
                       <div className="flex items-center gap-2">
                         <Key className="w-3 h-3 text-[var(--gold-dim)]" />
                         <span className="hud-label" style={{ fontSize: '8px' }}>
@@ -722,23 +856,33 @@ function AiAnalyst({ data, hideMobileTrigger = false }: AiAnalystProps) {
 
                     <div className="space-y-2">
                       <h3 className="hud-text text-[12px] text-[var(--text-heading)]">
-                        AEGIS ANALYST READY
+                        {analystMode === 'hermes' ? 'HERMES OPS READY' : 'AEGIS ANALYST READY'}
                       </h3>
                       <p className="text-[10px] font-mono text-[var(--text-muted)] leading-relaxed max-w-[280px]">
-                        I correlate live seismic, OSINT, risk, and cyber data to deliver operator-ready assessments.
+                        {analystMode === 'hermes'
+                          ? 'Hermes can run autonomous operator sweeps over live AEGIS feeds, prioritize the strongest cluster, and recommend next moves in real time.'
+                          : 'I correlate live seismic, OSINT, risk, and cyber data to deliver operator-ready assessments.'}
                       </p>
                     </div>
 
                     {/* Quick prompts */}
                     <div className="w-full space-y-1.5">
                       <span className="hud-label block text-center mb-2" style={{ fontSize: '7px' }}>
-                        SUGGESTED QUERIES
+                        {analystMode === 'hermes' ? 'AUTONOMOUS MISSIONS' : 'SUGGESTED QUERIES'}
                       </span>
-                      {[
-                        'What are the top 3 threats right now?',
-                        'Build a cross-domain escalation hypothesis from today\'s signals',
-                        'Assess cyber risks to critical infrastructure',
-                      ].map((prompt) => (
+                      {(
+                        analystMode === 'hermes'
+                          ? [
+                              'Run an autonomous command sweep over the live AEGIS feeds. Prioritize the strongest risk cluster, state the operator judgment, and propose the next autonomous moves in real time.',
+                              'Build a multi-domain operator brief with the highest-risk region, escalation path, and watchlist for the next 6 hours.',
+                              'Identify the single best next autonomous mission for AEGIS right now and justify it with feed evidence.',
+                            ]
+                          : [
+                              'What are the top 3 threats right now?',
+                              'Build a cross-domain escalation hypothesis from today\'s signals',
+                              'Assess cyber risks to critical infrastructure',
+                            ]
+                      ).map((prompt) => (
                         <button
                           key={prompt}
                           onClick={() => {
@@ -807,8 +951,13 @@ function AiAnalyst({ data, hideMobileTrigger = false }: AiAnalystProps) {
                               : 'var(--gold-primary)',
                           }}
                         >
-                          {msg.role === 'user' ? 'OPERATOR' : 'WORLDWATCH ANALYST'}
+                          {msg.sourceLabel || (msg.role === 'user' ? 'OPERATOR' : analystMode === 'hermes' ? 'HERMES OPS' : 'WORLDWATCH ANALYST')}
                         </span>
+                        {msg.runtimeLabel && (
+                          <span className="rounded-full border border-white/8 bg-black/20 px-1.5 py-0.5 text-[6px] font-mono tracking-[0.16em] text-[var(--text-muted)]">
+                            {msg.runtimeLabel}
+                          </span>
+                        )}
                         <span className="text-[7px] font-mono text-[var(--text-muted)] ml-auto">
                           {new Date(msg.timestamp).toLocaleTimeString([], {
                             hour: '2-digit',
@@ -875,7 +1024,7 @@ function AiAnalyst({ data, hideMobileTrigger = false }: AiAnalystProps) {
                 }}
               >
                 {/* Quick action */}
-                <div className="flex gap-2 mb-2">
+                <div className="flex gap-2 mb-2 flex-wrap">
                   <button
                     onClick={handleFusionDossier}
                     disabled={isLoading}
@@ -902,6 +1051,19 @@ function AiAnalyst({ data, hideMobileTrigger = false }: AiAnalystProps) {
                     <Sparkles className="w-3 h-3" />
                     GENERATE BRIEFING
                   </button>
+                  <button
+                    onClick={handleHermesSweep}
+                    disabled={isLoading}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[9px] font-mono tracking-[0.1em] uppercase transition-all disabled:opacity-40"
+                    style={{
+                      background: 'rgba(16, 185, 129, 0.10)',
+                      border: '1px solid rgba(16, 185, 129, 0.24)',
+                      color: '#A7F3D0',
+                    }}
+                  >
+                    <Sparkles className="w-3 h-3" />
+                    HERMES SWEEP
+                  </button>
 
                   <span className="flex items-center text-[7px] font-mono text-[var(--text-muted)] tracking-wider">
                     <ChevronDown className="w-2.5 h-2.5 mr-0.5" />
@@ -923,7 +1085,7 @@ function AiAnalyst({ data, hideMobileTrigger = false }: AiAnalystProps) {
                       value={inputText}
                       onChange={(e) => setInputText(e.target.value)}
                       onKeyDown={handleKeyDown}
-                      placeholder="Ask AEGIS for a fusion assessment..."
+                      placeholder={analystMode === 'hermes' ? 'Ask Hermes Ops for an autonomous mission...' : 'Ask AEGIS for a fusion assessment...'}
                       rows={1}
                       className="w-full bg-transparent px-3 py-2.5 text-[11px] font-mono text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none resize-none"
                       style={{ maxHeight: '120px', minHeight: '36px' }}
@@ -962,12 +1124,18 @@ function AiAnalyst({ data, hideMobileTrigger = false }: AiAnalystProps) {
                 </div>
 
                 {/* Footer */}
-                <div className="flex items-center justify-between mt-1.5 px-1">
+                <div className="flex items-center justify-between mt-1.5 px-1 gap-2">
                   <span className="text-[7px] font-mono text-[var(--text-muted)] tracking-wider">
-                    {keySaved ? '🔑 USER KEY ACTIVE' : '🆓 LOCAL FREE MODE'} • {messages.filter((m) => m.role === 'user').length} QUERIES
+                    {analystMode === 'hermes'
+                      ? hermesStatus?.available
+                        ? '🤖 HERMES LIVE'
+                        : '🛡️ HERMES HYBRID'
+                      : keySaved
+                        ? '🔑 USER KEY ACTIVE'
+                        : '🆓 LOCAL FREE MODE'} • {messages.filter((m) => m.role === 'user').length} QUERIES
                   </span>
-                  <span className="text-[7px] font-mono text-[var(--text-muted)] tracking-wider">
-                    FEEDS: {(data.earthquakes?.length || 0) + (data.news?.length || 0) + (data.gdelt?.length || 0)} ITEMS
+                  <span className="text-[7px] font-mono text-[var(--text-muted)] tracking-wider text-right">
+                    {analystMode === 'hermes' && hermesStatus?.command ? `${hermesStatus.command} • ` : ''}FEEDS: {(data.earthquakes?.length || 0) + (data.news?.length || 0) + (data.gdelt?.length || 0)} ITEMS
                   </span>
                 </div>
               </div>
