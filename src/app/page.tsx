@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, useCallback, useMemo, type ComponentType, 
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Layers, BarChart3, X, ExternalLink, AlertTriangle, Activity, Database, Wifi } from 'lucide-react';
+import { Layers, BarChart3, X, Globe, MapPinned, Satellite, Moon, ExternalLink, AlertTriangle, Activity, Database, Wifi } from 'lucide-react';
 import IntelFeed from '@/components/IntelFeed';
 import MarketsPanel from '@/components/MarketsPanel';
 import ScmPanel from '@/components/ScmPanel';
@@ -116,47 +116,6 @@ function AegisVectorGlyph({ className }: MobileNavGlyphProps) {
       <path d="M12 4.5a7.5 7.5 0 1 1 0 15 7.5 7.5 0 0 1 0-15Z" stroke="currentColor" strokeWidth="1.45" opacity=".8" />
       <path d="m12 7.4 2.2 4.6 4.5 2-4.5.9-2.2 3.7-2.2-3.7-4.5-.9 4.5-2L12 7.4Z" stroke="currentColor" strokeWidth="1.35" strokeLinejoin="round" />
       <path d="M12 11.1v2.8M10.6 12.5h2.8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" opacity=".75" />
-    </svg>
-  );
-}
-
-function AegisProjectionFlatGlyph({ className }: MobileNavGlyphProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
-      <rect x="4" y="6" width="16" height="11.5" rx="2.5" stroke="currentColor" strokeWidth="1.45" />
-      <path d="M7.3 9.2h9.4M7.3 12h9.4M7.3 14.8h5.6" stroke="currentColor" strokeWidth="1.15" strokeLinecap="round" opacity=".75" />
-      <path d="M8 18.7h8" stroke="currentColor" strokeWidth="1.15" strokeLinecap="round" opacity=".45" />
-    </svg>
-  );
-}
-
-function AegisProjectionOrbitalGlyph({ className }: MobileNavGlyphProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
-      <circle cx="12" cy="12" r="5.3" stroke="currentColor" strokeWidth="1.35" />
-      <path d="M4.8 12c1.5-2.8 4.2-4.5 7.2-4.5s5.7 1.7 7.2 4.5c-1.5 2.8-4.2 4.5-7.2 4.5S6.3 14.8 4.8 12Z" stroke="currentColor" strokeWidth="1.2" opacity=".75" />
-      <path d="M12 3.9v2.2M12 17.9v2.2" stroke="currentColor" strokeWidth="1.15" strokeLinecap="round" opacity=".55" />
-      <circle cx="17.4" cy="8" r="1.1" fill="currentColor" opacity=".9" />
-    </svg>
-  );
-}
-
-function AegisEarthSurfaceGlyph({ className }: MobileNavGlyphProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
-      <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="1.3" />
-      <path d="M7 9.4c1.2-1.2 2.4-1.7 3.8-1.4 1 .2 1.5.9 2.4 1.1.9.2 1.8-.1 2.8-.7M8.1 15.5c1-.6 2.1-.8 3.2-.6 1 .2 1.5.8 2.5 1 .8.1 1.7-.1 2.6-.7" stroke="currentColor" strokeWidth="1.15" strokeLinecap="round" opacity=".8" />
-      <path d="M10.1 6.8c-.1 1.2.1 2.3.7 3.3m1.4 1.9c.5.8.8 1.8.8 3" stroke="currentColor" strokeWidth="1.05" strokeLinecap="round" opacity=".5" />
-    </svg>
-  );
-}
-
-function AegisNightFieldGlyph({ className }: MobileNavGlyphProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
-      <path d="M14.9 4.6c-3 1-5.2 3.8-5.2 7.2 0 2.7 1.4 5.1 3.6 6.4-3.8.6-7.4-2.2-7.4-6.2 0-4.1 3.6-7 9-7.4Z" stroke="currentColor" strokeWidth="1.35" strokeLinejoin="round" />
-      <path d="M16.5 7.2v1.6M15.7 8h1.6M18.4 11.1v1.1M17.85 11.65h1.1" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" opacity=".8" />
-      <circle cx="8.1" cy="6.6" r="0.7" fill="currentColor" opacity=".75" />
     </svg>
   );
 }
@@ -403,16 +362,6 @@ function computeBearing(from: Coordinate, to: Coordinate) {
   return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
 }
 
-function normalizeBearingDelta(next: number, previous: number) {
-  return ((((next - previous) % 360) + 540) % 360) - 180;
-}
-
-function blendBearing(previous: number | null, next: number | null, strength = 0.34) {
-  if (next === null) return previous;
-  if (previous === null) return next;
-  return (previous + normalizeBearingDelta(next, previous) * strength + 360) % 360;
-}
-
 function distanceMetersBetween(a: Coordinate, b: Coordinate) {
   const R = 6371000;
   const lat1 = a.lat * Math.PI / 180;
@@ -546,31 +495,6 @@ interface DashboardEntity extends Partial<Coordinate> {
   [key: string]: unknown;
 }
 
-type PriorityPulseKind = 'quake' | 'war';
-type PriorityPulseSeverity = 'critical' | 'high';
-
-interface PriorityPulseEvent extends DashboardEntity {
-  id: string;
-  kind: PriorityPulseKind;
-  severity: PriorityPulseSeverity;
-  title: string;
-  subtitle: string;
-  lat: number;
-  lng: number;
-  detectedAt: number;
-  sourceTime?: string;
-  url?: string;
-  pulseRadius?: number;
-  pulseOpacity?: number;
-  shockwaveRadius?: number;
-  shockwaveOpacity?: number;
-  coreRadius?: number;
-  coreOpacity?: number;
-  label?: string;
-  ageSeconds?: number;
-  recencyBand?: 'impact' | 'fresh';
-}
-
 interface DashboardNews {
   coords?: [number, number];
   title?: string;
@@ -598,7 +522,6 @@ interface DashboardData extends Record<string, unknown> {
   fires?: DashboardEntity[];
   gps_jamming?: DashboardEntity[];
   sdk_entities?: unknown[];
-  priority_pulses?: PriorityPulseEvent[];
 }
 
 interface UsageMetrics {
@@ -677,97 +600,6 @@ const DEFAULT_ACTIVE_LAYERS: ActiveLayers = {
   day_night: true,
   sdk_stream: true,
 };
-
-const WAR_SIGNAL_KEYWORDS = [
-  'war', 'missile', 'strike', 'attack', 'drone', 'troops', 'military', 'conflict', 'invasion', 'ceasefire', 'frontline',
-];
-
-function toIsoTimestamp(value: unknown): string | undefined {
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return new Date(value).toISOString();
-  }
-  if (typeof value === 'string') {
-    const parsed = Date.parse(value);
-    if (!Number.isNaN(parsed)) return new Date(parsed).toISOString();
-  }
-  return undefined;
-}
-
-function collectPriorityCandidates(data: DashboardData) {
-  const candidates: Array<Omit<PriorityPulseEvent, 'detectedAt'>> = [];
-
-  for (const quake of data.earthquakes || []) {
-    if (typeof quake.lat !== 'number' || typeof quake.lng !== 'number') continue;
-    const magnitude = typeof quake.magnitude === 'number' ? quake.magnitude : Number(quake.magnitude || 0);
-    if (!Number.isFinite(magnitude) || magnitude < 5.8) continue;
-    const severity: PriorityPulseSeverity = magnitude >= 6.5 || String(quake.alert || '').toLowerCase() === 'red' ? 'critical' : 'high';
-    const place = typeof quake.place === 'string' && quake.place.trim() ? quake.place.trim() : 'global seismic event';
-    candidates.push({
-      id: `quake:${String(quake.id || place)}:${String(quake.time || '')}`,
-      kind: 'quake',
-      severity,
-      title: `M${magnitude.toFixed(1)} · ${place}`,
-      subtitle: severity === 'critical' ? 'Major earthquake just entered the feed' : 'Seismic event just entered the feed',
-      lat: quake.lat,
-      lng: quake.lng,
-      sourceTime: toIsoTimestamp(quake.time),
-      url: typeof quake.url === 'string' ? quake.url : undefined,
-      magnitude,
-      place,
-    });
-  }
-
-  for (const incident of data.gdelt || []) {
-    if (typeof incident.lat !== 'number' || typeof incident.lng !== 'number') continue;
-    const severityText = String(incident.severity || '').toLowerCase();
-    if (severityText !== 'critical' && severityText !== 'high') continue;
-    const title = typeof incident.title === 'string' && incident.title.trim()
-      ? incident.title.trim()
-      : typeof incident.name === 'string' && incident.name.trim()
-        ? incident.name.trim()
-        : 'Geopolitical conflict signal';
-    candidates.push({
-      id: `gdelt:${String(incident.id || incident.url || title)}`,
-      kind: 'war',
-      severity: severityText === 'critical' ? 'critical' : 'high',
-      title,
-      subtitle: `${String(incident.source || 'GDELT')} conflict escalation`,
-      lat: incident.lat,
-      lng: incident.lng,
-      sourceTime: toIsoTimestamp(incident.date),
-      url: typeof incident.url === 'string' ? incident.url : undefined,
-      source: incident.source,
-      theme: incident.theme,
-    });
-  }
-
-  for (const article of data.news || []) {
-    if (!Array.isArray(article.coords) || article.coords.length < 2) continue;
-    const riskScore = typeof article.risk_score === 'number' ? article.risk_score : Number(article.risk_score || 0);
-    const title = typeof article.title === 'string' ? article.title.trim() : '';
-    const description = typeof article.description === 'string' ? article.description.trim() : '';
-    const haystack = `${title} ${description}`.toLowerCase();
-    if (riskScore < 8 || !WAR_SIGNAL_KEYWORDS.some((keyword) => haystack.includes(keyword))) continue;
-    const severity: PriorityPulseSeverity = riskScore >= 9 ? 'critical' : 'high';
-    candidates.push({
-      id: `news:${String(article.id || article.link || title)}:${String(article.published || '')}`,
-      kind: 'war',
-      severity,
-      title: title || 'Priority conflict bulletin',
-      subtitle: `${String(article.source || 'Newswire')} just entered the feed`,
-      lat: article.coords[0],
-      lng: article.coords[1],
-      sourceTime: toIsoTimestamp(article.published),
-      url: typeof article.link === 'string' ? article.link : undefined,
-      source: article.source,
-      risk_score: riskScore,
-    });
-  }
-
-  return candidates
-    .sort((a, b) => Date.parse(b.sourceTime || '') - Date.parse(a.sourceTime || ''))
-    .slice(0, 10);
-}
 
 function getInitialUrlState() {
   if (typeof window === 'undefined') {
@@ -853,16 +685,12 @@ export default function Dashboard() {
   const [mapStyle, setMapStyle] = useState<'dark'|'satellite'>('dark');
   const [sweepData, setSweepData] = useState<unknown>(null);
   const [scanTargets, setScanTargets] = useState<ScanTarget[]>([]);
-  const [priorityPulseEvents, setPriorityPulseEvents] = useState<PriorityPulseEvent[]>([]);
-  const [priorityPulseNow, setPriorityPulseNow] = useState(() => Date.now());
 
   const isMobile = useIsMobile();
-  const seenPriorityPulseIdsRef = useRef<Set<string>>(new Set());
   const geocodeCache = useRef<Map<string, string>>(new Map());
   const geocodeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const geocodeAbortRef = useRef<AbortController | null>(null);
   const lastNavigationLocationRef = useRef<Coordinate | null>(null);
-  const smoothedNavigationBearingRef = useRef<number | null>(null);
   const lastGeocodedPos = useRef<{ lat: number; lng: number } | null>(null);
   const lastGeocodeKeyRef = useRef<string>('');
   const lastLocationLabelRef = useRef<string>('');
@@ -1121,9 +949,7 @@ export default function Dashboard() {
 
       setUserLocation(origin);
       setNavigationActive(true);
-      const initialBearing = route.steps?.[0]?.maneuver.bearingAfter ?? null;
-      smoothedNavigationBearingRef.current = initialBearing;
-      setNavigationBearing(initialBearing);
+      setNavigationBearing(route.steps?.[0]?.maneuver.bearingAfter ?? null);
       setCurrentRouteStepIndex(0);
       lastNavigationLocationRef.current = origin;
       setRouteSnapshot({
@@ -1418,33 +1244,10 @@ export default function Dashboard() {
     data.news,
   ]);
 
-  const animatedPriorityPulses = useMemo<PriorityPulseEvent[]>(() => priorityPulseEvents.map((event) => {
-    const ageMs = Math.max(0, priorityPulseNow - event.detectedAt);
-    const ageSeconds = Number((ageMs / 1000).toFixed(1));
-    const cycle = (ageMs % 1600) / 1600;
-    const shockwaveCycle = ((ageMs + 480) % 2200) / 2200;
-    const criticalBoost = event.severity === 'critical' ? 1.2 : 1;
-    return {
-      ...event,
-      pulseRadius: Math.round((14 + cycle * 22) * criticalBoost),
-      pulseOpacity: Number(Math.max(0.1, (0.38 - cycle * 0.24) + (event.severity === 'critical' ? 0.16 : 0.05)).toFixed(3)),
-      shockwaveRadius: Math.round((24 + shockwaveCycle * 34) * criticalBoost),
-      shockwaveOpacity: Number(Math.max(0.04, (0.18 - shockwaveCycle * 0.12) + (event.severity === 'critical' ? 0.08 : 0.03)).toFixed(3)),
-      coreRadius: Number((event.severity === 'critical' ? 8.2 : 6.2).toFixed(2)),
-      coreOpacity: Number((cycle < 0.5 ? 1 : 0.82).toFixed(2)),
-      label: `${event.kind === 'quake' ? 'QUAKE' : 'WAR'} • ${event.severity.toUpperCase()}`,
-      ageSeconds,
-      recencyBand: ageSeconds <= 6 ? 'impact' : 'fresh',
-    };
-  }), [priorityPulseEvents, priorityPulseNow]);
-
-  const latestPriorityPulse = animatedPriorityPulses[0] ?? null;
-
   const dataWithSdk = useMemo<DashboardData>(() => ({
     ...data,
     sdk_entities: sdkEntities,
-    priority_pulses: animatedPriorityPulses,
-  }), [data, sdkEntities, animatedPriorityPulses]);
+  }), [data, sdkEntities]);
 
   const totalFlights = useMemo(() => (
     (data.commercial_flights?.length||0)+(data.private_flights?.length||0)+(data.private_jets?.length||0)+(data.military_flights?.length||0)
@@ -1499,46 +1302,6 @@ export default function Dashboard() {
     return highRiskNews + significantQuakes;
   }, [data.news, data.earthquakes]);
 
-  useEffect(() => {
-    const candidates = collectPriorityCandidates(data);
-    if (!candidates.length) return;
-
-    const fresh = candidates.filter((candidate) => !seenPriorityPulseIdsRef.current.has(candidate.id));
-    if (!fresh.length) return;
-
-    const detectedAt = Date.now();
-    fresh.forEach((candidate) => seenPriorityPulseIdsRef.current.add(candidate.id));
-
-    setPriorityPulseEvents((prev) => [
-      ...fresh.map((candidate) => ({ ...candidate, detectedAt })),
-      ...prev,
-    ].slice(0, 8));
-
-    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted' && document.hidden) {
-      for (const item of fresh.slice(0, 2)) {
-        try {
-          new Notification(item.kind === 'quake' ? 'AEGIS · Earthquake pulse' : 'AEGIS · Conflict pulse', {
-            body: item.title,
-            tag: item.id,
-            silent: false,
-          });
-        } catch {
-          // Ignore notification transport failures.
-        }
-      }
-    }
-  }, [data]);
-
-  useEffect(() => {
-    if (!priorityPulseEvents.length) return;
-    const interval = window.setInterval(() => {
-      const now = Date.now();
-      setPriorityPulseNow(now);
-      setPriorityPulseEvents((prev) => prev.filter((item) => now - item.detectedAt < 14000));
-    }, 420);
-    return () => window.clearInterval(interval);
-  }, [priorityPulseEvents.length]);
-
   const maritimePressure = useMemo(() => {
     const congestedPorts = (data.maritime_ports || []).filter((port) => port.congestion === 'SEVERE' || port.congestion === 'CONGESTED').length;
     const riskyChokepoints = (data.maritime_chokepoints || []).filter((point) => point.risk === 'CRITICAL' || point.risk === 'HIGH').length;
@@ -1562,9 +1325,7 @@ export default function Dashboard() {
 
         const previous = lastNavigationLocationRef.current;
         const computedBearing = heading ?? (previous ? computeBearing(previous, nextLocation) : null);
-        const stabilizedBearing = blendBearing(smoothedNavigationBearingRef.current, computedBearing, heading !== null ? 0.4 : 0.28);
-        smoothedNavigationBearingRef.current = stabilizedBearing;
-        if (stabilizedBearing !== null) setNavigationBearing(stabilizedBearing);
+        if (computedBearing !== null) setNavigationBearing(computedBearing);
 
         if (routeSnapshot.steps.length > 0) {
           setCurrentRouteStepIndex(getClosestStepIndex(nextLocation, routeSnapshot.steps));
@@ -1577,8 +1338,8 @@ export default function Dashboard() {
       },
       {
         enableHighAccuracy: true,
-        maximumAge: 900,
-        timeout: 6000,
+        maximumAge: 2000,
+        timeout: 10000,
       },
     );
 
@@ -1593,7 +1354,6 @@ export default function Dashboard() {
     setNavigationBearing(null);
     setCurrentRouteStepIndex(0);
     lastNavigationLocationRef.current = null;
-    smoothedNavigationBearingRef.current = null;
   }, []);
 
   const selectRouteOption = useCallback((routeId: string) => {
@@ -1602,9 +1362,7 @@ export default function Dashboard() {
       const option = current.alternatives.find((candidate) => candidate.id === routeId);
       if (!option) return current;
       setCurrentRouteStepIndex(0);
-      const optionBearing = option.steps?.[0]?.maneuver.bearingAfter ?? null;
-      smoothedNavigationBearingRef.current = optionBearing;
-      setNavigationBearing(optionBearing);
+      setNavigationBearing(option.steps?.[0]?.maneuver.bearingAfter ?? null);
       setFlyToLocation({
         lat: current.destination.lat,
         lng: current.destination.lng,
@@ -1953,61 +1711,6 @@ export default function Dashboard() {
         />
       </ErrorBoundary>
 
-      <AnimatePresence>
-        {latestPriorityPulse && isEarthOps && selectedCelestialBody === 'earth' && (
-          <motion.div
-            key={latestPriorityPulse.id}
-            initial={{ opacity: 0, y: -18, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -12, scale: 0.98 }}
-            transition={{ duration: 0.22 }}
-            className="pointer-events-none absolute inset-x-0 top-[5.9rem] z-[240] flex justify-center px-3"
-          >
-            <motion.div
-              animate={{ boxShadow: latestPriorityPulse.severity === 'critical' ? ['0 0 0 rgba(244,63,94,0.0)', '0 0 38px rgba(244,63,94,0.26)', '0 0 0 rgba(244,63,94,0.0)'] : ['0 0 0 rgba(251,191,36,0.0)', '0 0 30px rgba(251,191,36,0.22)', '0 0 0 rgba(251,191,36,0.0)'] }}
-              transition={{ duration: latestPriorityPulse.severity === 'critical' ? 1.15 : 1.55, repeat: Infinity, ease: 'easeInOut' }}
-              className="relative w-[min(38rem,calc(100vw-1.25rem))]"
-            >
-              <div className={`absolute inset-x-3 -top-3 h-20 rounded-full blur-2xl ${latestPriorityPulse.severity === 'critical' ? 'bg-rose-500/18' : 'bg-amber-400/14'}`} />
-              <div className={`relative overflow-hidden rounded-[1.5rem] border px-4 py-3 shadow-[0_18px_60px_rgba(0,0,0,0.42)] backdrop-blur-xl ${latestPriorityPulse.severity === 'critical' ? 'border-rose-400/60 bg-[linear-gradient(135deg,rgba(62,8,18,0.97),rgba(26,9,14,0.92))]' : 'border-amber-300/45 bg-[linear-gradient(135deg,rgba(56,32,4,0.95),rgba(20,14,8,0.9))]'}`}>
-                <div className={`absolute inset-0 opacity-90 ${latestPriorityPulse.severity === 'critical' ? 'bg-[radial-gradient(circle_at_left,rgba(251,113,133,0.18),transparent_42%),linear-gradient(90deg,transparent,rgba(251,113,133,0.09),transparent)]' : 'bg-[radial-gradient(circle_at_left,rgba(251,191,36,0.16),transparent_42%),linear-gradient(90deg,transparent,rgba(251,191,36,0.08),transparent)]'}`} />
-                <motion.div
-                  animate={{ opacity: [0.2, 0.95, 0.2], scaleX: [0.92, 1.02, 0.92] }}
-                  transition={{ duration: latestPriorityPulse.severity === 'critical' ? 1.05 : 1.5, repeat: Infinity, ease: 'easeInOut' }}
-                  className={`absolute inset-x-5 top-0 h-[2px] origin-center rounded-full ${latestPriorityPulse.severity === 'critical' ? 'bg-rose-300/95' : 'bg-amber-200/90'}`}
-                />
-                <div className="relative flex items-start gap-3">
-                  <div className={`relative mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border ${latestPriorityPulse.severity === 'critical' ? 'border-rose-300/55 bg-rose-500/12 text-rose-100' : 'border-amber-300/40 bg-amber-400/12 text-amber-50'}`}>
-                    <span className={`absolute inset-1 rounded-[15px] border ${latestPriorityPulse.severity === 'critical' ? 'border-rose-200/18' : 'border-amber-100/18'}`} />
-                    <AlertTriangle className="h-5 w-5 animate-aegis-pulse" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2 text-[8px] font-mono uppercase tracking-[0.24em]">
-                      <span className={latestPriorityPulse.severity === 'critical' ? 'text-rose-200' : 'text-amber-100'}>Priority impact pulse</span>
-                      <span className="text-white/35">•</span>
-                      <span className="text-white/65">{latestPriorityPulse.kind === 'quake' ? 'Earthquake' : 'Conflict / war'}</span>
-                      <span className={`inline-flex rounded-full border px-2 py-[2px] text-[7px] ${latestPriorityPulse.severity === 'critical' ? 'border-rose-200/30 bg-rose-300/10 text-rose-100' : 'border-amber-100/20 bg-amber-200/10 text-amber-50'}`}>
-                        {latestPriorityPulse.recencyBand === 'impact' ? 'JUST NOW' : 'FRESH'}
-                      </span>
-                      <span className="inline-flex h-2 w-2 rounded-full bg-white/80 animate-aegis-pulse" />
-                    </div>
-                    <div className="mt-1 text-[14px] font-semibold leading-5 text-white md:text-[15px]">{latestPriorityPulse.title}</div>
-                    <div className="mt-1 text-[10px] text-white/72 md:text-[11px]">{latestPriorityPulse.subtitle}</div>
-                    <div className="mt-2 flex flex-wrap items-center gap-2 text-[9px] font-mono uppercase tracking-[0.18em] text-white/66">
-                      <span>{latestPriorityPulse.label}</span>
-                      <span className="text-white/28">•</span>
-                      <span>{latestPriorityPulse.ageSeconds?.toFixed(1)}s old</span>
-                      <span className="text-white/28">•</span>
-                      <span>{latestPriorityPulse.severity === 'critical' ? 'Operator escalation' : 'Watchlist escalation'}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       <SolarSystemMode
         selected={selectedCelestialBody}
         onSelect={setSelectedCelestialBody}
@@ -2130,43 +1833,35 @@ export default function Dashboard() {
       >
         {(showEarthOperationalShell || isFocusView) ? (
           <>
-            <div className="pointer-events-auto flex items-center gap-2 rounded-[1.35rem] border border-white/10 bg-[linear-gradient(135deg,rgba(7,15,24,0.94),rgba(8,18,28,0.86))] px-2 py-2 shadow-[0_16px_46px_rgba(0,0,0,0.22)] backdrop-blur-lg">
-              <button
-                onClick={() => setMapProjection(p => p === 'globe' ? 'mercator' : 'globe')}
-                className={`group relative flex items-center gap-2 rounded-[1rem] border px-2.5 py-2 transition-all ${mapProjection === 'globe' ? 'border-[rgba(212,175,55,0.34)] bg-[rgba(212,175,55,0.12)] text-[var(--gold-primary)] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]' : 'border-white/8 bg-white/[0.03] text-cyan-100/72 hover:border-cyan-300/30 hover:text-cyan-100'}`}
-                title={mapProjection === 'globe' ? copy.controls.switch2d : copy.controls.switch3d}
-              >
-                <span className="flex h-9 w-9 items-center justify-center rounded-[0.9rem] border border-current/15 bg-black/15">
-                  {mapProjection === 'globe' ? (
-                    <AegisProjectionFlatGlyph className="h-[18px] w-[18px]" />
-                  ) : (
-                    <AegisProjectionOrbitalGlyph className="h-[18px] w-[18px]" />
-                  )}
-                </span>
-                <span className="leading-tight">
-                  <span className="block text-[7px] font-mono uppercase tracking-[0.24em] opacity-72">Projection</span>
-                  <span className="mt-0.5 block text-[9px] font-semibold uppercase tracking-[0.12em]">{mapProjection === 'globe' ? 'Planar next' : 'Orbital next'}</span>
-                </span>
-              </button>
+            <button
+              onClick={() => setMapProjection(p => p === 'globe' ? 'mercator' : 'globe')}
+              className="glass-panel p-2.5 pointer-events-auto hover:border-[var(--gold-primary)]/40 transition-colors group relative"
+              title={mapProjection === 'globe' ? copy.controls.switch2d : copy.controls.switch3d}
+            >
+              {mapProjection === 'globe' ? (
+                <MapPinned className="w-4 h-4 text-[var(--gold-primary)] group-hover:scale-110 transition-transform" />
+              ) : (
+                <Globe className="w-4 h-4 text-[var(--cyan-primary)] group-hover:scale-110 transition-transform" />
+              )}
+              <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 text-[9px] font-mono text-[var(--text-muted)] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity glass-panel px-2 py-1 z-[300]">
+                {mapProjection === 'globe' ? copy.controls.map2d : copy.controls.globe3d}
+              </span>
+            </button>
 
-              <button
-                onClick={() => setMapStyle(s => s === 'dark' ? 'satellite' : 'dark')}
-                className={`group relative flex items-center gap-2 rounded-[1rem] border px-2.5 py-2 transition-all ${mapStyle === 'dark' ? 'border-[rgba(34,197,94,0.26)] bg-[rgba(17,94,89,0.16)] text-emerald-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]' : 'border-[rgba(59,130,246,0.22)] bg-[rgba(30,41,59,0.42)] text-cyan-100 hover:border-cyan-300/30'}`}
-                title={mapStyle === 'dark' ? copy.controls.satelliteView : copy.controls.nightView}
-              >
-                <span className="flex h-9 w-9 items-center justify-center rounded-[0.9rem] border border-current/15 bg-black/15">
-                  {mapStyle === 'dark' ? (
-                    <AegisEarthSurfaceGlyph className="h-[18px] w-[18px]" />
-                  ) : (
-                    <AegisNightFieldGlyph className="h-[18px] w-[18px]" />
-                  )}
-                </span>
-                <span className="leading-tight">
-                  <span className="block text-[7px] font-mono uppercase tracking-[0.24em] opacity-72">Surface</span>
-                  <span className="mt-0.5 block text-[9px] font-semibold uppercase tracking-[0.12em]">{mapStyle === 'dark' ? 'Earth color' : 'Night layer'}</span>
-                </span>
-              </button>
-            </div>
+            <button
+              onClick={() => setMapStyle(s => s === 'dark' ? 'satellite' : 'dark')}
+              className="glass-panel p-2.5 pointer-events-auto hover:border-[var(--gold-primary)]/40 transition-colors group relative"
+              title={mapStyle === 'dark' ? copy.controls.satelliteView : copy.controls.nightView}
+            >
+              {mapStyle === 'dark' ? (
+                <Satellite className="w-4 h-4 text-[var(--alert-green)] group-hover:scale-110 transition-transform" />
+              ) : (
+                <Moon className="w-4 h-4 text-[var(--cyan-primary)] group-hover:scale-110 transition-transform" />
+              )}
+              <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 text-[9px] font-mono text-[var(--text-muted)] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity glass-panel px-2 py-1 z-[300]">
+                {mapStyle === 'dark' ? copy.controls.satellite : copy.controls.nightMode}
+              </span>
+            </button>
           </>
         ) : isSolarView ? (
           <button
@@ -2192,12 +1887,12 @@ export default function Dashboard() {
 
       {!isMobile && earthNavigationMode && routeSnapshot && (
         <motion.div
-          initial={{ opacity: 0, y: 16, scale: 0.98 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ delay: 0.12, duration: 0.3 }}
-          className="absolute bottom-[5.9rem] left-1/2 z-[210] w-[min(58rem,calc(100vw-3rem))] -translate-x-1/2 pointer-events-auto"
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.12, duration: 0.35 }}
+          className="absolute right-4 top-[6.25rem] z-[210] w-[min(24rem,calc(100vw-3rem))] pointer-events-auto md:right-5"
         >
-          <div className="rounded-[1.5rem] border border-cyan-400/18 bg-[linear-gradient(135deg,rgba(6,16,25,0.95),rgba(6,20,30,0.92)_55%,rgba(16,94,122,0.10))] px-3.5 py-3 shadow-[0_22px_60px_rgba(0,0,0,0.26),0_0_26px_rgba(34,211,238,0.08)] backdrop-blur-xl">
+          <div className="rounded-[1.35rem] border border-cyan-400/18 bg-[rgba(8,18,28,0.88)] px-3.5 py-3 shadow-[0_18px_52px_rgba(0,0,0,0.24)] backdrop-blur-lg">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
@@ -2205,17 +1900,17 @@ export default function Dashboard() {
                     <div className="absolute inset-[5px] rounded-full border border-cyan-400/18" />
                     <div className="absolute left-1/2 top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-cyan-300" />
                   </div>
-                  <div className="text-[8px] font-mono uppercase tracking-[0.28em] text-cyan-300">VECTOR CORRIDOR</div>
+                  <div className="text-[8px] font-mono uppercase tracking-[0.26em] text-cyan-300">VECTOR MODE</div>
                 </div>
-                <div className="mt-1 text-sm font-semibold tracking-[0.06em] text-white md:text-[15px]">{routeSnapshot.destination.label}</div>
-                <div className="mt-2 grid gap-2 text-[8px] font-mono uppercase tracking-[0.16em] text-[var(--text-secondary)] sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                <div className="mt-1 text-sm font-semibold tracking-[0.06em] text-white">{routeSnapshot.destination.label}</div>
+                <div className="mt-2 grid gap-2 text-[8px] font-mono uppercase tracking-[0.16em] text-[var(--text-secondary)] sm:grid-cols-2">
                   <div className="rounded-xl border border-white/8 bg-black/20 px-2.5 py-2">
-                    <div className="text-[7px] tracking-[0.2em] text-cyan-300">Live fix</div>
+                    <div className="text-[7px] tracking-[0.2em] text-cyan-300">From</div>
                     <div className="mt-1 text-[10px] font-semibold tracking-[0.05em] text-white">Live position</div>
                     <div className="mt-0.5 text-[8px] text-[var(--text-secondary)]">{formatCoordinateLabel(routeSnapshot.origin)}</div>
                   </div>
                   <div className="rounded-xl border border-white/8 bg-black/20 px-2.5 py-2">
-                    <div className="text-[7px] tracking-[0.2em] text-cyan-300">Target</div>
+                    <div className="text-[7px] tracking-[0.2em] text-cyan-300">To</div>
                     <div className="mt-1 truncate text-[10px] font-semibold tracking-[0.05em] text-white">{routeSnapshot.destination.label}</div>
                     <div className="mt-0.5 text-[8px] text-[var(--text-secondary)]">{formatCoordinateLabel(routeSnapshot.destination)}</div>
                   </div>
@@ -2232,7 +1927,7 @@ export default function Dashboard() {
                     </div>
                   </div>
                 )}
-                <div className="mt-2 grid grid-cols-2 gap-2 xl:grid-cols-4">
+                <div className="mt-2 grid grid-cols-2 gap-2 lg:grid-cols-4">
                   <div className="rounded-xl border border-cyan-400/14 bg-cyan-400/[0.06] px-2.5 py-2">
                     <div className="text-[7px] font-mono uppercase tracking-[0.18em] text-cyan-300">Mode</div>
                     <div className="mt-1 text-[11px] font-semibold tracking-[0.05em] text-white">{formatRouteModeLabel(routeSnapshot.mode)}</div>
@@ -2264,25 +1959,25 @@ export default function Dashboard() {
                   )}
                 </div>
               </div>
-              <div className="flex shrink-0 flex-wrap justify-end gap-2 xl:w-[12rem]">
+              <div className="flex gap-2">
                 <button
                   type="button"
                   onClick={toggleNavigationFollow}
                   className="rounded-full border border-cyan-400/25 bg-cyan-400/10 px-3 py-1.5 text-[10px] font-mono uppercase tracking-[0.16em] text-cyan-200 hover:bg-cyan-400/18"
                 >
-                  {navigationActive ? 'Pause lock' : 'Lock route'}
+                  {navigationActive ? 'Pause Vector' : 'Start Vector'}
                 </button>
                 <button
                   type="button"
                   onClick={clearNavigationState}
                   className="rounded-full border border-white/10 px-3 py-1.5 text-[10px] font-mono uppercase tracking-[0.16em] text-[var(--text-muted)] hover:text-white"
                 >
-                  Clear
+                  Clear Route
                 </button>
               </div>
             </div>
             {routeSnapshot.alternatives.length > 1 && (
-              <div className="mt-3 flex flex-wrap gap-2 border-t border-white/8 pt-3">
+              <div className="mt-3 flex flex-wrap gap-2">
                 {routeSnapshot.alternatives.map((option) => (
                   <button
                     key={option.id}
@@ -2296,7 +1991,7 @@ export default function Dashboard() {
               </div>
             )}
             {routeRiskSummary && (
-              <div className="mt-3 rounded-2xl border border-white/8 bg-black/20 px-3 py-2.5 xl:max-w-[28rem]">
+              <div className="mt-3 rounded-2xl border border-white/8 bg-black/20 px-3 py-2.5">
                 <div className="flex flex-wrap items-center gap-2 text-[8px] font-mono uppercase tracking-[0.18em]">
                   <span className="text-cyan-300">Route Threat Scan</span>
                   <span className="text-[var(--text-secondary)]">{routeRiskSummary.nearbySignals} signals</span>
@@ -2349,7 +2044,7 @@ export default function Dashboard() {
           <div className="flex items-center gap-2">
             <h1 className="text-base md:text-xl font-bold tracking-[0.4em] md:tracking-[0.5em] text-[var(--text-heading)] font-mono">AEGIS</h1>
             <span className="hidden md:inline-flex items-center gap-1 px-1.5 py-[1px] rounded-sm border border-[var(--cyan-primary)]/40 bg-[var(--cyan-primary)]/10 text-[7px] font-mono font-bold tracking-[0.15em] text-[var(--cyan-primary)] uppercase" style={{ lineHeight: '1.4' }}>
-              <AegisProjectionOrbitalGlyph className="h-2.5 w-2.5" />
+              <Globe className="w-2.5 h-2.5" />
               {copy.header.badge}
             </span>
           </div>

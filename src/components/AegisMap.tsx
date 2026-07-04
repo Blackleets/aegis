@@ -40,7 +40,6 @@ interface AegisMapData extends Record<string, unknown> {
   radiation?: MapEntity[];
   live_feeds?: MapEntity[];
   news?: MapEntity[];
-  priority_pulses?: MapEntity[];
 }
 
 interface AegisMapProps {
@@ -329,53 +328,13 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       );
     } catch {}
 
-    try {
-      for (const layer of map.getStyle().layers || []) {
-        const id = `${layer.id} ${String((layer as { 'source-layer'?: string })['source-layer'] || '')}`.toLowerCase();
-
-        if (layer.type === 'background') {
-          try {
-            map.setPaintProperty(layer.id, 'background-color', isGlobe ? '#050d16' : '#0b131d');
-          } catch {}
-        }
-
-        if (layer.type === 'fill') {
-          if (/(water|ocean|sea|river|lake)/.test(id)) {
-            try {
-              map.setPaintProperty(layer.id, 'fill-color', isGlobe ? '#1e5e86' : '#122536');
-              map.setPaintProperty(layer.id, 'fill-opacity', isGlobe ? 0.92 : 0.72);
-            } catch {}
-          } else if (/(land|landcover|park|forest|grass|vegetation|wood|natural)/.test(id)) {
-            try {
-              map.setPaintProperty(layer.id, 'fill-color', isGlobe ? '#3f5f3a' : '#1b242d');
-              map.setPaintProperty(layer.id, 'fill-opacity', isGlobe ? 0.88 : 0.68);
-            } catch {}
-          }
-        }
-
-        if (layer.type === 'line') {
-          if (/(coast|shore)/.test(id)) {
-            try {
-              map.setPaintProperty(layer.id, 'line-color', isGlobe ? '#9bc7da' : '#50616f');
-              map.setPaintProperty(layer.id, 'line-opacity', isGlobe ? 0.42 : 0.28);
-            } catch {}
-          } else if (/(boundary|admin|country)/.test(id)) {
-            try {
-              map.setPaintProperty(layer.id, 'line-color', isGlobe ? '#5a7688' : '#3d4b57');
-              map.setPaintProperty(layer.id, 'line-opacity', isGlobe ? 0.32 : 0.22);
-            } catch {}
-          }
-        }
-      }
-    } catch {}
-
     if (map.getLayer('satellite-layer')) {
       try {
-        map.setPaintProperty('satellite-layer', 'raster-opacity', isGlobe ? 0.72 : 0.88);
-        map.setPaintProperty('satellite-layer', 'raster-saturation', isGlobe ? 0.82 : 0.12);
-        map.setPaintProperty('satellite-layer', 'raster-contrast', isGlobe ? 0.18 : 0.04);
-        map.setPaintProperty('satellite-layer', 'raster-brightness-min', isGlobe ? 0.18 : 0.02);
-        map.setPaintProperty('satellite-layer', 'raster-brightness-max', isGlobe ? 1.18 : 1.04);
+        map.setPaintProperty('satellite-layer', 'raster-opacity', isGlobe ? 1 : 0.82);
+        map.setPaintProperty('satellite-layer', 'raster-saturation', isGlobe ? 0.22 : 0);
+        map.setPaintProperty('satellite-layer', 'raster-contrast', isGlobe ? 0.14 : 0);
+        map.setPaintProperty('satellite-layer', 'raster-brightness-min', isGlobe ? 0.16 : 0);
+        map.setPaintProperty('satellite-layer', 'raster-brightness-max', isGlobe ? 1.04 : 1);
       } catch {}
     }
 
@@ -422,7 +381,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       createDot(map, 'dot-cctv', '#39FF14', 10);
 
       // Sources
-      const sources = ['flights','military','jets','private-fl','flight-trails','military-trails','jet-trails','private-trails','satellites','earthquakes','gdelt','gdelt-hotspots','gps-jamming','day-night','cctv','fires','weather','infrastructure','maritime','maritime-choke','maritime-ships','live-news','sigint-news','priority-pulses','conflict-zones', 'war-alerts-targets', 'war-alerts-lines', 'balloons', 'radiation', 'ip-sweep-devices', 'ip-sweep-pulse', 'ip-sweep-connections', 'scan-targets', 'sdk-entities', 'sdk-links', 'user-route', 'route-markers'];
+      const sources = ['flights','military','jets','private-fl','flight-trails','military-trails','jet-trails','private-trails','satellites','earthquakes','gdelt','gdelt-hotspots','gps-jamming','day-night','cctv','fires','weather','infrastructure','maritime','maritime-choke','maritime-ships','live-news','sigint-news','conflict-zones', 'war-alerts-targets', 'war-alerts-lines', 'balloons', 'radiation', 'ip-sweep-devices', 'ip-sweep-pulse', 'ip-sweep-connections', 'scan-targets', 'sdk-entities', 'sdk-links', 'user-route', 'route-markers'];
       sources.forEach(s => map.addSource(s, { type: 'geojson', data: EMPTY_FC }));
 
 
@@ -550,41 +509,6 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       map.addLayer({ id: 'eq-label', type: 'symbol', source: 'earthquakes', minzoom: 5, filter: ['>=',['get','magnitude'],4.5], layout: {
         'text-field': ['concat','M',['to-string',['get','magnitude']]], 'text-size': 9, 'text-font': ['Open Sans Regular'], 'text-offset': [0,1.5],
       }, paint: { 'text-color': '#FFD700', 'text-halo-color': '#000', 'text-halo-width': 1 }});
-      map.addLayer({ id: 'priority-pulse-shockwave', type: 'circle', source: 'priority-pulses', paint: {
-        'circle-radius': ['coalesce', ['get', 'shockwaveRadius'], 34],
-        'circle-color': ['match', ['get', 'severity'], 'critical', '#FF4D6D', '#FFB020'],
-        'circle-opacity': ['coalesce', ['get', 'shockwaveOpacity'], 0.12],
-        'circle-stroke-width': 1.4,
-        'circle-stroke-color': ['match', ['get', 'severity'], 'critical', '#FFB0C1', '#FFE39A'],
-        'circle-stroke-opacity': ['coalesce', ['get', 'shockwaveOpacity'], 0.12],
-        'circle-blur': 0.4,
-      }});
-      map.addLayer({ id: 'priority-pulse-halo', type: 'circle', source: 'priority-pulses', paint: {
-        'circle-radius': ['coalesce', ['get', 'pulseRadius'], 18],
-        'circle-color': ['match', ['get', 'severity'], 'critical', '#FF4D6D', '#FFB020'],
-        'circle-opacity': ['coalesce', ['get', 'pulseOpacity'], 0.22],
-        'circle-blur': 1,
-      }});
-      map.addLayer({ id: 'priority-pulse-core', type: 'circle', source: 'priority-pulses', paint: {
-        'circle-radius': ['coalesce', ['get', 'coreRadius'], 5.4],
-        'circle-color': ['match', ['get', 'severity'], 'critical', '#FFE0E8', '#FFF1C2'],
-        'circle-opacity': ['coalesce', ['get', 'coreOpacity'], 0.92],
-        'circle-stroke-width': 2,
-        'circle-stroke-color': ['match', ['get', 'severity'], 'critical', '#FF4D6D', '#FFB020'],
-        'circle-stroke-opacity': 0.9,
-      }});
-      map.addLayer({ id: 'priority-pulse-label', type: 'symbol', source: 'priority-pulses', minzoom: 3.2, layout: {
-        'text-field': ['get', 'label'],
-        'text-size': ['interpolate', ['linear'], ['zoom'], 3, 9, 6, 10.5, 10, 12],
-        'text-font': ['Open Sans Bold'],
-        'text-offset': [0, 2],
-        'text-allow-overlap': true,
-      }, paint: {
-        'text-color': ['match', ['get', 'severity'], 'critical', '#FFD6DE', '#FFF1BF'],
-        'text-halo-color': 'rgba(2, 7, 18, 0.96)',
-        'text-halo-width': 1.5,
-        'text-opacity': 0.95,
-      }});
 
       // Fires
       map.addLayer({ id: 'fires-heat', type: 'circle', source: 'fires', paint: {
@@ -1119,28 +1043,6 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       });
     });
 
-    ['priority-pulse-core', 'priority-pulse-halo', 'priority-pulse-shockwave'].forEach(layer => {
-      map.on('click', layer, e => {
-        if (!e.features?.length) return;
-        const p = e.features[0].properties as EntityProperties;
-        const coords = (e.features[0].geometry).coordinates;
-        const accent = p.severity === 'critical' ? '#FF4D6D' : '#FFB020';
-        popup(coords, `<div style="${pStyle}border:1px solid ${accent}66;">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;">
-            <div style="color:${accent};font-size:12px;font-weight:700;letter-spacing:0.08em;">${p.kind === 'quake' ? '🌍 EARTH PULSE' : '⚔️ CONFLICT PULSE'}</div>
-            <span style="padding:3px 7px;border-radius:999px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.08);color:#F8FAFC;font-size:9px;letter-spacing:0.08em;">LIVE</span>
-          </div>
-          <div style="font-size:10px;color:#E8E6E0;line-height:1.45;margin-bottom:8px;">${p.title || 'Priority event'}</div>
-          <div style="font-size:9px;color:#A9B4C2;margin-bottom:8px;">${p.subtitle || 'New high-priority alert now pulsing on Earth Ops.'}</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:9px;margin-bottom:8px;">
-            <div><span style="color:#5C5A54;">SEVERITY</span><br/><span style="color:${accent};">${String(p.severity || 'high').toUpperCase()}</span></div>
-            <div><span style="color:#5C5A54;">COORDS</span><br/><span style="color:#E8E6E0;">${coords[1].toFixed(3)}°, ${coords[0].toFixed(3)}°</span></div>
-          </div>
-          ${p.url ? `<a href="${p.url}" target="_blank" style="${linkStyle}color:${accent};border:1px solid ${accent}66;background:${accent}1A;">SOURCE ↗</a>` : ''}
-        </div>`);
-      });
-    });
-
     // ── Global Event / Conflict Markers ──
     map.on('click', 'conflict-icons', e => {
       if (!e.features?.length) return;
@@ -1193,7 +1095,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
     });
 
     // ── Generic hover for clickables ──
-    ['conflict-icons','cctv-dots','eq-circles','sat-dots','fires-heat','gdelt-dots','gdelt-hotspot-core','gdelt-hotspot-halo','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots','sigint-news-dots','priority-pulse-core','priority-pulse-halo','priority-pulse-shockwave','balloon-dots','rad-dots','ship-dots','sweep-device-dots','scan-targets-dots','sdk-sea','sdk-sea-glow','sdk-air','sdk-air-glow','sdk-intel','sdk-intel-glow'].forEach(layer => {
+    ['conflict-icons','cctv-dots','eq-circles','sat-dots','fires-heat','gdelt-dots','gdelt-hotspot-core','gdelt-hotspot-halo','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots','sigint-news-dots','balloon-dots','rad-dots','ship-dots','sweep-device-dots','scan-targets-dots','sdk-sea','sdk-sea-glow','sdk-air','sdk-air-glow','sdk-intel','sdk-intel-glow'].forEach(layer => {
       map.on('mouseenter', layer, () => { map.getCanvas().style.cursor = 'pointer'; });
       map.on('mouseleave', layer, () => { map.getCanvas().style.cursor = ''; });
     });
@@ -1515,38 +1417,8 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
 
   useEffect(() => {
     if (!mapReady) return;
-    setGeo('earthquakes', activeLayers.earthquakes && data.earthquakes ? data.earthquakes.map((eq: MapEntity) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [eq.lng, eq.lat] }, properties: { id: eq.id, magnitude: eq.magnitude, place: eq.place, depth: eq.depth, source: eq.source, time: eq.time, alert: eq.alert } })) : []);
+    setGeo('earthquakes', activeLayers.earthquakes && data.earthquakes ? data.earthquakes.map((eq: MapEntity) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [eq.lng, eq.lat] }, properties: { magnitude: eq.magnitude, place: eq.place } })) : []);
   }, [mapReady, data.earthquakes, activeLayers.earthquakes, setGeo]);
-
-  useEffect(() => {
-    if (!mapReady) return;
-    setGeo('priority-pulses', Array.isArray(data.priority_pulses)
-      ? data.priority_pulses
-          .filter((event: MapEntity) => typeof event.lat === 'number' && typeof event.lng === 'number')
-          .map((event: MapEntity) => ({
-            type: 'Feature',
-            geometry: { type: 'Point', coordinates: [event.lng, event.lat] },
-            properties: {
-              id: event.id,
-              kind: event.kind,
-              severity: event.severity,
-              title: event.title,
-              subtitle: event.subtitle,
-              label: event.label,
-              pulseRadius: event.pulseRadius,
-              pulseOpacity: event.pulseOpacity,
-              shockwaveRadius: event.shockwaveRadius,
-              shockwaveOpacity: event.shockwaveOpacity,
-              coreRadius: event.coreRadius,
-              coreOpacity: event.coreOpacity,
-              ageSeconds: event.ageSeconds,
-              recencyBand: event.recencyBand,
-              url: event.url,
-              sourceTime: event.sourceTime,
-            },
-          }))
-      : []);
-  }, [mapReady, data.priority_pulses, setGeo]);
 
   useEffect(() => {
     if (!mapReady) return;
@@ -1995,7 +1867,6 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
   useEffect(() => {
     if (!mapReady) return;
     setVis(['eq-circles','eq-label'], activeLayers.earthquakes);
-    setVis(['priority-pulse-shockwave','priority-pulse-halo','priority-pulse-core','priority-pulse-label'], true);
     setVis(['sat-dots','sat-glow'], activeLayers.satellites);
     setVis(['gdelt-dots','gdelt-hotspot-halo','gdelt-hotspot-core','gdelt-hotspot-label'], activeLayers.global_incidents);
     setVis(['jam-fill','jam-label'], activeLayers.gps_jamming);
@@ -2167,24 +2038,20 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       ? Number.POSITIVE_INFINITY
       : Math.abs((((nextBearing - lastBearing) % 360) + 540) % 360 - 180);
 
-    if (movementDelta < 0.00012 && bearingDelta < 2) return;
-    if (movementDelta < 0.00055 && bearingDelta < 6 && now - lastNavCameraUpdateRef.current < 460) return;
+    if (movementDelta < 0.00025 && bearingDelta < 3) return;
+    if (movementDelta < 0.0009 && bearingDelta < 8 && now - lastNavCameraUpdateRef.current < 850) return;
 
     lastNavCameraUpdateRef.current = now;
     lastNavCameraCenterRef.current = currentLocation;
     lastNavCameraBearingRef.current = nextBearing;
 
-    const travelIntensity = Math.min(1, movementDelta / 0.0035);
-    const turnIntensity = Number.isFinite(bearingDelta) ? Math.min(1, bearingDelta / 28) : 0;
-    const easedDuration = Math.round(260 + (1 - travelIntensity) * 150 + turnIntensity * 110);
-
     map.easeTo({
-      center: [currentLocation.lng, currentLocation.lat + 0.0022],
-      zoom: Math.max(map.getZoom(), 16.1),
-      pitch: 58,
+      center: [currentLocation.lng, currentLocation.lat + 0.0035],
+      zoom: Math.max(map.getZoom(), 15.7),
+      pitch: 54,
       bearing: nextBearing,
-      padding: { top: 72, bottom: 220, left: 72, right: 72 },
-      duration: easedDuration,
+      padding: { top: 108, bottom: 156, left: 64, right: 64 },
+      duration: 720,
       essential: true,
     });
   }, [currentLocation, mapReady, navigationActive, navigationBearing]);
@@ -2296,11 +2163,11 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
               type: 'raster',
               source: 'satellite-tiles',
               paint: {
-                'raster-opacity': 0.72,
-                'raster-saturation': 0.82,
-                'raster-contrast': 0.18,
-                'raster-brightness-min': 0.18,
-                'raster-brightness-max': 1.18,
+                'raster-opacity': 0.86,
+                'raster-saturation': 0.04,
+                'raster-contrast': 0.08,
+                'raster-brightness-min': 0.06,
+                'raster-brightness-max': 1.02,
               },
             },
             'day-night-fill',
