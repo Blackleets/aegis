@@ -330,18 +330,18 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
 
     if (map.getLayer('satellite-layer')) {
       try {
-        map.setPaintProperty('satellite-layer', 'raster-opacity', isGlobe ? 1 : 0.88);
-        map.setPaintProperty('satellite-layer', 'raster-saturation', isGlobe ? 0.72 : 0.18);
-        map.setPaintProperty('satellite-layer', 'raster-contrast', isGlobe ? 0.2 : 0.08);
-        map.setPaintProperty('satellite-layer', 'raster-brightness-min', isGlobe ? 0.28 : 0.12);
-        map.setPaintProperty('satellite-layer', 'raster-brightness-max', isGlobe ? 1 : 1);
+        map.setPaintProperty('satellite-layer', 'raster-opacity', isGlobe ? (isDark ? 0.98 : 1) : 0.88);
+        map.setPaintProperty('satellite-layer', 'raster-saturation', isGlobe ? (isDark ? 0.38 : 0.72) : 0.18);
+        map.setPaintProperty('satellite-layer', 'raster-contrast', isGlobe ? (isDark ? 0.16 : 0.2) : 0.08);
+        map.setPaintProperty('satellite-layer', 'raster-brightness-min', isGlobe ? (isDark ? 0.06 : 0.28) : 0.12);
+        map.setPaintProperty('satellite-layer', 'raster-brightness-max', isGlobe ? (isDark ? 0.72 : 1) : 1);
       } catch {}
     }
 
     if (map.getLayer('day-night-fill')) {
       try {
         map.setPaintProperty('day-night-fill', 'fill-color', '#05101f');
-        map.setPaintProperty('day-night-fill', 'fill-opacity', isGlobe ? 0 : 0.12);
+        map.setPaintProperty('day-night-fill', 'fill-opacity', isGlobe ? (isDark ? 0.2 : 0.04) : 0.12);
       } catch {}
     }
   }, []);
@@ -2148,7 +2148,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
     if (!mapReady || !mapRef.current) return;
     prevStyleRef.current = mapStyle;
     const map = mapRef.current;
-    const shouldShowSatelliteLayer = mapStyle === 'satellite';
+    const shouldShowSatelliteLayer = projection === 'globe' || mapStyle === 'satellite';
 
     try {
       if (shouldShowSatelliteLayer) {
