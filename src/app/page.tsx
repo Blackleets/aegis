@@ -500,7 +500,7 @@ export default function Dashboard() {
   const [rightRailFocus, setRightRailFocus] = useState<'alerts' | 'recon'>('alerts');
   const [mobilePanel, setMobilePanel] = useState<MobilePanel | null>(null);
   const [vectorDockOpen, setVectorDockOpen] = useState(false);
-  const [mobileModeDockCollapsed, setMobileModeDockCollapsed] = useState(false);
+  const [mobileModeDockCollapsed, setMobileModeDockCollapsed] = useState(true);
   const [dashboardMode, setDashboardMode] = useState<DashboardMode>('earth');
   const [mapProjection, setMapProjection] = useState<'globe'|'mercator'>('globe');
   const [selectedCelestialBody, setSelectedCelestialBody] = useState<CelestialBodyId>('earth');
@@ -1383,19 +1383,19 @@ export default function Dashboard() {
         onEarthOps={() => {
           setDashboardMode('earth');
           setSelectedCelestialBody('earth');
-          setMobileModeDockCollapsed(false);
+          setMobileModeDockCollapsed(isMobile);
         }}
         onSolarView={() => {
           setShowSplash(false);
           setDashboardMode('solar');
           setSelectedCelestialBody(prev => prev === 'earth' ? 'mars' : prev);
-          setMobileModeDockCollapsed(false);
+          setMobileModeDockCollapsed(isMobile);
         }}
         onFocus={() => {
           setShowSplash(false);
           setDashboardMode('focus');
           setSelectedCelestialBody('earth');
-          setMobileModeDockCollapsed(false);
+          setMobileModeDockCollapsed(isMobile);
         }}
       />
 
@@ -1491,7 +1491,7 @@ export default function Dashboard() {
           <>
             <button
               onClick={() => setMapProjection(p => p === 'globe' ? 'mercator' : 'globe')}
-              className="glass-panel p-2.5 pointer-events-auto hover:border-[var(--gold-primary)]/40 transition-colors group relative"
+              className="glass-panel flex min-w-[4.5rem] flex-col items-center gap-1 px-2.5 py-2 pointer-events-auto hover:border-[var(--gold-primary)]/40 transition-colors group relative"
               title={mapProjection === 'globe' ? copy.controls.switch2d : copy.controls.switch3d}
             >
               {mapProjection === 'globe' ? (
@@ -1499,6 +1499,9 @@ export default function Dashboard() {
               ) : (
                 <Globe className="w-4 h-4 text-[var(--cyan-primary)] group-hover:scale-110 transition-transform" />
               )}
+              <span className="text-[7px] font-mono font-bold tracking-[0.14em] text-[var(--text-primary)] leading-none">
+                {mapProjection === 'globe' ? '2D' : '3D'}
+              </span>
               <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 text-[9px] font-mono text-[var(--text-muted)] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity glass-panel px-2 py-1 z-[300]">
                 {mapProjection === 'globe' ? copy.controls.map2d : copy.controls.globe3d}
               </span>
@@ -1506,7 +1509,7 @@ export default function Dashboard() {
 
             <button
               onClick={() => setMapStyle(s => s === 'dark' ? 'satellite' : 'dark')}
-              className="glass-panel p-2.5 pointer-events-auto hover:border-[var(--gold-primary)]/40 transition-colors group relative"
+              className="glass-panel flex min-w-[4.8rem] flex-col items-center gap-1 px-2.5 py-2 pointer-events-auto hover:border-[var(--gold-primary)]/40 transition-colors group relative"
               title={mapStyle === 'dark' ? copy.controls.satelliteView : copy.controls.nightView}
             >
               {mapStyle === 'dark' ? (
@@ -1514,6 +1517,9 @@ export default function Dashboard() {
               ) : (
                 <Moon className="w-4 h-4 text-[var(--cyan-primary)] group-hover:scale-110 transition-transform" />
               )}
+              <span className="text-[7px] font-mono font-bold tracking-[0.14em] text-[var(--text-primary)] leading-none">
+                {mapStyle === 'dark' ? 'SAT' : 'NOCHE'}
+              </span>
               <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 text-[9px] font-mono text-[var(--text-muted)] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity glass-panel px-2 py-1 z-[300]">
                 {mapStyle === 'dark' ? copy.controls.satellite : copy.controls.nightMode}
               </span>

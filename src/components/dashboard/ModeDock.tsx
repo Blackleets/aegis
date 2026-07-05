@@ -68,7 +68,7 @@ export default function ModeDock({ mode, locale, isMobile = false, collapsed = f
       initial={{ opacity: 0, y: -12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 3.05, duration: 0.45 }}
-      className="absolute top-2 md:top-3 left-1/2 z-[220] w-[min(36rem,calc(100vw-0.75rem))] md:w-[min(36rem,calc(100vw-1rem))] -translate-x-1/2 pointer-events-auto"
+      className="absolute top-2 md:top-3 left-1/2 z-[220] w-[min(34rem,calc(100vw-1.1rem))] md:w-[min(36rem,calc(100vw-1rem))] -translate-x-1/2 pointer-events-auto"
     >
       <div className="sovereign-panel px-1.5 py-1.5 md:px-2 md:py-2 backdrop-blur-xl">
         <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/22 to-transparent" />
@@ -151,8 +151,8 @@ export default function ModeDock({ mode, locale, isMobile = false, collapsed = f
 
         {isMobile && collapsed && (
           <div className="mt-0.5 flex items-center justify-between gap-2 px-1.5 sm:hidden">
-            <div className="text-[6px] font-mono tracking-[0.16em] text-[var(--text-secondary)]">{activeMeta.label}</div>
-            <div className={`text-[5px] font-mono tracking-[0.18em] ${activeMeta.accent}`}>{activeMeta.signal}</div>
+            <div className="truncate text-[6px] font-mono tracking-[0.16em] text-[var(--text-secondary)]">{activeMeta.label}</div>
+            <div className={`max-w-[8.5rem] truncate text-right text-[5px] font-mono tracking-[0.18em] ${activeMeta.accent}`}>{activeMeta.signal}</div>
           </div>
         )}
       </div>

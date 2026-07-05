@@ -1,8 +1,8 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { motion } from 'framer-motion';
-import { Activity, BarChart3, Globe, Wifi } from 'lucide-react';
+import { Activity, BarChart3, ChevronDown, ChevronUp, Globe, Wifi } from 'lucide-react';
 
 type UsageMetrics = {
   onlineUsers: number;
@@ -57,9 +57,11 @@ export default function TopHudOverlays({
   zuluClock,
   uptimeClock,
 }: TopHudOverlaysProps) {
+  const [mobileHudCollapsed, setMobileHudCollapsed] = useState(false);
+
   return (
     <>
-      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, delay: 2.5 }} className="absolute top-2 left-2 md:top-5 md:left-5 z-[200] pointer-events-none flex items-center gap-1.5 md:gap-3">
+      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, delay: 2.5 }} className={`${isMobile ? 'hidden' : 'flex'} absolute top-2 left-2 md:top-5 md:left-5 z-[200] pointer-events-none items-center gap-1.5 md:gap-3`}>
         <div className="w-6 h-6 md:w-9 md:h-9 flex items-center justify-center relative">
           <div className="absolute inset-[-4px] md:inset-[-5px] rounded-full border border-[var(--gold-primary)]/20" style={{ animation: 'aegis-rotate 12s linear infinite' }}>
             <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1 h-1 rounded-full bg-[var(--gold-primary)] shadow-[0_0_6px_var(--gold-primary)]" />
@@ -113,18 +115,31 @@ export default function TopHudOverlays({
       )}
 
       {isMobile && showAuxiliaryHud && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 2.5 }} className="absolute top-2 right-2 z-[200] pointer-events-auto flex flex-col items-end gap-1">
-          <div className="flex items-center gap-1 rounded-xl border border-[var(--border-primary)]/70 bg-[rgba(15,23,32,0.92)] px-2 py-1 shadow-[0_10px_30px_rgba(0,0,0,0.18)] backdrop-blur-md">
-            <span className={`h-1.5 w-1.5 rounded-full ${backendStatus === 'connected' ? 'bg-[var(--alert-green)]' : backendStatus === 'error' ? 'bg-[var(--alert-red)]' : 'bg-[var(--gold-primary)]'} animate-aegis-pulse`} />
-            <span className="text-[6px] font-mono font-bold tracking-[0.14em] text-[var(--text-primary)]">{backendStatusLabel}</span>
-            <span className="text-[var(--border-primary)]/70">•</span>
-            <span className="text-[6px] font-mono tracking-[0.14em] text-[var(--text-muted)]">{alertsLabel}</span>
-            <span className="text-[8px] font-bold tabular-nums" style={{ color: activeIntelAlerts > 0 ? '#FF9500' : 'var(--alert-green)' }}>{activeIntelAlerts}</span>
-          </div>
-          <a href="https://ko-fi.com/M8D41ZYW4Z" target="_blank" rel="noreferrer" className="glass-panel px-2 py-1 flex items-center gap-1 text-[6px] font-mono tracking-[0.14em] hover:opacity-80 transition-opacity border-[var(--border-primary)]/80 bg-[rgba(15,23,32,0.92)]">
-            <div className="w-1.5 h-1.5 rounded-full bg-[var(--gold-primary)] animate-aegis-pulse" />
-            <span className="text-[var(--text-primary)] font-bold">{supportProjectCompactLabel}</span>
-          </a>
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 2.5 }} className="absolute top-[5.35rem] right-2 z-[200] pointer-events-auto flex flex-col items-end gap-1">
+          <button
+            type="button"
+            onClick={() => setMobileHudCollapsed(value => !value)}
+            className="inline-flex items-center gap-1 rounded-full border border-[var(--border-primary)]/70 bg-[rgba(15,23,32,0.92)] px-2 py-1 text-[6px] font-mono tracking-[0.14em] text-[var(--text-primary)] shadow-[0_10px_30px_rgba(0,0,0,0.18)] backdrop-blur-md"
+            aria-label={mobileHudCollapsed ? 'Mostrar HUD móvil' : 'Ocultar HUD móvil'}
+          >
+            {mobileHudCollapsed ? <ChevronDown className="h-3 w-3" /> : <ChevronUp className="h-3 w-3" />}
+            <span>HUD</span>
+          </button>
+          {!mobileHudCollapsed && (
+            <>
+              <div className="flex items-center gap-1 rounded-xl border border-[var(--border-primary)]/70 bg-[rgba(15,23,32,0.92)] px-2 py-1 shadow-[0_10px_30px_rgba(0,0,0,0.18)] backdrop-blur-md">
+                <span className={`h-1.5 w-1.5 rounded-full ${backendStatus === 'connected' ? 'bg-[var(--alert-green)]' : backendStatus === 'error' ? 'bg-[var(--alert-red)]' : 'bg-[var(--gold-primary)]'} animate-aegis-pulse`} />
+                <span className="text-[6px] font-mono font-bold tracking-[0.14em] text-[var(--text-primary)]">{backendStatusLabel}</span>
+                <span className="text-[var(--border-primary)]/70">•</span>
+                <span className="text-[6px] font-mono tracking-[0.14em] text-[var(--text-muted)]">{alertsLabel}</span>
+                <span className="text-[8px] font-bold tabular-nums" style={{ color: activeIntelAlerts > 0 ? '#FF9500' : 'var(--alert-green)' }}>{activeIntelAlerts}</span>
+              </div>
+              <a href="https://ko-fi.com/M8D41ZYW4Z" target="_blank" rel="noreferrer" className="glass-panel px-2 py-1 flex items-center gap-1 text-[6px] font-mono tracking-[0.14em] hover:opacity-80 transition-opacity border-[var(--border-primary)]/80 bg-[rgba(15,23,32,0.92)]">
+                <div className="w-1.5 h-1.5 rounded-full bg-[var(--gold-primary)] animate-aegis-pulse" />
+                <span className="text-[var(--text-primary)] font-bold">{supportProjectCompactLabel}</span>
+              </a>
+            </>
+          )}
         </motion.div>
       )}
     </>
