@@ -500,6 +500,7 @@ export default function Dashboard() {
   const [rightRailFocus, setRightRailFocus] = useState<'alerts' | 'recon'>('alerts');
   const [mobilePanel, setMobilePanel] = useState<MobilePanel | null>(null);
   const [vectorDockOpen, setVectorDockOpen] = useState(false);
+  const [mobileModeDockCollapsed, setMobileModeDockCollapsed] = useState(false);
   const [dashboardMode, setDashboardMode] = useState<DashboardMode>('earth');
   const [mapProjection, setMapProjection] = useState<'globe'|'mercator'>('globe');
   const [selectedCelestialBody, setSelectedCelestialBody] = useState<CelestialBodyId>('earth');
@@ -1375,20 +1376,26 @@ export default function Dashboard() {
       <ModeDock
         mode={dashboardMode}
         locale={locale}
+        isMobile={isMobile}
+        collapsed={isMobile && mobileModeDockCollapsed}
+        onToggleCollapsed={() => setMobileModeDockCollapsed(prev => !prev)}
         onLocaleChange={setLocale}
         onEarthOps={() => {
           setDashboardMode('earth');
           setSelectedCelestialBody('earth');
+          setMobileModeDockCollapsed(false);
         }}
         onSolarView={() => {
           setShowSplash(false);
           setDashboardMode('solar');
           setSelectedCelestialBody(prev => prev === 'earth' ? 'mars' : prev);
+          setMobileModeDockCollapsed(false);
         }}
         onFocus={() => {
           setShowSplash(false);
           setDashboardMode('focus');
           setSelectedCelestialBody('earth');
+          setMobileModeDockCollapsed(false);
         }}
       />
 

@@ -2148,7 +2148,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
     if (!mapReady || !mapRef.current) return;
     prevStyleRef.current = mapStyle;
     const map = mapRef.current;
-    const shouldShowSatelliteLayer = projection === 'globe' || mapStyle !== 'dark';
+    const shouldShowSatelliteLayer = mapStyle === 'satellite';
 
     try {
       if (shouldShowSatelliteLayer) {
