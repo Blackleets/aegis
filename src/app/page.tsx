@@ -247,7 +247,7 @@ function MobileLayersPanel({ metrics, layerPanel, presets }: MobileLayersPanelPr
 function MobileSearchPanel({ searchBar, sharePanel, routeError }: MobileSearchPanelProps) {
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between gap-2 rounded-2xl border border-cyan-300/14 bg-[linear-gradient(135deg,rgba(10,22,34,0.82),rgba(4,12,20,0.68))] px-3 py-2">
+      <div className="flex items-center justify-between gap-2 rounded-2xl border border-cyan-300/14 bg-[linear-gradient(135deg,rgba(10,22,34,0.82),rgba(4,12,20,0.68))] px-3 py-2.5">
         <div>
           <div className="text-[7px] font-mono uppercase tracking-[0.22em] text-cyan-200">GPS</div>
           <div className="mt-1 text-[9px] font-semibold text-white">Busca un destino y empieza la ruta.</div>
