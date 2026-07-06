@@ -1500,7 +1500,7 @@ export default function Dashboard() {
                 <Globe className="w-4 h-4 text-[var(--cyan-primary)] group-hover:scale-110 transition-transform" />
               )}
               <span className="text-[7px] font-mono font-bold tracking-[0.14em] text-[var(--text-primary)] leading-none">
-                {mapProjection === 'globe' ? '2D' : '3D'}
+                {mapProjection === 'globe' ? 'MAPA' : 'GLOBO'}
               </span>
               <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 text-[9px] font-mono text-[var(--text-muted)] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity glass-panel px-2 py-1 z-[300]">
                 {mapProjection === 'globe' ? copy.controls.map2d : copy.controls.globe3d}
@@ -1518,7 +1518,7 @@ export default function Dashboard() {
                 <Moon className="w-4 h-4 text-[var(--cyan-primary)] group-hover:scale-110 transition-transform" />
               )}
               <span className="text-[7px] font-mono font-bold tracking-[0.14em] text-[var(--text-primary)] leading-none">
-                {mapStyle === 'dark' ? 'SAT' : 'NOCHE'}
+                {mapStyle === 'dark' ? 'COLOR' : 'NOCHE'}
               </span>
               <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 text-[9px] font-mono text-[var(--text-muted)] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity glass-panel px-2 py-1 z-[300]">
                 {mapStyle === 'dark' ? copy.controls.satellite : copy.controls.nightMode}

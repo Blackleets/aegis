@@ -80,10 +80,10 @@ export default function ModeDock({ mode, locale, isMobile = false, collapsed = f
                 type="button"
                 onClick={onToggleCollapsed}
                 className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.03] px-2 py-1 text-[6px] font-mono tracking-[0.14em] text-[var(--text-secondary)] transition-colors hover:border-white/20 hover:text-[var(--text-primary)] sm:hidden"
-                aria-label={collapsed ? 'Mostrar panel de modos' : 'Ocultar panel de modos'}
+                aria-label={collapsed ? 'Abrir panel de modos' : 'Cerrar panel de modos'}
               >
                 {collapsed ? <ChevronDown className="h-3 w-3" /> : <ChevronUp className="h-3 w-3" />}
-                <span>{collapsed ? 'SHOW' : 'HIDE'}</span>
+                <span>{collapsed ? 'ABRIR' : 'CERRAR'}</span>
               </button>
             )}
             <div className="hidden items-center gap-1 rounded-full border border-white/8 bg-white/[0.03] px-1 py-1 sm:flex">

@@ -120,10 +120,10 @@ export default function TopHudOverlays({
             type="button"
             onClick={() => setMobileHudCollapsed(value => !value)}
             className="inline-flex items-center gap-1 rounded-full border border-[var(--border-primary)]/70 bg-[rgba(15,23,32,0.92)] px-2 py-1 text-[6px] font-mono tracking-[0.14em] text-[var(--text-primary)] shadow-[0_10px_30px_rgba(0,0,0,0.18)] backdrop-blur-md"
-            aria-label={mobileHudCollapsed ? 'Mostrar HUD móvil' : 'Ocultar HUD móvil'}
+            aria-label={mobileHudCollapsed ? 'Ver HUD móvil' : 'Ocultar HUD móvil'}
           >
             {mobileHudCollapsed ? <ChevronDown className="h-3 w-3" /> : <ChevronUp className="h-3 w-3" />}
-            <span>HUD</span>
+            <span>{mobileHudCollapsed ? 'VER HUD' : 'OCULTAR'}</span>
           </button>
           {!mobileHudCollapsed && (
             <>
