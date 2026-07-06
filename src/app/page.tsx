@@ -1430,18 +1430,18 @@ export default function Dashboard() {
                   <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300/50 to-transparent" />
                   <div className="mb-2 flex items-start justify-between gap-3">
                     <div>
-                      <div className="text-[8px] font-mono uppercase tracking-[0.28em] text-cyan-200">AEGIS VECTOR · GPS</div>
-                      <div className="mt-1 text-[10px] font-semibold tracking-[0.06em] text-white">
-                        {routeLoading ? 'Plotting route from live position…' : 'Immersive nav opens from the edge, not over Earth'}
+                      <div className="text-[8px] font-mono uppercase tracking-[0.24em] text-cyan-200">AEGIS GPS</div>
+                      <div className="mt-1 text-[10px] font-semibold tracking-[0.04em] text-white">
+                        {routeLoading ? 'Calculando ruta…' : 'Buscar destino y abrir ruta'}
                       </div>
                     </div>
                     <button
                       type="button"
                       onClick={() => setVectorDockOpen(false)}
                       className="rounded-full border border-white/10 px-2 py-1 text-[8px] font-mono text-[var(--text-muted)] hover:text-white"
-                      aria-label="Close AEGIS VECTOR dock"
+                      aria-label="Cerrar panel GPS"
                     >
-                      Close
+                      Cerrar
                     </button>
                   </div>
                   <div className="flex items-start gap-2">
@@ -1457,9 +1457,7 @@ export default function Dashboard() {
                       {routeError}
                     </div>
                   )}
-                  <div className="mt-2 rounded-2xl border border-cyan-300/14 bg-cyan-400/[0.055] px-3 py-2 text-[7px] font-mono uppercase tracking-[0.15em] text-cyan-100/65">
-                    GPS / route mode stays docked aside so the planet remains the scene.
-                  </div>
+
                 </div>
               </motion.div>
             )}

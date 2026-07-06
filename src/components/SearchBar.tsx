@@ -1,7 +1,7 @@
 'use client';
 
 import { memo, useState, useRef, useEffect, useCallback } from 'react';
-import { Search, X, MapPin, Navigation, LocateFixed, Route, Car, Footprints, Bike, Sparkles, Radar, Crosshair, Plus, Flag, GitCommitHorizontal } from 'lucide-react';
+import { Search, X, MapPin, Navigation, LocateFixed, Car, Footprints, Bike, Plus, Flag, GitCommitHorizontal } from 'lucide-react';
 
 /* ═══════════════════════════════════════════════════════════════
    AEGIS — Search / Locate Bar
@@ -84,7 +84,6 @@ function SearchBar({ onLocate, onRoute, defaultOpen = false, variant = 'default'
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchAbortRef = useRef<AbortController | null>(null);
   const searchSeqRef = useRef(0);
-  const quickSearches = ['Madrid', 'Ukraine', '40.4168,-3.7038'] as const;
   const normalizedQuery = value.trim();
   const showNoResults = normalizedQuery.length >= 2 && !loading && results.length === 0 && lastResolvedQuery === normalizedQuery;
   const isMobileNav = variant === 'mobile-nav';
@@ -321,34 +320,7 @@ function SearchBar({ onLocate, onRoute, defaultOpen = false, variant = 'default'
 
   return (
     <div className={`relative w-full space-y-2 ${isMobileNav ? 'space-y-3' : ''}`}>
-      {isMobileNav ? null : (
-        <div className="rounded-[1.55rem] border border-cyan-300/20 bg-[linear-gradient(145deg,rgba(5,14,24,0.96),rgba(9,23,34,0.90))] px-3.5 py-3 shadow-[0_22px_44px_rgba(0,0,0,0.28)]">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <div className="text-[9px] font-mono uppercase tracking-[0.24em] text-cyan-300">Mobile route shell</div>
-              <div className="mt-1 text-[14px] font-semibold tracking-[0.02em] text-white">Busca, fija origen y navega sin tapar el mapa</div>
-            </div>
-            <div className="rounded-full border border-cyan-300/24 bg-cyan-300/10 px-2.5 py-1 text-[9px] font-mono uppercase tracking-[0.18em] text-cyan-100">GPS</div>
-          </div>
-          <div className="mt-3 grid grid-cols-3 gap-2">
-            <div className="rounded-2xl border border-white/8 bg-black/20 px-3 py-2.5">
-              <div className="text-[8px] font-mono uppercase tracking-[0.18em] text-cyan-300">Destino</div>
-              <div className="mt-1 text-[11px] font-semibold text-white">Búsqueda directa</div>
-              <div className="mt-1 text-[9px] text-cyan-100/62">Ciudad, dirección o lat,lng</div>
-            </div>
-            <div className="rounded-2xl border border-white/8 bg-black/20 px-3 py-2.5">
-              <div className="text-[8px] font-mono uppercase tracking-[0.18em] text-emerald-300">Origen</div>
-              <div className="mt-1 text-[11px] font-semibold text-white">GPS del móvil</div>
-              <div className="mt-1 text-[9px] text-emerald-100/62">Bloqueo rápido y reintento</div>
-            </div>
-            <div className="rounded-2xl border border-white/8 bg-black/20 px-3 py-2.5">
-              <div className="text-[8px] font-mono uppercase tracking-[0.18em] text-[var(--gold-primary)]">Ruta</div>
-              <div className="mt-1 text-[11px] font-semibold text-white">Conducción limpia</div>
-              <div className="mt-1 text-[9px] text-[var(--gold-primary)]/62">Drive · Walk · Cycle</div>
-            </div>
-          </div>
-        </div>
-      )}
+
 
       <div className={`flex items-center gap-2 ${isMobileNav ? 'rounded-[1.45rem] border border-cyan-300/20 bg-[rgba(4,14,24,0.92)] px-3.5 py-3 shadow-[0_14px_28px_rgba(0,0,0,0.24)]' : 'glass-panel px-3 py-2.5 !border-[var(--border-active)]'}`}>
         <Search className="w-3.5 h-3.5 text-[var(--gold-primary)] flex-shrink-0" />
@@ -360,7 +332,7 @@ function SearchBar({ onLocate, onRoute, defaultOpen = false, variant = 'default'
             if (e.key === 'Escape') resetAndClose();
             if (e.key === 'Enter' && results.length > 0) handleSelect(results[0]);
           }}
-          placeholder={isMobileNav ? 'Busca un destino…' : 'ENTER PLACE OR COORDINATES TO PLOT A VECTOR...'}
+          placeholder={isMobileNav ? 'Busca un destino…' : 'Busca ciudad, dirección o coordenadas…'}
           className={`flex-1 bg-transparent outline-none placeholder:text-[var(--text-muted)] ${isMobileNav ? 'text-[13px] text-white font-medium tracking-[0.02em]' : 'text-[10px] text-[var(--text-primary)] font-mono tracking-wider'}`}
         />
         {loading && <div className="w-3 h-3 border border-[var(--gold-primary)] border-t-transparent rounded-full animate-spin" />}
@@ -369,56 +341,15 @@ function SearchBar({ onLocate, onRoute, defaultOpen = false, variant = 'default'
         </button>
       </div>
 
-      {isMobileNav ? null : (
-        <div className={`grid gap-2 ${isMobileNav ? 'grid-cols-1' : 'sm:grid-cols-3'}`}>
-          <div className="rounded-2xl border border-cyan-300/18 bg-[linear-gradient(180deg,rgba(34,211,238,0.10),rgba(34,211,238,0.03))] px-3 py-2">
-            <div className="flex items-center gap-1.5 text-[7px] font-mono uppercase tracking-[0.2em] text-cyan-200">
-              <Radar className="h-3 w-3" />
-              Vector Index
-            </div>
-            <div className="mt-1 text-[9px] font-semibold tracking-[0.04em] text-white">Server geocode + coordinates</div>
-            <div className="mt-1 text-[7px] font-mono uppercase tracking-[0.14em] text-cyan-100/70">City · address · country · lat,lng</div>
-          </div>
-          <div className="rounded-2xl border border-emerald-300/18 bg-[linear-gradient(180deg,rgba(16,185,129,0.10),rgba(16,185,129,0.03))] px-3 py-2">
-            <div className="flex items-center gap-1.5 text-[7px] font-mono uppercase tracking-[0.2em] text-emerald-200">
-              <Crosshair className="h-3 w-3" />
-              GPS Lock
-            </div>
-            <div className="mt-1 text-[9px] font-semibold tracking-[0.04em] text-white">Origin anchored from live device location</div>
-            <div className="mt-1 text-[7px] font-mono uppercase tracking-[0.14em] text-emerald-100/70">High accuracy · live origin · fast retry</div>
-          </div>
-          <div className="rounded-2xl border border-[rgba(212,175,55,0.18)] bg-[linear-gradient(180deg,rgba(212,175,55,0.10),rgba(212,175,55,0.03))] px-3 py-2">
-            <div className="flex items-center gap-1.5 text-[7px] font-mono uppercase tracking-[0.2em] text-[var(--gold-primary)]">
-              <Sparkles className="h-3 w-3" />
-              Route Builder
-            </div>
-            <div className="mt-1 text-[9px] font-semibold tracking-[0.04em] text-white">Premium planner over real OSRM routes</div>
-            <div className="mt-1 text-[7px] font-mono uppercase tracking-[0.14em] text-[var(--gold-primary)]/75">Modes · stops · alternatives · nav cockpit</div>
-          </div>
-        </div>
-      )}
 
-      {isMobileNav ? null : (
-        <div className={`flex flex-wrap items-center gap-1.5 ${isMobileNav ? 'text-[8px]' : 'text-[7px]'} font-mono uppercase tracking-[0.16em] text-[var(--text-muted)]`}>
-          <span className="mr-0.5">Try</span>
-          {quickSearches.map((sample) => (
-            <button
-              key={sample}
-              type="button"
-              onClick={() => void handleSearch(sample)}
-              className="rounded-full border border-white/10 bg-white/[0.035] px-2 py-1 text-[7px] text-[var(--text-secondary)] transition-colors hover:border-cyan-300/35 hover:bg-cyan-300/[0.08] hover:text-cyan-100"
-            >
-              {sample}
-            </button>
-          ))}
-        </div>
-      )}
+
+
 
       <div className={`rounded-[1.15rem] border border-cyan-300/15 bg-[linear-gradient(180deg,rgba(6,18,27,0.88),rgba(7,15,24,0.58))] px-3 py-3 shadow-[0_12px_28px_rgba(0,0,0,0.16)] ${isMobileNav ? 'rounded-[1.55rem] border-cyan-300/22 bg-[linear-gradient(180deg,rgba(7,20,30,0.98),rgba(4,12,20,0.90))] px-3.5 py-3.5 shadow-[0_24px_48px_rgba(0,0,0,0.28),inset_0_1px_0_rgba(255,255,255,0.03)]' : ''}`}>
         <div className="flex items-start justify-between gap-3">
           <div>
-            <div className="text-[7px] font-mono uppercase tracking-[0.22em] text-cyan-300">{isMobileNav ? 'Ruta' : 'Vector Builder'}</div>
-            <div className="mt-1 text-[10px] font-semibold tracking-[0.02em] text-white">{isMobileNav ? 'Usa tu GPS y elige cómo moverte.' : 'Choose transport profile, lock origin, and stage up to three intermediate stops.'}</div>
+            <div className="text-[7px] font-mono uppercase tracking-[0.22em] text-cyan-300">{isMobileNav ? 'Ruta' : 'Ruta'}</div>
+            <div className="mt-1 text-[10px] font-semibold tracking-[0.02em] text-white">{isMobileNav ? 'Usa tu GPS y elige cómo moverte.' : 'Usa tu GPS y elige cómo moverte.'}</div>
             {isMobileNav && (
               <div className="mt-1.5 text-[8px] font-mono uppercase tracking-[0.16em] text-cyan-100/58">Elige modo y abre la ruta al instante</div>
             )}
@@ -435,7 +366,7 @@ function SearchBar({ onLocate, onRoute, defaultOpen = false, variant = 'default'
             className="inline-flex items-center gap-1.5 rounded-full border border-cyan-300/30 bg-cyan-400/[0.10] px-2.5 py-1.5 text-[8px] font-mono uppercase tracking-[0.18em] text-cyan-100 hover:border-cyan-300/55 hover:bg-cyan-400/[0.16]"
           >
             <LocateFixed className="h-3 w-3" />
-            {isMobileNav ? 'Usar mi GPS' : 'Lock GPS origin'}
+            {isMobileNav ? 'Usar mi GPS' : 'Usar mi GPS'}
           </button>
           {!isMobileNav && (
             <button
@@ -445,7 +376,7 @@ function SearchBar({ onLocate, onRoute, defaultOpen = false, variant = 'default'
               className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-[8px] font-mono uppercase tracking-[0.18em] text-[var(--text-secondary)] disabled:opacity-40"
             >
               <X className="h-3 w-3" />
-              Clear stops
+Limpiar paradas
             </button>
           )}
         </div>
@@ -475,37 +406,31 @@ function SearchBar({ onLocate, onRoute, defaultOpen = false, variant = 'default'
           })}
         </div>
 
-        {!isMobileNav && (
+        {!isMobileNav && draftWaypoints.length > 0 && (
           <div className="mt-3 rounded-2xl border border-[rgba(212,175,55,0.14)] bg-[rgba(212,175,55,0.05)] px-3 py-2.5">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <div className="text-[7px] font-mono uppercase tracking-[0.2em] text-[var(--gold-primary)]">Multi-stop plan</div>
-                <div className="mt-1 text-[9px] font-semibold tracking-[0.04em] text-white">Origin → optional stops → final destination</div>
+                <div className="text-[7px] font-mono uppercase tracking-[0.2em] text-[var(--gold-primary)]">Paradas</div>
+                <div className="mt-1 text-[9px] font-semibold tracking-[0.04em] text-white">Origen → paradas opcionales → destino final</div>
               </div>
               <div className="rounded-full border border-[rgba(212,175,55,0.18)] bg-[rgba(212,175,55,0.08)] px-2 py-1 text-[7px] font-mono uppercase tracking-[0.16em] text-[var(--gold-primary)]/90">
                 {draftWaypoints.length}/{MAX_WAYPOINTS} stops
               </div>
             </div>
-            {draftWaypoints.length > 0 ? (
-              <div className="mt-2 flex flex-wrap gap-2">
-                {draftWaypoints.map((stop, index) => (
-                  <span
-                    key={`${stop.label}-${index}-${stop.lat}-${stop.lng}`}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-cyan-300/18 bg-cyan-300/[0.08] px-2 py-1 text-[7px] font-mono uppercase tracking-[0.14em] text-cyan-100"
-                  >
-                    <GitCommitHorizontal className="h-3 w-3" />
-                    S{index + 1} · {stop.label}
-                    <button type="button" onClick={() => removeWaypoint(stop)} className="text-cyan-200/80 hover:text-white">
-                      <X className="h-3 w-3" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <div className="mt-2 text-[7px] font-mono uppercase tracking-[0.14em] text-[var(--text-secondary)]">
-                Add intermediate stops from search results, then build the final leg on any target.
-              </div>
-            )}
+            <div className="mt-2 flex flex-wrap gap-2">
+              {draftWaypoints.map((stop, index) => (
+                <span
+                  key={`${stop.label}-${index}-${stop.lat}-${stop.lng}`}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-cyan-300/18 bg-cyan-300/[0.08] px-2 py-1 text-[7px] font-mono uppercase tracking-[0.14em] text-cyan-100"
+                >
+                  <GitCommitHorizontal className="h-3 w-3" />
+                  S{index + 1} · {stop.label}
+                  <button type="button" onClick={() => removeWaypoint(stop)} className="text-cyan-200/80 hover:text-white">
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
           </div>
         )}
 
@@ -522,12 +447,7 @@ function SearchBar({ onLocate, onRoute, defaultOpen = false, variant = 'default'
               {isMobileNav ? 'Ubicando…' : 'Locating...'}
             </span>
           )}
-          {!isMobileNav && (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(212,175,55,0.18)] bg-[rgba(212,175,55,0.08)] px-2.5 py-1.5 text-[8px] font-mono uppercase tracking-[0.18em] text-[var(--gold-primary)]/90">
-              <Route className="h-3 w-3" />
-              Premium route build ready
-            </span>
-          )}
+
         </div>
       </div>
 
