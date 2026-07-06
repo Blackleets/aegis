@@ -247,14 +247,12 @@ function MobileLayersPanel({ metrics, layerPanel, presets }: MobileLayersPanelPr
 function MobileSearchPanel({ searchBar, sharePanel, routeError }: MobileSearchPanelProps) {
   return (
     <div className="space-y-2">
-      <div className="rounded-2xl border border-cyan-300/18 bg-[linear-gradient(135deg,rgba(34,211,238,0.10),rgba(5,13,22,0.72))] px-3 py-2">
-        <div className="flex flex-wrap items-center gap-1.5 text-[7px] font-mono uppercase tracking-[0.24em] text-cyan-200">
-          <span>AEGIS VECTOR · GPS MODE</span>
-          <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-1.5 py-0.5 text-[6px] text-emerald-100/80">REAL ROUTES</span>
-          <span className="rounded-full border border-white/10 bg-white/[0.03] px-1.5 py-0.5 text-[6px] text-cyan-100/70">Drive · Walk · Cycle</span>
+      <div className="flex items-center justify-between gap-2 rounded-2xl border border-cyan-300/14 bg-[linear-gradient(135deg,rgba(10,22,34,0.82),rgba(4,12,20,0.68))] px-3 py-2">
+        <div>
+          <div className="text-[7px] font-mono uppercase tracking-[0.22em] text-cyan-200">GPS</div>
+          <div className="mt-1 text-[9px] font-semibold text-white">Busca un destino y empieza la ruta.</div>
         </div>
-        <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-white">Elige destino, bloquea GPS y entra en navegación real</div>
-        <div className="mt-1 text-[8px] font-mono uppercase tracking-[0.12em] text-[var(--text-secondary)]">Usa tu ubicación, rutas reales y el cockpit inferior para seguir el trayecto sin tapar la Tierra.</div>
+        <div className="shrink-0">{sharePanel}</div>
       </div>
       {routeError && (
         <div className="rounded-2xl border border-rose-400/20 bg-rose-500/8 px-3 py-2 text-[8px] font-mono uppercase tracking-[0.14em] text-rose-300">
@@ -262,9 +260,6 @@ function MobileSearchPanel({ searchBar, sharePanel, routeError }: MobileSearchPa
         </div>
       )}
       {searchBar}
-      <div className="flex justify-end">
-        {sharePanel}
-      </div>
     </div>
   );
 }
@@ -1263,14 +1258,14 @@ export default function Dashboard() {
   }, [routeSnapshot, data.news, data.gdelt, data.earthquakes, data.weather_events, data.fires, data.gps_jamming]);
   const earthNavigationMode = selectedCelestialBody === 'earth' && (navigationActive || routeSnapshot !== null || routeLoading);
   const mobileVectorStatusLabel = routeLoading
-    ? 'ROUTING'
+    ? 'CALCULANDO'
     : navigationActive
-      ? 'FOLLOW LIVE'
+      ? 'SIGUIENDO'
       : routeSnapshot
-        ? 'ROUTE READY'
+        ? 'RUTA LISTA'
         : userLocation
-          ? 'GPS LOCKED'
-          : 'GPS REQUIRED';
+          ? 'GPS LISTO'
+          : 'GPS REQUERIDO';
 
   const isEarthOps = dashboardMode === 'earth';
   const isSolarView = dashboardMode === 'solar';
@@ -1688,6 +1683,7 @@ export default function Dashboard() {
               currentRouteStep={currentRouteStep}
               onToggleNavigationFollow={toggleNavigationFollow}
               onClearNavigationState={clearNavigationState}
+              onOpenSearch={() => setMobilePanel('search')}
             />
           )}
 
@@ -1729,7 +1725,7 @@ export default function Dashboard() {
             searchContent={(
               <MobileSearchPanel
                 routeError={routeError}
-                searchBar={<SearchBar defaultOpen onLocate={(result) => { setFlyToLocation({ lat: result.lat, lng: result.lng, zoom: result.zoom, bbox: result.bbox, label: result.label, ts: Date.now() }); setMobilePanel(null); }} onRoute={async (request) => { await handleRouteRequest(request); setMobilePanel(null); }} />}
+                searchBar={<SearchBar variant="mobile-nav" defaultOpen onLocate={(result) => { setFlyToLocation({ lat: result.lat, lng: result.lng, zoom: result.zoom, bbox: result.bbox, label: result.label, ts: Date.now() }); setMobilePanel(null); }} onRoute={async (request) => { await handleRouteRequest(request); setMobilePanel(null); }} />}
                 sharePanel={<SharePanel mapView={mapView} activeLayers={activeLayers} mouseCoords={null} />}
               />
             )}

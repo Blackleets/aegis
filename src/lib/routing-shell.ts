@@ -70,8 +70,9 @@ export function formatRouteDistance(distanceMeters: number) {
 }
 
 export function formatRouteDuration(durationSeconds: number) {
-  const hours = Math.floor(durationSeconds / 3600);
-  const minutes = Math.max(1, Math.round((durationSeconds % 3600) / 60));
+  const totalMinutes = Math.max(1, Math.round(durationSeconds / 60));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
   return hours > 0 ? `${hours}h ${minutes}m` : `${minutes} min`;
 }
 

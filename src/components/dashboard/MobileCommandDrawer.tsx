@@ -57,7 +57,7 @@ export default function MobileCommandDrawer({
             exit={{ y: '100%' }}
             transition={{ type: 'spring', damping: 30, stiffness: 300 }}
             className="fixed bottom-[52px] left-0 right-0 z-[400] glass-panel rounded-b-none overflow-y-auto styled-scrollbar"
-            style={{ maxHeight: mobilePanel === 'search' ? 'min(42vh, calc(100dvh - 130px))' : 'min(55vh, calc(100dvh - 100px))', paddingBottom: 'env(safe-area-inset-bottom, 4px)' }}
+            style={{ maxHeight: mobilePanel === 'search' ? 'min(68vh, calc(100dvh - 96px))' : 'min(55vh, calc(100dvh - 100px))', paddingBottom: 'env(safe-area-inset-bottom, 4px)' }}
           >
             <div className="mobile-drawer-handle" />
             <div className="px-3 pb-3">
