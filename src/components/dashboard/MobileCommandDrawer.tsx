@@ -66,14 +66,14 @@ export default function MobileCommandDrawer({
             <div className="mobile-drawer-handle" />
             <div className={`px-3 pb-3 ${isSearchPanel ? 'pt-1' : ''}`}>
               {isSearchPanel ? (
-                <div className="sticky top-0 z-10 -mx-3 mb-2 border-b border-[var(--border-primary)]/25 bg-[linear-gradient(180deg,rgba(10,18,25,0.96),rgba(10,18,25,0.84))] px-3 pb-2 pt-1 backdrop-blur-md">
+                <div className="sticky top-0 z-10 -mx-3 mb-2 border-b border-[var(--border-primary)]/18 bg-[linear-gradient(180deg,rgba(10,18,25,0.94),rgba(10,18,25,0.78))] px-3 pb-1.5 pt-0.5 backdrop-blur-md">
                   <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <div className="text-[7px] font-mono tracking-[0.22em] text-[var(--text-secondary)]">MOBILE COMMAND PANEL</div>
-                      <span className="mt-1 block text-[9px] font-semibold tracking-[0.12em] text-[var(--text-primary)]">{activeTab?.label ?? 'GPS'}</span>
+                    <div className="inline-flex items-center gap-2 rounded-full border border-cyan-300/14 bg-cyan-300/[0.05] px-2.5 py-1 text-[7px] font-mono uppercase tracking-[0.2em] text-cyan-100/88">
+                      <span className="h-1.5 w-1.5 rounded-full bg-cyan-300/80" />
+                      {activeTab?.label ?? 'GPS'}
                     </div>
-                    <button onClick={() => onTogglePanel('search')} className="text-[var(--text-muted)] p-1">
-                      <X className="w-4 h-4" />
+                    <button onClick={() => onTogglePanel('search')} className="rounded-full border border-white/10 bg-white/[0.03] p-1.5 text-[var(--text-muted)] transition-colors hover:text-white">
+                      <X className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
