@@ -2138,7 +2138,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       duration: 2400,
       essential: true,
     });
-  }, [mapReady, flyToLocation, projection]);
+  }, [currentLocation, flyToLocation, mapReady, navigationActive, navigationBearing, projection]);
 
   // Dynamic projection switching (lightweight — no terrain DEM)
   useEffect(() => {
