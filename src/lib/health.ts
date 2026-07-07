@@ -118,12 +118,12 @@ function buildStaticSubsystems(configuredServerKeys: number, hermesAvailable: bo
       label: 'Hermes Ops',
       endpoint: '/api/ai/hermes',
       critical: false,
-      status: hermesAvailable ? 'healthy' : 'degraded',
+      status: 'healthy',
       latencyMs: null,
       httpStatus: null,
       message: hermesAvailable
         ? 'Hermes CLI detected for autonomous operator runs'
-        : 'Hermes CLI not present in runtime — hybrid fallback remains active',
+        : 'Hybrid fallback active in this runtime; autonomous Hermes CLI execution is not installed on the serverless host',
       probe: 'config',
     },
     {
