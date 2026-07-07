@@ -51,7 +51,7 @@ interface AegisMapProps {
   onViewStateChange?: (vs: { zoom: number; latitude: number }) => void;
   flyToLocation?: { lat: number; lng: number; ts: number; zoom?: number; bbox?: [west: number, south: number, east: number, north: number] | null; label?: string } | null;
   projection?: 'mercator' | 'globe';
-  mapStyle?: string;
+  mapStyle?: 'dark' | 'satellite';
   sweepData?: SweepData | null;
   scanTargets?: ScanTarget[];
   currentLocation?: { lat: number; lng: number } | null;
@@ -2015,14 +2015,14 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
         markerFeatures.push({
           type: 'Feature',
           geometry: { type: 'Point', coordinates: [currentLocation.lng, currentLocation.lat] },
-          properties: { role: 'origin', label: 'FROM GPS' },
+          properties: { role: 'origin', label: window.innerWidth < 768 ? '' : 'FROM GPS' },
         });
       }
       if (routeDestination) {
         markerFeatures.push({
           type: 'Feature',
           geometry: { type: 'Point', coordinates: [routeDestination.lng, routeDestination.lat] },
-          properties: { role: 'destination', label: 'DEST' },
+          properties: { role: 'destination', label: window.innerWidth < 768 ? '' : 'DEST' },
         });
       }
       markerSource.setData({ type: 'FeatureCollection', features: markerFeatures });
@@ -2051,17 +2051,20 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
     lastNavCameraBearingRef.current = nextBearing;
 
     map.easeTo({
-      center: [currentLocation.lng, currentLocation.lat + 0.0035],
-      zoom: Math.max(map.getZoom(), 15.7),
-      pitch: 54,
+      center: [currentLocation.lng, currentLocation.lat + (window.innerWidth < 768 ? 0.0009 : 0.0035)],
+      zoom: Math.max(map.getZoom(), window.innerWidth < 768 ? 17.1 : 15.7),
+      pitch: window.innerWidth < 768 ? 72 : 54,
       bearing: nextBearing,
-      padding: { top: 108, bottom: 156, left: 64, right: 64 },
-      duration: 720,
+      padding: window.innerWidth < 768
+        ? { top: 112, bottom: 86, left: 18, right: 18 }
+        : { top: 108, bottom: 156, left: 64, right: 64 },
+      duration: window.innerWidth < 768 ? 560 : 720,
       essential: true,
     });
   }, [currentLocation, mapReady, navigationActive, navigationBearing]);
 
   useEffect(() => {
+
     if (!mapReady || !mapRef.current || projection !== 'globe' || navigationActive) return;
 
     const map = mapRef.current;
@@ -2102,6 +2105,19 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
     const map = mapRef.current;
     const targetZoom = flyToLocation.zoom ?? (projection === 'globe' ? 7.2 : 10);
 
+    if (navigationActive && currentLocation && window.innerWidth < 768) {
+      map.easeTo({
+        center: [currentLocation.lng, currentLocation.lat + 0.0009],
+        zoom: Math.max(map.getZoom(), 17.1),
+        pitch: 72,
+        bearing: navigationBearing ?? map.getBearing(),
+        padding: { top: 112, bottom: 86, left: 18, right: 18 },
+        duration: 520,
+        essential: true,
+      });
+      return;
+    }
+
     if (flyToLocation.bbox) {
       const [west, south, east, north] = flyToLocation.bbox;
       map.fitBounds(
@@ -2118,7 +2134,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
     map.flyTo({
       center: [flyToLocation.lng, flyToLocation.lat],
       zoom: targetZoom,
-      pitch: projection === 'globe' ? 42 : 0,
+      pitch: projection === 'globe' ? 42 : (window.innerWidth < 768 ? 62 : 0),
       duration: 2400,
       essential: true,
     });
@@ -2141,7 +2157,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
     } catch (e) {
       console.warn('Projection switch failed:', e);
     }
-  }, [applyAegisGlobeStyling, currentLocation, mapReady, projection, mapStyle, navigationActive]);
+  }, [applyAegisGlobeStyling, currentLocation, mapReady, navigationActive, navigationBearing, projection, mapStyle]);
 
   // Satellite / globe presentation switching
   useEffect(() => {

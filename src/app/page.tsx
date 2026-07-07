@@ -1565,7 +1565,6 @@ export default function Dashboard() {
         liveLabel={copy.status.live}
         visitsLabel={copy.status.visits}
         alertsLabel={copy.status.alerts}
-        supportProjectCompactLabel={copy.status.supportProjectCompact}
         backendStatus={backendStatus}
         backendStatusLabel={backendStatusLabel}
         backendStatusAccentClass={backendStatusAccentClass}

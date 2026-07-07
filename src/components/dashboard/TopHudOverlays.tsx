@@ -24,7 +24,6 @@ type TopHudOverlaysProps = {
   liveLabel: string;
   visitsLabel: string;
   alertsLabel: string;
-  supportProjectCompactLabel: string;
   backendStatus: 'connected' | 'error' | 'connecting';
   backendStatusLabel: string;
   backendStatusAccentClass: string;
@@ -46,7 +45,6 @@ export default function TopHudOverlays({
   liveLabel,
   visitsLabel,
   alertsLabel,
-  supportProjectCompactLabel,
   backendStatus,
   backendStatusLabel,
   backendStatusAccentClass,
@@ -126,7 +124,6 @@ export default function TopHudOverlays({
             <span>{mobileHudCollapsed ? 'VER HUD' : 'OCULTAR'}</span>
           </button>
           {!mobileHudCollapsed && (
-            <>
               <div className="flex items-center gap-1 rounded-xl border border-[var(--border-primary)]/70 bg-[rgba(15,23,32,0.92)] px-2 py-1 shadow-[0_10px_30px_rgba(0,0,0,0.18)] backdrop-blur-md">
                 <span className={`h-1.5 w-1.5 rounded-full ${backendStatus === 'connected' ? 'bg-[var(--alert-green)]' : backendStatus === 'error' ? 'bg-[var(--alert-red)]' : 'bg-[var(--gold-primary)]'} animate-aegis-pulse`} />
                 <span className="text-[6px] font-mono font-bold tracking-[0.14em] text-[var(--text-primary)]">{backendStatusLabel}</span>
@@ -134,11 +131,6 @@ export default function TopHudOverlays({
                 <span className="text-[6px] font-mono tracking-[0.14em] text-[var(--text-muted)]">{alertsLabel}</span>
                 <span className="text-[8px] font-bold tabular-nums" style={{ color: activeIntelAlerts > 0 ? '#FF9500' : 'var(--alert-green)' }}>{activeIntelAlerts}</span>
               </div>
-              <a href="https://ko-fi.com/M8D41ZYW4Z" target="_blank" rel="noreferrer" className="glass-panel px-2 py-1 flex items-center gap-1 text-[6px] font-mono tracking-[0.14em] hover:opacity-80 transition-opacity border-[var(--border-primary)]/80 bg-[rgba(15,23,32,0.92)]">
-                <div className="w-1.5 h-1.5 rounded-full bg-[var(--gold-primary)] animate-aegis-pulse" />
-                <span className="text-[var(--text-primary)] font-bold">{supportProjectCompactLabel}</span>
-              </a>
-            </>
           )}
         </motion.div>
       )}
