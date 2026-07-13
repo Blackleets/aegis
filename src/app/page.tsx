@@ -34,6 +34,7 @@ import { DEFAULT_LOCALE, getDashboardCopy, isLocale, type Locale } from '@/lib/i
 import { type ActiveLayers, type BoundingBox, type Coordinate, type FlyToLocation, type MapView, type RouteOption, type RouteRiskSummary, type RouteSnapshot, type RouteStep, computeBearing, countSignalsNearRoute, distanceMetersBetween, distanceToRoutePath, formatEtaLabel, formatProgressLabel, getClosestStepIndex, getYouTubeWatchUrl, localizeRouteInstruction } from '@/lib/routing-shell';
 import { getArrivalThresholdMeters, getNextSimulationIndex, resolveNavigationBearing, shouldAcceptNavigationFix, shouldRerouteNavigation, snapNavigationToRoute, stabilizeNavigationCoordinate } from '@/lib/vector-navigation';
 import { recommendRoute } from '@/lib/route-intelligence';
+import { chooseRouteAlertChannel } from '@/lib/route-alert-priority';
 
 const AegisMap = dynamic(() => import('@/components/AegisMap'), { ssr: false });
 const LayerPanel = dynamic(() => import('@/components/LayerPanel'));
@@ -532,6 +533,7 @@ export default function Dashboard() {
   const lastSpokenEarthquakeRef = useRef<string | null>(null);
   const alertedEarthquakeIdsRef = useRef<Set<string>>(new Set());
   const alertedContextIdsRef = useRef<Set<string>>(new Set());
+  const notifiedRouteAlertIdsRef = useRef<Set<string>>(new Set());
   const lastSpokenContextRef = useRef<string | null>(null);
   const arrivalSpokenRef = useRef(false);
   const preNavigationMapStateRef = useRef<{ projection: 'globe' | 'mercator'; style: 'dark' | 'satellite' } | null>(null);
@@ -1502,13 +1504,6 @@ export default function Dashboard() {
       if (alertedEarthquakeIdsRef.current.has(nearby.id)) return current;
       alertedEarthquakeIdsRef.current.add(nearby.id);
 
-      if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-        const distance = nearby.distanceMeters < 1000 ? `${nearby.distanceMeters} m` : `${(nearby.distanceMeters / 1000).toFixed(1)} km`;
-        new Notification(`AEGIS · Terremoto M${nearby.magnitude}`, {
-          body: `Registrado a ${distance}. Fuente: USGS.`,
-          tag: `aegis-earthquake-${nearby.id}`,
-        });
-      }
       return nearby;
     });
   }, [data.earthquakes, navigationActive, userLocation]);
@@ -1594,16 +1589,57 @@ export default function Dashboard() {
       if (current?.id === alert.id) return alert;
       if (alertedContextIdsRef.current.has(alert.id)) return current;
       alertedContextIdsRef.current.add(alert.id);
-      if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-        const distance = alert.distanceMeters < 1000 ? `${alert.distanceMeters} m` : `${(alert.distanceMeters / 1000).toFixed(1)} km`;
-        new Notification(`AEGIS · ${alert.title}`, {
-          body: `${distance} · Fuente: ${alert.source}`,
-          tag: `aegis-context-${alert.id}`,
-        });
-      }
       return alert;
     });
   }, [data.cameras, data.fires, data.weather_events, navigationActive, userLocation]);
+
+  const visibleRouteAlertChannel = useMemo(() => chooseRouteAlertChannel(
+    nearbyEarthquakeAlert ? {
+      channel: 'earthquake',
+      id: nearbyEarthquakeAlert.id,
+      severity: nearbyEarthquakeAlert.magnitude >= 5 ? 'critical' : 'warning',
+      distanceMeters: nearbyEarthquakeAlert.distanceMeters,
+      source: nearbyEarthquakeAlert.source,
+      observedAt: nearbyEarthquakeAlert.time,
+      magnitude: nearbyEarthquakeAlert.magnitude,
+    } : null,
+    nearbyContextAlert ? {
+      channel: 'context',
+      id: nearbyContextAlert.id,
+      severity: nearbyContextAlert.severity,
+      distanceMeters: nearbyContextAlert.distanceMeters,
+      source: nearbyContextAlert.source,
+      observedAt: null,
+    } : null,
+  ), [nearbyContextAlert, nearbyEarthquakeAlert]);
+
+  const visibleNearbyEarthquakeAlert = visibleRouteAlertChannel === 'earthquake' ? nearbyEarthquakeAlert : null;
+  const visibleNearbyContextAlert = visibleRouteAlertChannel === 'context' ? nearbyContextAlert : null;
+
+  useEffect(() => {
+    const visibleAlert = visibleNearbyEarthquakeAlert || visibleNearbyContextAlert;
+    if (!visibleAlert || notifiedRouteAlertIdsRef.current.has(visibleAlert.id)) return;
+    notifiedRouteAlertIdsRef.current.add(visibleAlert.id);
+    if (typeof window === 'undefined' || !('Notification' in window) || Notification.permission !== 'granted') return;
+
+    const distance = visibleAlert.distanceMeters < 1000
+      ? `${visibleAlert.distanceMeters} m`
+      : `${(visibleAlert.distanceMeters / 1000).toFixed(1)} km`;
+    if (visibleNearbyEarthquakeAlert) {
+      new Notification(`AEGIS · Terremoto M${visibleNearbyEarthquakeAlert.magnitude}`, {
+        body: `Registrado a ${distance}. Fuente: USGS.`,
+        tag: `aegis-earthquake-${visibleNearbyEarthquakeAlert.id}`,
+      });
+      return;
+    }
+
+    if (visibleNearbyContextAlert) {
+      new Notification(`AEGIS · ${visibleNearbyContextAlert.title}`, {
+        body: `${distance} · Fuente: ${visibleNearbyContextAlert.source}`,
+        tag: `aegis-context-${visibleNearbyContextAlert.id}`,
+      });
+    }
+  }, [visibleNearbyContextAlert, visibleNearbyEarthquakeAlert]);
 
   const speakNavigationMessage = useCallback((message: string) => {
     if (!navigationVoiceEnabled || typeof window === 'undefined' || !('speechSynthesis' in window)) return;
@@ -1616,22 +1652,22 @@ export default function Dashboard() {
   }, [navigationVoiceEnabled]);
 
   useEffect(() => {
-    if (!nearbyEarthquakeAlert || lastSpokenEarthquakeRef.current === nearbyEarthquakeAlert.id) return;
-    lastSpokenEarthquakeRef.current = nearbyEarthquakeAlert.id;
-    const distance = nearbyEarthquakeAlert.distanceMeters < 1000
-      ? `${nearbyEarthquakeAlert.distanceMeters} metros`
-      : `${(nearbyEarthquakeAlert.distanceMeters / 1000).toFixed(1)} kilómetros`;
-    speakNavigationMessage(`Aviso AEGIS. Terremoto de magnitud ${nearbyEarthquakeAlert.magnitude}, registrado a ${distance}. Fuente U S G S.`);
-  }, [nearbyEarthquakeAlert, speakNavigationMessage]);
+    if (!visibleNearbyEarthquakeAlert || lastSpokenEarthquakeRef.current === visibleNearbyEarthquakeAlert.id) return;
+    lastSpokenEarthquakeRef.current = visibleNearbyEarthquakeAlert.id;
+    const distance = visibleNearbyEarthquakeAlert.distanceMeters < 1000
+      ? `${visibleNearbyEarthquakeAlert.distanceMeters} metros`
+      : `${(visibleNearbyEarthquakeAlert.distanceMeters / 1000).toFixed(1)} kilómetros`;
+    speakNavigationMessage(`Aviso AEGIS. Terremoto de magnitud ${visibleNearbyEarthquakeAlert.magnitude}, registrado a ${distance}. Fuente U S G S.`);
+  }, [visibleNearbyEarthquakeAlert, speakNavigationMessage]);
 
   useEffect(() => {
-    if (!nearbyContextAlert || lastSpokenContextRef.current === nearbyContextAlert.id) return;
-    lastSpokenContextRef.current = nearbyContextAlert.id;
-    const distance = nearbyContextAlert.distanceMeters < 1000
-      ? `${nearbyContextAlert.distanceMeters} metros`
-      : `${(nearbyContextAlert.distanceMeters / 1000).toFixed(1)} kilómetros`;
-    speakNavigationMessage(`Aviso AEGIS. ${nearbyContextAlert.title}, a ${distance}. Fuente ${nearbyContextAlert.source}.`);
-  }, [nearbyContextAlert, speakNavigationMessage]);
+    if (!visibleNearbyContextAlert || lastSpokenContextRef.current === visibleNearbyContextAlert.id) return;
+    lastSpokenContextRef.current = visibleNearbyContextAlert.id;
+    const distance = visibleNearbyContextAlert.distanceMeters < 1000
+      ? `${visibleNearbyContextAlert.distanceMeters} metros`
+      : `${(visibleNearbyContextAlert.distanceMeters / 1000).toFixed(1)} kilómetros`;
+    speakNavigationMessage(`Aviso AEGIS. ${visibleNearbyContextAlert.title}, a ${distance}. Fuente ${visibleNearbyContextAlert.source}.`);
+  }, [visibleNearbyContextAlert, speakNavigationMessage]);
 
   useEffect(() => {
     if (!navigationActive || !currentRouteStep || lastSpokenStepRef.current === currentRouteStep.index) return;
@@ -2161,9 +2197,9 @@ export default function Dashboard() {
               onToggleSimulation={toggleNavigationSimulation}
               onToggleVoice={toggleNavigationVoice}
               onSelectRouteOption={selectRouteOption}
-              nearbyEarthquakeAlert={nearbyEarthquakeAlert}
+              nearbyEarthquakeAlert={visibleNearbyEarthquakeAlert}
               onDismissNearbyEarthquake={() => setNearbyEarthquakeAlert(null)}
-              nearbyContextAlert={nearbyContextAlert}
+              nearbyContextAlert={visibleNearbyContextAlert}
               onDismissNearbyContext={() => setNearbyContextAlert(null)}
               recommendedRouteId={routeRecommendation?.routeId ?? null}
               routeRecommendationLabel={routeRecommendation?.reason ?? null}
