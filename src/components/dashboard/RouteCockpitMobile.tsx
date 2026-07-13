@@ -22,6 +22,7 @@ import {
   Search,
   ShieldAlert,
   Signpost,
+  FlaskConical,
   X,
 } from 'lucide-react';
 import { type RouteRiskSummary, type RouteSnapshot, type RouteStep, formatRouteDistance, formatRouteDuration, formatStepDistance } from '@/lib/routing-shell';
@@ -41,9 +42,12 @@ type RouteCockpitMobileProps = {
   gpsAccuracyMeters: number | null;
   navigationSpeedKmh: number | null;
   navigationRerouting: boolean;
+  navigationSimulationActive: boolean;
+  navigationArrived: boolean;
   onToggleNavigationFollow: () => void;
   onClearNavigationState: () => void;
   onOpenSearch: () => void;
+  onToggleSimulation: () => void;
 };
 
 function getModeMeta(mode: RouteSnapshot['mode']) {
@@ -113,9 +117,12 @@ export default function RouteCockpitMobile({
   gpsAccuracyMeters,
   navigationSpeedKmh,
   navigationRerouting,
+  navigationSimulationActive,
+  navigationArrived,
   onToggleNavigationFollow,
   onClearNavigationState,
   onOpenSearch,
+  onToggleSimulation,
 }: RouteCockpitMobileProps) {
   const destinationLabel = routeSnapshot?.destination.label ?? 'Preparando ruta';
   const distanceLabel = routeSnapshot ? formatRouteDistance(remainingRouteDistance || routeSnapshot.distanceMeters) : '--';
@@ -124,7 +131,7 @@ export default function RouteCockpitMobile({
   const ModeIcon = modeMeta?.Icon ?? Navigation2;
   const stepInstruction = currentRouteStep ? localizeInstruction(currentRouteStep.instruction) : 'Sigue la ruta';
   const stepDistance = currentStepDistanceMeters !== null ? formatStepDistance(currentStepDistanceMeters) : null;
-  const statusLabel = routeLoading ? 'Calculando ruta…' : navigationRerouting ? 'Recalculando…' : navigationActive ? 'Copiloto activo' : 'Ruta lista';
+  const statusLabel = routeLoading ? 'Calculando ruta…' : navigationArrived ? 'Has llegado' : navigationRerouting ? 'Recalculando…' : navigationSimulationActive ? 'Simulación GPS' : navigationActive ? 'Copiloto activo' : 'Ruta lista';
   const nextInstruction = nextRouteStep ? localizeInstruction(nextRouteStep.instruction) : null;
   const gpsQualityLabel = gpsAccuracyMeters === null
     ? 'GPS'
@@ -226,8 +233,17 @@ export default function RouteCockpitMobile({
                     <span>{gpsQualityLabel}</span>
                     {navigationSpeedKmh !== null && <><span>·</span><span>{Math.round(navigationSpeedKmh)} km/h</span></>}
                     {navigationRerouting && <><span>·</span><span className="text-amber-200">Buscando mejor ruta</span></>}
+                    {navigationSimulationActive && <><span>·</span><span className="text-violet-200">Modo prueba</span></>}
                   </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={onToggleSimulation}
+                  className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full border transition-transform active:scale-95 ${navigationSimulationActive ? 'border-violet-300/40 bg-violet-300/18 text-violet-100' : 'border-white/12 bg-white/[0.06] text-white/72'}`}
+                  aria-label={navigationSimulationActive ? 'Detener simulación GPS' : 'Probar ruta con simulación GPS'}
+                >
+                  <FlaskConical className="h-5 w-5" />
+                </button>
                 <button
                   type="button"
                   onClick={onToggleNavigationFollow}
