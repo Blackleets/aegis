@@ -1805,7 +1805,7 @@ export default function Dashboard() {
         locale={locale}
       />
 
-      {(!isMobile || !navigationActive) && <ModeDock
+      {!isMobile && <ModeDock
         mode={dashboardMode}
         locale={locale}
         isMobile={isMobile}
@@ -1915,7 +1915,7 @@ export default function Dashboard() {
       {/* ── MAP VIEW CONTROLS (Earth ops) / return control (planet vista) ── */}
       <motion.div
         initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 3.5 }}
-        className={`absolute z-[200] flex items-center gap-2 pointer-events-none ${isEarthOps ? 'bottom-[75px] md:bottom-6 left-3 md:left-[19rem] xl:left-[20rem]' : 'bottom-[88px] md:bottom-8 left-1/2 -translate-x-1/2'}`}
+        className={`absolute z-[200] hidden md:flex items-center gap-2 pointer-events-none ${isEarthOps ? 'bottom-[75px] md:bottom-6 left-3 md:left-[19rem] xl:left-[20rem]' : 'bottom-[88px] md:bottom-8 left-1/2 -translate-x-1/2'}`}
       >
         {(showEarthOperationalShell || isFocusView) ? (
           <>
@@ -1993,7 +1993,7 @@ export default function Dashboard() {
       )}
 
       <TopHudOverlays
-        showAuxiliaryHud={showAuxiliaryHud}
+        showAuxiliaryHud={showAuxiliaryHud && !isMobile}
         isMobile={isMobile}
         headerBadge={copy.header.badge}
         headerSubtitle={copy.header.subtitle}
@@ -2088,7 +2088,7 @@ export default function Dashboard() {
         onSelectRouteOption={selectRouteOption}
       />
 
-      {showAuxiliaryHud && <AiAnalyst data={dataWithSdk} hideMobileTrigger />}
+      {showAuxiliaryHud && !isMobile && <AiAnalyst data={dataWithSdk} hideMobileTrigger />}
 
       <LiveFeedOverlay
         liveFeedUrl={liveFeedUrl}
@@ -2143,6 +2143,10 @@ export default function Dashboard() {
             mobileNavTabs={mobileNavTabs}
             mobilePanel={mobilePanel}
             onTogglePanel={(panel) => setMobilePanel(mobilePanel === panel ? null : panel)}
+            isGlobeView={mapProjection === 'globe'}
+            isSatelliteView={mapStyle === 'satellite'}
+            onToggleProjection={() => setMapProjection((projection) => projection === 'globe' ? 'mercator' : 'globe')}
+            onToggleMapStyle={() => setMapStyle((style) => style === 'dark' ? 'satellite' : 'dark')}
             headerSummary={(
               <MobileDrawerHeaderSummary
                 commandPanelLabel={copy.status.mobileCommandPanel}
@@ -2239,7 +2243,7 @@ export default function Dashboard() {
       <KeyboardShortcuts />
 
       {/* ── GLOBAL STATUS TICKER (bottom) ── */}
-      {showAuxiliaryHud && <GlobalStatusBar />}
+      {showAuxiliaryHud && !isMobile && <GlobalStatusBar />}
 
       {/* Shortcut hint */}
       <div className="desktop-only absolute bottom-[26px] right-5 z-[200] pointer-events-none text-[6px] font-mono text-[var(--text-muted)]/40 tracking-widest">
