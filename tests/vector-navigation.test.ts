@@ -7,6 +7,13 @@ describe('vector navigation camera', () => {
     expect(getVectorCameraPreset('walking', true).zoom).toBeGreaterThan(getVectorCameraPreset('driving', true).zoom);
   });
 
+  it('keeps driving navigation at street-level zoom on mobile', () => {
+    const preset = getVectorCameraPreset('driving', true);
+    expect(preset.zoom).toBeGreaterThanOrEqual(17.5);
+    expect(preset.pitch).toBeGreaterThanOrEqual(60);
+    expect(preset.lookAheadMeters).toBeLessThan(100);
+  });
+
   it('looks ahead in the current direction instead of always shifting north', () => {
     const origin = { lat: 40.4168, lng: -3.7038 };
     const east = getNavigationCameraTarget(origin, 90, 100);
