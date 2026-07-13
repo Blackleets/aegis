@@ -1,7 +1,7 @@
 'use client';
 
 import { AnimatePresence, motion } from 'framer-motion';
-import { ChevronRight, LocateFixed, Map, Menu, Navigation, Search, Satellite, X } from 'lucide-react';
+import { ChevronRight, LocateFixed, Map, Menu, Navigation, RotateCw, Search, Satellite, X } from 'lucide-react';
 import { useState, type ComponentType, type ReactNode } from 'react';
 import { useRealtimePresence } from '@/hooks/useRealtimePresence';
 
@@ -29,6 +29,8 @@ type MobileCommandDrawerProps = {
   isSatelliteView: boolean;
   onToggleProjection: () => void;
   onToggleMapStyle: () => void;
+  ambientMotionEnabled: boolean;
+  onToggleAmbientMotion: () => void;
 };
 
 export default function MobileCommandDrawer({
@@ -44,6 +46,8 @@ export default function MobileCommandDrawer({
   isGlobeView,
   onToggleProjection,
   onToggleMapStyle,
+  ambientMotionEnabled,
+  onToggleAmbientMotion,
 }: MobileCommandDrawerProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const { onlineCount, status: presenceStatus } = useRealtimePresence();
@@ -115,6 +119,20 @@ export default function MobileCommandDrawer({
             </button>
             <button type="button" onClick={onToggleMapStyle} className="grid h-10 w-10 place-items-center rounded-[14px] border border-transparent bg-transparent text-emerald-200 shadow-[0_12px_30px_rgba(0,0,0,0.36)] backdrop-blur-xl" aria-label="Cambiar estilo del mapa">
               <Satellite className="h-5 w-5" />
+            </button>
+            <button
+              type="button"
+              onClick={onToggleAmbientMotion}
+              className={`grid h-10 w-10 place-items-center rounded-[14px] border transition-colors ${
+                ambientMotionEnabled
+                  ? 'border-cyan-200/20 bg-cyan-300/10 text-cyan-100'
+                  : 'border-transparent bg-transparent text-white/35'
+              }`}
+              aria-label={ambientMotionEnabled ? 'Pausar rotación ambiental' : 'Activar rotación ambiental'}
+              aria-pressed={ambientMotionEnabled}
+              title={ambientMotionEnabled ? 'Rotación ambiental activa' : 'Rotación ambiental pausada'}
+            >
+              <RotateCw className="h-[18px] w-[18px]" />
             </button>
           </div>
 

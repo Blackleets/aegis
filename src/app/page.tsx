@@ -509,6 +509,8 @@ export default function Dashboard() {
   const [mobileModeDockCollapsed, setMobileModeDockCollapsed] = useState(true);
   const [dashboardMode, setDashboardMode] = useState<DashboardMode>('earth');
   const [mapProjection, setMapProjection] = useState<'globe'|'mercator'>('globe');
+  const [ambientMotionEnabled, setAmbientMotionEnabled] = useState(true);
+  const ambientMotionPreferenceLoadedRef = useRef(false);
   const [selectedCelestialBody, setSelectedCelestialBody] = useState<CelestialBodyId>('earth');
 
   const [mapStyle, setMapStyle] = useState<'dark'|'satellite'>('dark');
@@ -542,6 +544,19 @@ export default function Dashboard() {
   const [liveFeedUrl, setLiveFeedUrl] = useState<string | null>(null);
   const [liveFeedName, setLiveFeedName] = useState('');
   const [liveFeedEmbedAllowed, setLiveFeedEmbedAllowed] = useState(true);
+
+  useEffect(() => {
+    const enabled = window.localStorage.getItem('aegis:ambient-motion') !== 'paused';
+    queueMicrotask(() => {
+      ambientMotionPreferenceLoadedRef.current = true;
+      setAmbientMotionEnabled(enabled);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!ambientMotionPreferenceLoadedRef.current) return;
+    window.localStorage.setItem('aegis:ambient-motion', ambientMotionEnabled ? 'active' : 'paused');
+  }, [ambientMotionEnabled]);
 
   // Splash screen
   useEffect(() => {
@@ -1799,6 +1814,14 @@ export default function Dashboard() {
           navigationActive={navigationActive}
           navigationBearing={navigationBearing}
           navigationMode={routeSnapshot?.mode ?? 'driving'}
+          ambientMotionEnabled={
+            ambientMotionEnabled
+            && mobilePanel === null
+            && !vectorDockOpen
+            && routeSnapshot === null
+            && dashboardMode === 'earth'
+            && selectedCelestialBody === 'earth'
+          }
         />
       </ErrorBoundary>
 
@@ -2156,6 +2179,8 @@ export default function Dashboard() {
             isSatelliteView={mapStyle === 'satellite'}
             onToggleProjection={() => setMapProjection((projection) => projection === 'globe' ? 'mercator' : 'globe')}
             onToggleMapStyle={() => setMapStyle((style) => style === 'dark' ? 'satellite' : 'dark')}
+            ambientMotionEnabled={ambientMotionEnabled}
+            onToggleAmbientMotion={() => setAmbientMotionEnabled((enabled) => !enabled)}
             headerSummary={(
               <MobileDrawerHeaderSummary
                 commandPanelLabel={copy.status.mobileCommandPanel}
