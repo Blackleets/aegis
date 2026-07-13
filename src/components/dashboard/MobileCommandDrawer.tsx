@@ -5,7 +5,7 @@ import { ChevronRight, LocateFixed, Map, Menu, Navigation, RotateCw, Search, Sat
 import { useState, type ComponentType, type ReactNode } from 'react';
 import { useRealtimePresence } from '@/hooks/useRealtimePresence';
 
-type MobilePanel = 'layers' | 'markets' | 'intel' | 'search' | 'recon';
+type MobilePanel = 'layers' | 'markets' | 'intel' | 'alerts' | 'search' | 'recon';
 type MobileNavGlyphProps = { className?: string };
 
 type MobileTab = {
@@ -22,6 +22,7 @@ type MobileCommandDrawerProps = {
   layersContent: ReactNode;
   marketsContent: ReactNode;
   intelContent: ReactNode;
+  alertsContent: ReactNode;
   searchContent: ReactNode;
   reconContent: ReactNode;
   headerSummary: ReactNode;
@@ -40,6 +41,7 @@ export default function MobileCommandDrawer({
   layersContent,
   marketsContent,
   intelContent,
+  alertsContent,
   searchContent,
   reconContent,
   headerSummary,
@@ -201,6 +203,7 @@ export default function MobileCommandDrawer({
               {mobilePanel === 'layers' && layersContent}
               {mobilePanel === 'markets' && marketsContent}
               {mobilePanel === 'intel' && intelContent}
+              {mobilePanel === 'alerts' && alertsContent}
               {mobilePanel === 'search' && searchContent}
               {mobilePanel === 'recon' && reconContent}
               {!isSearchPanel && activeTab && <span className="sr-only">{activeTab.label}</span>}
