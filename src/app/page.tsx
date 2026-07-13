@@ -35,6 +35,7 @@ import { type ActiveLayers, type BoundingBox, type Coordinate, type FlyToLocatio
 import { getArrivalThresholdMeters, getNextSimulationIndex, resolveNavigationBearing, shouldAcceptNavigationFix, shouldRerouteNavigation, snapNavigationToRoute, stabilizeNavigationCoordinate } from '@/lib/vector-navigation';
 import { recommendRoute } from '@/lib/route-intelligence';
 import { chooseRouteAlertChannel } from '@/lib/route-alert-priority';
+import { vibrateForRouteAlert } from '@/lib/route-alert-haptics';
 
 const AegisMap = dynamic(() => import('@/components/AegisMap'), { ssr: false });
 const LayerPanel = dynamic(() => import('@/components/LayerPanel'));
@@ -534,6 +535,7 @@ export default function Dashboard() {
   const alertedEarthquakeIdsRef = useRef<Set<string>>(new Set());
   const alertedContextIdsRef = useRef<Set<string>>(new Set());
   const notifiedRouteAlertIdsRef = useRef<Set<string>>(new Set());
+  const hapticRouteAlertIdsRef = useRef<Set<string>>(new Set());
   const lastSpokenContextRef = useRef<string | null>(null);
   const arrivalSpokenRef = useRef(false);
   const preNavigationMapStateRef = useRef<{ projection: 'globe' | 'mercator'; style: 'dark' | 'satellite' } | null>(null);
@@ -1615,6 +1617,19 @@ export default function Dashboard() {
 
   const visibleNearbyEarthquakeAlert = visibleRouteAlertChannel === 'earthquake' ? nearbyEarthquakeAlert : null;
   const visibleNearbyContextAlert = visibleRouteAlertChannel === 'context' ? nearbyContextAlert : null;
+
+  useEffect(() => {
+    const visibleAlert = visibleNearbyEarthquakeAlert || visibleNearbyContextAlert;
+    if (!visibleAlert || hapticRouteAlertIdsRef.current.has(visibleAlert.id)) return;
+    hapticRouteAlertIdsRef.current.add(visibleAlert.id);
+
+    vibrateForRouteAlert(
+      visibleNearbyEarthquakeAlert
+        ? (visibleNearbyEarthquakeAlert.magnitude >= 5 ? 'critical' : 'warning')
+        : visibleNearbyContextAlert?.severity ?? 'info',
+      visibleNearbyEarthquakeAlert ? 'earthquake' : 'context',
+    );
+  }, [visibleNearbyContextAlert, visibleNearbyEarthquakeAlert]);
 
   useEffect(() => {
     const visibleAlert = visibleNearbyEarthquakeAlert || visibleNearbyContextAlert;
