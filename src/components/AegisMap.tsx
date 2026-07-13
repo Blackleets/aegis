@@ -2328,14 +2328,39 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
         if (!navigationActive && !currentLocation) {
           map.easeTo({ center: [0, 31], zoom: Math.min(map.getZoom(), 1.82), pitch: 12, duration: 1200 });
         }
+      } else if (navigationActive && currentLocation) {
+        // Projection changes cancel in-flight MapLibre camera transitions. Re-apply the
+        // complete VECTOR camera here, after setProjection, so a pitch-only transition
+        // cannot leave navigation stranded at the previous globe zoom.
+        const isMobileNavigation = window.innerWidth < 768;
+        const cameraPreset = getVectorCameraPreset(navigationMode, isMobileNavigation);
+        const nextBearing = navigationBearing ?? map.getBearing();
+        const cameraTarget = getNavigationCameraTarget(currentLocation, nextBearing, cameraPreset.lookAheadMeters);
+        map.easeTo({
+          center: [cameraTarget.lng, cameraTarget.lat],
+          zoom: Math.max(map.getZoom(), cameraPreset.zoom),
+          pitch: cameraPreset.pitch,
+          bearing: nextBearing,
+          padding: isMobileNavigation
+            ? { top: 112, bottom: 86, left: 18, right: 18 }
+            : { top: 108, bottom: 156, left: 64, right: 64 },
+          duration: 850,
+          essential: true,
+        });
       } else {
-        const cameraPreset = getVectorCameraPreset(navigationMode, window.innerWidth < 768);
-        map.easeTo({ pitch: navigationActive ? cameraPreset.pitch : 0, duration: 800 });
+        map.easeTo({ pitch: 0, bearing: 0, duration: 800 });
       }
     } catch (e) {
       console.warn('Projection switch failed:', e);
     }
   }, [applyAegisGlobeStyling, currentLocation, mapReady, navigationActive, navigationBearing, navigationMode, projection, mapStyle]);
+
+  useEffect(() => {
+    if (navigationActive) return;
+    lastNavCameraCenterRef.current = null;
+    lastNavCameraBearingRef.current = null;
+    lastNavCameraUpdateRef.current = 0;
+  }, [navigationActive]);
 
   // Satellite / globe presentation switching
   useEffect(() => {
