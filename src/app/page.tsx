@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback, useMemo, type ComponentType, type ReactNode } from 'react';
 import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Globe, MapPinned, Satellite, Moon } from 'lucide-react';
+import { Bell, X, Globe, MapPinned, Satellite, Moon } from 'lucide-react';
 import IntelFeed from '@/components/IntelFeed';
 import MarketsPanel from '@/components/MarketsPanel';
 import ScmPanel from '@/components/ScmPanel';
@@ -28,6 +28,7 @@ import NasaMissionStrip, { type NasaEventItem } from '@/components/dashboard/Nas
 import MobileCommandDrawer from '@/components/dashboard/MobileCommandDrawer';
 import RouteCockpitDesktop from '@/components/dashboard/RouteCockpitDesktop';
 import RouteCockpitMobile from '@/components/dashboard/RouteCockpitMobile';
+import RouteAlertPreferencesPanel from '@/components/dashboard/RouteAlertPreferencesPanel';
 import SplashScreen from '@/components/dashboard/SplashScreen';
 import TopHudOverlays from '@/components/dashboard/TopHudOverlays';
 import { DEFAULT_LOCALE, getDashboardCopy, isLocale, type Locale } from '@/lib/i18n';
@@ -37,6 +38,7 @@ import { recommendRoute } from '@/lib/route-intelligence';
 import { chooseRouteAlertChannel } from '@/lib/route-alert-priority';
 import { vibrateForRouteAlert } from '@/lib/route-alert-haptics';
 import { formatRouteAlertAge, getAlertObservedAt, isRouteAlertFresh } from '@/lib/route-alert-freshness';
+import { DEFAULT_ROUTE_ALERT_PREFERENCES, parseRouteAlertPreferences, type RouteAlertPreferences } from '@/lib/route-alert-preferences';
 
 const AegisMap = dynamic(() => import('@/components/AegisMap'), { ssr: false });
 const LayerPanel = dynamic(() => import('@/components/LayerPanel'));
@@ -44,7 +46,7 @@ const CameraViewer = dynamic(() => import('@/components/CameraViewer'));
 const OsintPanel = dynamic(() => import('@/components/OsintPanel'));
 
 type DashboardMode = 'earth' | 'solar' | 'focus';
-type MobilePanel = 'layers' | 'markets' | 'intel' | 'search' | 'recon';
+type MobilePanel = 'layers' | 'markets' | 'intel' | 'alerts' | 'search' | 'recon';
 type MobileNavGlyphProps = { className?: string };
 
 type MobileDrawerHeaderSummaryProps = {
@@ -515,6 +517,8 @@ export default function Dashboard() {
   const [mapProjection, setMapProjection] = useState<'globe'|'mercator'>('globe');
   const [ambientMotionEnabled, setAmbientMotionEnabled] = useState(true);
   const ambientMotionPreferenceLoadedRef = useRef(false);
+  const [routeAlertPreferences, setRouteAlertPreferences] = useState<RouteAlertPreferences>(DEFAULT_ROUTE_ALERT_PREFERENCES);
+  const routeAlertPreferencesLoadedRef = useRef(false);
   const [selectedCelestialBody, setSelectedCelestialBody] = useState<CelestialBodyId>('earth');
 
   const [mapStyle, setMapStyle] = useState<'dark'|'satellite'>('dark');
@@ -563,6 +567,19 @@ export default function Dashboard() {
     if (!ambientMotionPreferenceLoadedRef.current) return;
     window.localStorage.setItem('aegis:ambient-motion', ambientMotionEnabled ? 'active' : 'paused');
   }, [ambientMotionEnabled]);
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem('aegis:route-alert-preferences');
+    queueMicrotask(() => {
+      routeAlertPreferencesLoadedRef.current = true;
+      setRouteAlertPreferences(parseRouteAlertPreferences(stored));
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!routeAlertPreferencesLoadedRef.current) return;
+    window.localStorage.setItem('aegis:route-alert-preferences', JSON.stringify(routeAlertPreferences));
+  }, [routeAlertPreferences]);
 
   // Splash screen
   useEffect(() => {
@@ -1473,7 +1490,7 @@ export default function Dashboard() {
     : currentRouteStep?.distanceMeters ?? null;
 
   useEffect(() => {
-    if (!navigationActive || !userLocation) {
+    if (!navigationActive || !userLocation || !routeAlertPreferences.earthquakes) {
       queueMicrotask(() => setNearbyEarthquakeAlert(null));
       return;
     }
@@ -1510,7 +1527,7 @@ export default function Dashboard() {
 
       return nearby;
     });
-  }, [data.earthquakes, navigationActive, userLocation]);
+  }, [data.earthquakes, navigationActive, routeAlertPreferences.earthquakes, userLocation]);
 
   useEffect(() => {
     if (!navigationActive || !userLocation) {
@@ -1526,7 +1543,7 @@ export default function Dashboard() {
       && Math.abs(entity.lng - userLocation.lng) <= lngDelta;
 
     for (const camera of data.cameras || []) {
-      if (!near(camera, 0.006, 0.009)) continue;
+      if (!routeAlertPreferences.trafficCameras || !near(camera, 0.006, 0.009)) continue;
       const distanceMeters = Math.round(distanceMetersBetween(userLocation, camera as Coordinate));
       if (distanceMeters > 500) continue;
       const id = `camera-${String(camera.id || `${camera.lat}-${camera.lng}`)}`;
@@ -1547,6 +1564,7 @@ export default function Dashboard() {
       if (!near(event, 0.55, 0.75)) continue;
       const distanceMeters = Math.round(distanceMetersBetween(userLocation, event as Coordinate));
       const isVolcano = event.type === 'volcano';
+      if (isVolcano ? !routeAlertPreferences.volcanoes : !routeAlertPreferences.wildfires) continue;
       const limit = isVolcano ? 50000 : 20000;
       if (distanceMeters > limit) continue;
       const id = `${isVolcano ? 'volcano' : 'fire'}-${String(event.date || '')}-${event.lat}-${event.lng}`;
@@ -1566,7 +1584,7 @@ export default function Dashboard() {
     }
 
     for (const event of data.weather_events || []) {
-      if (!near(event, 0.75, 1)) continue;
+      if (!routeAlertPreferences.severeWeather || !near(event, 0.75, 1)) continue;
       const severity = String(event.severity || 'low');
       if (severity !== 'high' && severity !== 'medium') continue;
       const distanceMeters = Math.round(distanceMetersBetween(userLocation, event as Coordinate));
@@ -1603,7 +1621,7 @@ export default function Dashboard() {
       alertedContextIdsRef.current.add(alert.id);
       return alert;
     });
-  }, [data.cameras, data.fires, data.weather_events, navigationActive, userLocation]);
+  }, [data.cameras, data.fires, data.weather_events, navigationActive, routeAlertPreferences.severeWeather, routeAlertPreferences.trafficCameras, routeAlertPreferences.volcanoes, routeAlertPreferences.wildfires, userLocation]);
 
   const visibleRouteAlertChannel = useMemo(() => chooseRouteAlertChannel(
     nearbyEarthquakeAlert ? {
@@ -1630,7 +1648,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     const visibleAlert = visibleNearbyEarthquakeAlert || visibleNearbyContextAlert;
-    if (!visibleAlert || hapticRouteAlertIdsRef.current.has(visibleAlert.id)) return;
+    if (!routeAlertPreferences.haptics || !visibleAlert || hapticRouteAlertIdsRef.current.has(visibleAlert.id)) return;
     hapticRouteAlertIdsRef.current.add(visibleAlert.id);
 
     vibrateForRouteAlert(
@@ -1639,11 +1657,11 @@ export default function Dashboard() {
         : visibleNearbyContextAlert?.severity ?? 'info',
       visibleNearbyEarthquakeAlert ? 'earthquake' : 'context',
     );
-  }, [visibleNearbyContextAlert, visibleNearbyEarthquakeAlert]);
+  }, [routeAlertPreferences.haptics, visibleNearbyContextAlert, visibleNearbyEarthquakeAlert]);
 
   useEffect(() => {
     const visibleAlert = visibleNearbyEarthquakeAlert || visibleNearbyContextAlert;
-    if (!visibleAlert || notifiedRouteAlertIdsRef.current.has(visibleAlert.id)) return;
+    if (!routeAlertPreferences.notifications || !visibleAlert || notifiedRouteAlertIdsRef.current.has(visibleAlert.id)) return;
     notifiedRouteAlertIdsRef.current.add(visibleAlert.id);
     if (typeof window === 'undefined' || !('Notification' in window) || Notification.permission !== 'granted') return;
 
@@ -1664,7 +1682,7 @@ export default function Dashboard() {
         tag: `aegis-context-${visibleNearbyContextAlert.id}`,
       });
     }
-  }, [visibleNearbyContextAlert, visibleNearbyEarthquakeAlert]);
+  }, [routeAlertPreferences.notifications, visibleNearbyContextAlert, visibleNearbyEarthquakeAlert]);
 
   const speakNavigationMessage = useCallback((message: string) => {
     if (!navigationVoiceEnabled || typeof window === 'undefined' || !('speechSynthesis' in window)) return;
@@ -1837,15 +1855,18 @@ export default function Dashboard() {
       ? copy.status.macroAtlas
       : mobilePanel === 'intel'
         ? copy.status.signalLedger
-        : mobilePanel === 'recon'
-          ? 'AEGIS RECON'
-          : copy.status.search;
+        : mobilePanel === 'alerts'
+          ? (locale === 'es' ? 'CENTRO DE ALERTAS' : 'ALERT CENTER')
+          : mobilePanel === 'recon'
+            ? 'AEGIS RECON'
+            : copy.status.search;
 
   const mobileNavTabs = useMemo<Array<{ id: MobilePanel; icon: ComponentType<MobileNavGlyphProps>; label: string; accent?: boolean }>>(() => ([
     { id: 'layers', icon: AegisLayersGlyph, label: locale === 'es' ? 'CAPAS' : 'LAYERS' },
     { id: 'markets', icon: AegisMarketsGlyph, label: copy.status.markets },
     { id: 'intel', icon: AegisIntelGlyph, label: copy.status.intel },
-    { id: 'recon', icon: AegisReconGlyph, label: 'CORTEX', accent: true },
+    { id: 'alerts', icon: Bell, label: locale === 'es' ? 'ALERTAS' : 'ALERTS', accent: true },
+    { id: 'recon', icon: AegisReconGlyph, label: 'CORTEX' },
     { id: 'search', icon: AegisVectorGlyph, label: locale === 'es' ? 'GPS' : 'VECTOR' },
   ]), [copy.status.intel, copy.status.markets, locale]);
 
@@ -2273,6 +2294,12 @@ export default function Dashboard() {
             )}
             marketsContent={<MarketsPanel data={data} spaceWeather={spaceWeather} />}
             intelContent={<IntelFeed data={data} onLocate={(lat, lng) => { setFlyToLocation({ lat, lng, ts: Date.now() }); setMobilePanel(null); }} />}
+            alertsContent={(
+              <>
+                <RouteAlertPreferencesPanel value={routeAlertPreferences} onChange={setRouteAlertPreferences} />
+                <LiveAlerts data={dataWithSdk} onLocate={(lat, lng) => { setFlyToLocation({ lat, lng, ts: Date.now() }); setMobilePanel(null); }} onWatchFeed={(url, name) => { setLiveFeedUrl(url); setLiveFeedName(name); }} />
+              </>
+            )}
             searchContent={(
               <MobileSearchPanel
                 routeError={routeError}
