@@ -436,7 +436,9 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
 
       // Sources
       const sources = ['flights','military','jets','private-fl','flight-trails','military-trails','jet-trails','private-trails','satellites','earthquakes','earthquake-pulses','gdelt','gdelt-hotspots','gps-jamming','day-night','cctv','fires','weather','infrastructure','maritime','maritime-choke','maritime-ships','live-news','sigint-news','conflict-zones', 'war-alerts-targets', 'war-alerts-lines', 'balloons', 'radiation', 'ip-sweep-devices', 'ip-sweep-pulse', 'ip-sweep-connections', 'scan-targets', 'sdk-entities', 'sdk-links', 'user-route', 'route-markers'];
-      sources.forEach(s => map.addSource(s, { type: 'geojson', data: EMPTY_FC }));
+      sources.forEach((sourceId) => map.addSource(sourceId, sourceId === 'earthquakes'
+        ? { type: 'geojson', data: EMPTY_FC, cluster: true, clusterRadius: 44, clusterMaxZoom: 5 }
+        : { type: 'geojson', data: EMPTY_FC }));
 
       const firstLabelLayer = map.getStyle().layers?.find((layer) => layer.type === 'symbol')?.id;
       if (map.getSource('carto') && !map.getLayer('vector-building-footprints')) {
@@ -626,11 +628,29 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
         'text-halo-width': 1.7,
       }});
 
-      // Earthquakes
-      map.addLayer({ id: 'eq-circles', type: 'circle', source: 'earthquakes', paint: {
+      // Earthquakes — clustered in global view, individual at regional zoom.
+      map.addLayer({ id: 'eq-clusters', type: 'circle', source: 'earthquakes', filter: ['has', 'point_count'], paint: {
+        'circle-radius': ['step', ['get', 'point_count'], 12, 10, 16, 35, 21, 80, 27],
+        'circle-color': ['step', ['get', 'point_count'], '#EAB308', 10, '#F59E0B', 35, '#F97316', 80, '#EF4444'],
+        'circle-opacity': 0.78,
+        'circle-stroke-width': 2,
+        'circle-stroke-color': 'rgba(255,255,255,0.72)',
+        'circle-stroke-opacity': 0.48,
+      }});
+      map.addLayer({ id: 'eq-cluster-count', type: 'symbol', source: 'earthquakes', filter: ['has', 'point_count'], layout: {
+        'text-field': ['get', 'point_count_abbreviated'],
+        'text-size': 10,
+        'text-font': ['Open Sans Bold'],
+        'text-allow-overlap': true,
+      }, paint: {
+        'text-color': '#FFF7ED',
+        'text-halo-color': 'rgba(5,10,18,0.82)',
+        'text-halo-width': 1,
+      }});
+      map.addLayer({ id: 'eq-circles', type: 'circle', source: 'earthquakes', filter: ['!', ['has', 'point_count']], paint: {
         'circle-radius': ['interpolate',['linear'],['get','magnitude'], 2.5,4, 5,12, 7,24],
         'circle-color': ['interpolate',['linear'],['get','magnitude'], 2.5,'#FFD700', 4,'#FF9500', 6,'#FF1744'],
-        'circle-opacity': 0.6, 'circle-blur': 0.3, 'circle-stroke-width': 1, 'circle-stroke-color': '#FFD700', 'circle-stroke-opacity': 0.3,
+        'circle-opacity': 0.68, 'circle-blur': 0.22, 'circle-stroke-width': 1, 'circle-stroke-color': '#FFD700', 'circle-stroke-opacity': 0.38,
       }});
       map.addLayer({ id: 'eq-pulse-ring', type: 'circle', source: 'earthquake-pulses', paint: {
         'circle-radius': ['interpolate', ['linear'], ['get', 'progress'], 0, 7, 1, ['interpolate', ['linear'], ['get', 'magnitude'], 2.5, 42, 5, 70, 7, 110]],
@@ -647,7 +667,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
         'circle-opacity': ['interpolate', ['linear'], ['get', 'progress'], 0, 1, 0.8, 0.72, 1, 0],
         'circle-blur': 0.15,
       }});
-      map.addLayer({ id: 'eq-label', type: 'symbol', source: 'earthquakes', minzoom: 5, filter: ['>=',['get','magnitude'],4.5], layout: {
+      map.addLayer({ id: 'eq-label', type: 'symbol', source: 'earthquakes', minzoom: 5, filter: ['all', ['!', ['has', 'point_count']], ['>=',['get','magnitude'],4.5]], layout: {
         'text-field': ['concat','M',['to-string',['get','magnitude']]], 'text-size': 9, 'text-font': ['Open Sans Regular'], 'text-offset': [0,1.5],
       }, paint: { 'text-color': '#FFD700', 'text-halo-color': '#000', 'text-halo-width': 1 }});
 
@@ -1106,6 +1126,17 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
     });
 
     // ── Earthquakes (with USGS link) ──
+    map.on('click', 'eq-clusters', e => {
+      if (!e.features?.length) return;
+      const coords = e.features[0].geometry.coordinates;
+      map.easeTo({
+        center: coords,
+        zoom: Math.min(7, map.getZoom() + 2.2),
+        duration: 650,
+        essential: true,
+      });
+    });
+
     map.on('click', 'eq-circles', e => {
       if (!e.features?.length) return;
       const p = e.features[0].properties as EntityProperties;
@@ -1240,7 +1271,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
     });
 
     // ── Generic hover for clickables ──
-    ['conflict-icons','cctv-dots','eq-circles','sat-dots','fires-heat','gdelt-dots','gdelt-hotspot-core','gdelt-hotspot-halo','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots','sigint-news-dots','balloon-dots','rad-dots','ship-dots','sweep-device-dots','scan-targets-dots','sdk-sea','sdk-sea-glow','sdk-air','sdk-air-glow','sdk-intel','sdk-intel-glow'].forEach(layer => {
+    ['conflict-icons','cctv-dots','eq-clusters','eq-circles','sat-dots','fires-heat','gdelt-dots','gdelt-hotspot-core','gdelt-hotspot-halo','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots','sigint-news-dots','balloon-dots','rad-dots','ship-dots','sweep-device-dots','scan-targets-dots','sdk-sea','sdk-sea-glow','sdk-air','sdk-air-glow','sdk-intel','sdk-intel-glow'].forEach(layer => {
       map.on('mouseenter', layer, () => { map.getCanvas().style.cursor = 'pointer'; });
       map.on('mouseleave', layer, () => { map.getCanvas().style.cursor = ''; });
     });
@@ -1619,8 +1650,20 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
 
     if (earthquakePulseFrameRef.current !== null) return;
 
+    let lastPulseRenderAt = 0;
     const animatePulses = (now: number) => {
       const durationMs = 4200;
+      if (document.hidden) {
+        earthquakePulsesRef.current = [];
+        earthquakePulseFrameRef.current = null;
+        setGeo('earthquake-pulses', []);
+        return;
+      }
+      if (now - lastPulseRenderAt < 33) {
+        earthquakePulseFrameRef.current = window.requestAnimationFrame(animatePulses);
+        return;
+      }
+      lastPulseRenderAt = now;
       earthquakePulsesRef.current = earthquakePulsesRef.current.filter((pulse) => now - pulse.startedAt < durationMs);
 
       const features: GeoJsonFeature[] = earthquakePulsesRef.current.map((pulse) => ({
@@ -2099,7 +2142,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
   // Visibility
   useEffect(() => {
     if (!mapReady) return;
-    setVis(['eq-circles','eq-label','eq-pulse-ring','eq-pulse-core'], activeLayers.earthquakes);
+    setVis(['eq-clusters','eq-cluster-count','eq-circles','eq-label','eq-pulse-ring','eq-pulse-core'], activeLayers.earthquakes);
     setVis(['sat-dots','sat-glow'], activeLayers.satellites);
     setVis(['gdelt-dots','gdelt-hotspot-halo','gdelt-hotspot-core','gdelt-hotspot-label'], activeLayers.global_incidents);
     setVis(['jam-fill','jam-label'], activeLayers.gps_jamming);
@@ -2330,13 +2373,14 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
   }, [mapReady, navigationActive]);
 
   useEffect(() => {
-
     if (!mapReady || !mapRef.current || projection !== 'globe' || navigationActive) return;
+    if (window.innerWidth < 1024 || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
     const map = mapRef.current;
     let frame = 0;
     let lastTime = performance.now();
     const MAX_IDLE_SPIN_ZOOM = 2.4;
+    globeSpinPauseUntilRef.current = Math.max(globeSpinPauseUntilRef.current, Date.now() + 12000);
 
     const spin = (timestamp: number) => {
       if (!mapRef.current) return;
@@ -2352,13 +2396,13 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       }
 
       const deltaMs = Math.max(0, timestamp - lastTime);
-      if (deltaMs < 32) return;
+      if (deltaMs < 100) return;
       const deltaSeconds = deltaMs / 1000;
       lastTime = timestamp;
       if (deltaSeconds <= 0) return;
 
       const center = map.getCenter();
-      map.jumpTo({ center: [normalizeLongitude(center.lng - deltaSeconds * 1.35), center.lat] });
+      map.jumpTo({ center: [normalizeLongitude(center.lng - deltaSeconds * 0.08), center.lat] });
     };
 
     frame = window.requestAnimationFrame(spin);
