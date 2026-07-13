@@ -44,6 +44,12 @@ export function shouldRerouteNavigation({
     && cooldownElapsedMs > 30_000;
 }
 
+export function getNextSimulationIndex(currentIndex: number, coordinateCount: number) {
+  if (coordinateCount <= 1) return 0;
+  const stride = Math.max(1, Math.floor(coordinateCount / 180));
+  return Math.min(coordinateCount - 1, currentIndex + stride);
+}
+
 export function getVectorCameraPreset(mode: VectorNavigationMode, isMobile: boolean) {
   if (mode === 'walking') {
     return {
