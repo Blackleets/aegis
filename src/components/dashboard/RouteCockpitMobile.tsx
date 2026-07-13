@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { type RouteRiskSummary, type RouteSnapshot, type RouteStep, formatRouteDistance, formatRouteDuration, formatStepDistance, localizeRouteInstruction } from '@/lib/routing-shell';
 import { requestNavigationNotificationPermission } from '@/lib/navigation-notifications';
+import { formatRouteAlertAge } from '@/lib/route-alert-freshness';
 
 type NearbyEarthquakeAlert = {
   id: string;
@@ -50,6 +51,7 @@ type NearbyContextAlert = {
   distanceMeters: number;
   source: string;
   severity: 'info' | 'warning' | 'critical';
+  observedAt: number | null;
 };
 
 type TrafficInsight = {
@@ -264,7 +266,7 @@ export default function RouteCockpitMobile({
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5 text-[9px] font-mono uppercase tracking-[0.16em] text-amber-200">
-                          Evento sísmico cercano · USGS
+                          Evento sísmico cercano · USGS · {formatRouteAlertAge(nearbyEarthquakeAlert.time)}
                         </div>
                         <div className="mt-0.5 truncate text-[12px] font-bold text-white">
                           M{nearbyEarthquakeAlert.magnitude} · {formatStepDistance(nearbyEarthquakeAlert.distanceMeters)} de distancia
@@ -300,7 +302,7 @@ export default function RouteCockpitMobile({
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="text-[9px] font-mono uppercase tracking-[0.16em] text-cyan-100/68">
-                          Aviso en ruta · {nearbyContextAlert.source}
+                          Aviso en ruta · {nearbyContextAlert.source} · {formatRouteAlertAge(nearbyContextAlert.observedAt)}
                         </div>
                         <div className="mt-0.5 truncate text-[12px] font-bold text-white">
                           {nearbyContextAlert.title} · {formatStepDistance(nearbyContextAlert.distanceMeters)}

@@ -36,6 +36,7 @@ import { getArrivalThresholdMeters, getNextSimulationIndex, resolveNavigationBea
 import { recommendRoute } from '@/lib/route-intelligence';
 import { chooseRouteAlertChannel } from '@/lib/route-alert-priority';
 import { vibrateForRouteAlert } from '@/lib/route-alert-haptics';
+import { formatRouteAlertAge, getAlertObservedAt, isRouteAlertFresh } from '@/lib/route-alert-freshness';
 
 const AegisMap = dynamic(() => import('@/components/AegisMap'), { ssr: false });
 const LayerPanel = dynamic(() => import('@/components/LayerPanel'));
@@ -333,6 +334,7 @@ interface NearbyContextAlert {
   distanceMeters: number;
   source: string;
   severity: 'info' | 'warning' | 'critical';
+  observedAt: number | null;
 }
 
 interface RouteRecommendation {
@@ -1517,6 +1519,7 @@ export default function Dashboard() {
     }
 
     const candidates: Array<NearbyContextAlert & { priority: number }> = [];
+    const now = Date.now();
     const near = (entity: DashboardEntity, latDelta: number, lngDelta: number) =>
       typeof entity.lat === 'number' && typeof entity.lng === 'number'
       && Math.abs(entity.lat - userLocation.lat) <= latDelta
@@ -1535,6 +1538,7 @@ export default function Dashboard() {
         distanceMeters,
         source: String(camera.source || 'organismo vial'),
         severity: 'info',
+        observedAt: now,
         priority: 1,
       });
     }
@@ -1546,6 +1550,8 @@ export default function Dashboard() {
       const limit = isVolcano ? 50000 : 20000;
       if (distanceMeters > limit) continue;
       const id = `${isVolcano ? 'volcano' : 'fire'}-${String(event.date || '')}-${event.lat}-${event.lng}`;
+      const observedAt = getAlertObservedAt(event);
+      if (!isRouteAlertFresh(isVolcano ? 'volcano' : 'wildfire', observedAt, now)) continue;
       candidates.push({
         id,
         kind: isVolcano ? 'volcano' : 'wildfire',
@@ -1554,6 +1560,7 @@ export default function Dashboard() {
         distanceMeters,
         source: isVolcano ? 'NASA EONET' : 'NASA FIRMS',
         severity: 'critical',
+        observedAt,
         priority: 4,
       });
     }
@@ -1565,6 +1572,8 @@ export default function Dashboard() {
       const distanceMeters = Math.round(distanceMetersBetween(userLocation, event as Coordinate));
       const limit = severity === 'high' ? 60000 : 25000;
       if (distanceMeters > limit) continue;
+      const observedAt = getAlertObservedAt(event);
+      if (!isRouteAlertFresh('severe-weather', observedAt, now)) continue;
       candidates.push({
         id: `weather-${String(event.id || `${event.lat}-${event.lng}-${event.title || ''}`)}`,
         kind: 'severe-weather',
@@ -1573,6 +1582,7 @@ export default function Dashboard() {
         distanceMeters,
         source: String(event.provider || 'NASA/NOAA'),
         severity: severity === 'high' ? 'critical' : 'warning',
+        observedAt,
         priority: severity === 'high' ? 3 : 2,
       });
     }
@@ -1611,7 +1621,7 @@ export default function Dashboard() {
       severity: nearbyContextAlert.severity,
       distanceMeters: nearbyContextAlert.distanceMeters,
       source: nearbyContextAlert.source,
-      observedAt: null,
+      observedAt: nearbyContextAlert.observedAt,
     } : null,
   ), [nearbyContextAlert, nearbyEarthquakeAlert]);
 
@@ -1650,7 +1660,7 @@ export default function Dashboard() {
 
     if (visibleNearbyContextAlert) {
       new Notification(`AEGIS · ${visibleNearbyContextAlert.title}`, {
-        body: `${distance} · Fuente: ${visibleNearbyContextAlert.source}`,
+        body: `${distance} · ${formatRouteAlertAge(visibleNearbyContextAlert.observedAt)} · Fuente: ${visibleNearbyContextAlert.source}`,
         tag: `aegis-context-${visibleNearbyContextAlert.id}`,
       });
     }
