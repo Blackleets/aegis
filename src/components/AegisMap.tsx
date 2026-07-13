@@ -5,7 +5,7 @@ import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 import { findNewEarthquakes, getEarthquakeSeverity, isRecentEarthquake } from '@/lib/earthquakes';
-import { getNavigationCameraTarget, getVectorCameraPreset, type VectorNavigationMode } from '@/lib/vector-navigation';
+import { getNavigationCameraTarget, getVectorCameraPreset, shouldUpdateNavigationCamera, smoothNavigationBearing, type VectorNavigationMode } from '@/lib/vector-navigation';
 
 type Coordinates = [number, number];
 type EntityProperties = Record<string, unknown>;
@@ -2193,17 +2193,8 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
     const cameraPreset = getVectorCameraPreset(navigationMode, isMobileNavigation);
     const now = Date.now();
     const lastCenter = lastNavCameraCenterRef.current;
-    const nextBearing = navigationBearing ?? map.getBearing();
-    const lastBearing = lastNavCameraBearingRef.current;
-    const movementDelta = lastCenter
-      ? Math.abs(lastCenter.lat - currentLocation.lat) + Math.abs(lastCenter.lng - currentLocation.lng)
-      : Number.POSITIVE_INFINITY;
-    const bearingDelta = lastBearing === null
-      ? Number.POSITIVE_INFINITY
-      : Math.abs((((nextBearing - lastBearing) % 360) + 540) % 360 - 180);
-
-    if (movementDelta < 0.00025 && bearingDelta < 3) return;
-    if (movementDelta < 0.0009 && bearingDelta < 8 && now - lastNavCameraUpdateRef.current < 850) return;
+    if (!shouldUpdateNavigationCamera(lastCenter, currentLocation, now - lastNavCameraUpdateRef.current)) return;
+    const nextBearing = smoothNavigationBearing(lastNavCameraBearingRef.current, navigationBearing ?? map.getBearing());
 
     lastNavCameraUpdateRef.current = now;
     lastNavCameraCenterRef.current = currentLocation;
@@ -2212,7 +2203,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
 
     map.easeTo({
       center: [cameraTarget.lng, cameraTarget.lat],
-      zoom: Math.max(map.getZoom(), cameraPreset.zoom),
+      zoom: cameraPreset.zoom,
       pitch: cameraPreset.pitch,
       bearing: nextBearing,
       padding: isMobileNavigation
@@ -2308,11 +2299,11 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
 
     if (navigationActive && currentLocation && window.innerWidth < 768) {
       const cameraPreset = getVectorCameraPreset(navigationMode, true);
-      const nextBearing = navigationBearing ?? map.getBearing();
+      const nextBearing = smoothNavigationBearing(lastNavCameraBearingRef.current, navigationBearing ?? map.getBearing());
       const cameraTarget = getNavigationCameraTarget(currentLocation, nextBearing, cameraPreset.lookAheadMeters);
       map.easeTo({
         center: [cameraTarget.lng, cameraTarget.lat],
-        zoom: Math.max(map.getZoom(), cameraPreset.zoom),
+        zoom: cameraPreset.zoom,
         pitch: cameraPreset.pitch,
         bearing: nextBearing,
         padding: { top: 112, bottom: 86, left: 18, right: 18 },
@@ -2361,11 +2352,11 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
         // cannot leave navigation stranded at the previous globe zoom.
         const isMobileNavigation = window.innerWidth < 768;
         const cameraPreset = getVectorCameraPreset(navigationMode, isMobileNavigation);
-        const nextBearing = navigationBearing ?? map.getBearing();
+        const nextBearing = smoothNavigationBearing(lastNavCameraBearingRef.current, navigationBearing ?? map.getBearing());
         const cameraTarget = getNavigationCameraTarget(currentLocation, nextBearing, cameraPreset.lookAheadMeters);
         map.easeTo({
           center: [cameraTarget.lng, cameraTarget.lat],
-          zoom: Math.max(map.getZoom(), cameraPreset.zoom),
+          zoom: cameraPreset.zoom,
           pitch: cameraPreset.pitch,
           bearing: nextBearing,
           padding: isMobileNavigation

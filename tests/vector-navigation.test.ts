@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { getNavigationCameraTarget, getVectorCameraPreset } from '../src/lib/vector-navigation';
+import { getNavigationCameraTarget, getVectorCameraPreset, shouldUpdateNavigationCamera, smoothNavigationBearing } from '../src/lib/vector-navigation';
 
 describe('vector navigation camera', () => {
   it('uses a closer camera for walking than driving', () => {
@@ -9,9 +9,20 @@ describe('vector navigation camera', () => {
 
   it('keeps driving navigation at street-level zoom on mobile', () => {
     const preset = getVectorCameraPreset('driving', true);
-    expect(preset.zoom).toBeGreaterThanOrEqual(17.5);
-    expect(preset.pitch).toBeGreaterThanOrEqual(60);
+    expect(preset.zoom).toBeGreaterThanOrEqual(16.5);
+    expect(preset.pitch).toBeGreaterThanOrEqual(50);
     expect(preset.lookAheadMeters).toBeLessThan(100);
+  });
+
+  it('ignores stationary GPS jitter and rate-limits camera updates', () => {
+    const previous = { lat: 40.4168, lng: -3.7038 };
+    expect(shouldUpdateNavigationCamera(previous, { lat: 40.41681, lng: -3.70381 }, 2_000)).toBe(false);
+    expect(shouldUpdateNavigationCamera(previous, { lat: 40.417, lng: -3.7038 }, 500)).toBe(false);
+    expect(shouldUpdateNavigationCamera(previous, { lat: 40.417, lng: -3.7038 }, 2_000)).toBe(true);
+  });
+
+  it('smooths bearing changes across north without spinning the long way', () => {
+    expect(smoothNavigationBearing(350, 10, 0.5)).toBeCloseTo(0);
   });
 
   it('looks ahead in the current direction instead of always shifting north', () => {

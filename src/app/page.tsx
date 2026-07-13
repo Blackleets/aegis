@@ -1169,7 +1169,8 @@ export default function Dashboard() {
         if (computedBearing !== null) setNavigationBearing(computedBearing);
 
         if (routeSnapshot.steps.length > 0) {
-          setCurrentRouteStepIndex(getClosestStepIndex(nextLocation, routeSnapshot.steps));
+          const closestStepIndex = getClosestStepIndex(nextLocation, routeSnapshot.steps);
+          setCurrentRouteStepIndex((currentIndex) => Math.max(currentIndex, Math.min(currentIndex + 1, closestStepIndex)));
         }
 
         lastNavigationLocationRef.current = nextLocation;

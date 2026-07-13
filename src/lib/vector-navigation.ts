@@ -5,6 +5,27 @@ export interface NavigationCoordinate {
   lng: number;
 }
 
+export function navigationDistanceMeters(a: NavigationCoordinate, b: NavigationCoordinate) {
+  const latScale = 111_320;
+  const meanLat = ((a.lat + b.lat) / 2) * Math.PI / 180;
+  const latMeters = (b.lat - a.lat) * latScale;
+  const lngMeters = (b.lng - a.lng) * latScale * Math.cos(meanLat);
+  return Math.hypot(latMeters, lngMeters);
+}
+
+export function shouldUpdateNavigationCamera(previous: NavigationCoordinate | null, current: NavigationCoordinate, elapsedMs: number) {
+  if (!previous) return true;
+  if (elapsedMs < 1_100) return false;
+  return navigationDistanceMeters(previous, current) >= 8;
+}
+
+export function smoothNavigationBearing(previous: number | null, next: number, factor = 0.32) {
+  if (!Number.isFinite(next)) return previous ?? 0;
+  if (previous === null || !Number.isFinite(previous)) return ((next % 360) + 360) % 360;
+  const delta = ((((next - previous) % 360) + 540) % 360) - 180;
+  return ((previous + delta * factor) % 360 + 360) % 360;
+}
+
 export function getVectorCameraPreset(mode: VectorNavigationMode, isMobile: boolean) {
   if (mode === 'walking') {
     return {
@@ -25,10 +46,10 @@ export function getVectorCameraPreset(mode: VectorNavigationMode, isMobile: bool
   }
 
   return {
-    zoom: isMobile ? 17.7 : 16.6,
-    pitch: isMobile ? 68 : 60,
-    lookAheadMeters: isMobile ? 68 : 125,
-    durationMs: isMobile ? 460 : 620,
+    zoom: isMobile ? 16.7 : 16.2,
+    pitch: isMobile ? 54 : 52,
+    lookAheadMeters: isMobile ? 95 : 135,
+    durationMs: isMobile ? 760 : 720,
   };
 }
 
