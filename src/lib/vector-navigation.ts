@@ -104,3 +104,85 @@ export function getNavigationCameraTarget(
     lng: ((lng2 * 180 / Math.PI + 540) % 360) - 180,
   };
 }
+
+
+export function stabilizeNavigationCoordinate(
+  previous: NavigationCoordinate | null,
+  next: NavigationCoordinate,
+  gpsAccuracyMeters: number | null,
+  speedKmh: number | null,
+): NavigationCoordinate {
+  if (!previous) return next;
+  const jumpMeters = navigationDistanceMeters(previous, next);
+  const accuracy = gpsAccuracyMeters ?? 35;
+
+  // Reject implausible one-sample jumps while stationary or moving slowly.
+  if ((speedKmh ?? 0) < 12 && jumpMeters > Math.max(90, accuracy * 2.5)) {
+    return previous;
+  }
+
+  const accuracyFactor = accuracy <= 12 ? 0.76 : accuracy <= 30 ? 0.56 : 0.34;
+  const speedFactor = speedKmh !== null && speedKmh >= 45 ? 0.82 : accuracyFactor;
+  const factor = Math.min(0.88, Math.max(0.28, speedFactor));
+
+  return {
+    lat: previous.lat + (next.lat - previous.lat) * factor,
+    lng: previous.lng + (next.lng - previous.lng) * factor,
+  };
+}
+
+export function snapNavigationToRoute(
+  coordinate: NavigationCoordinate,
+  route: NavigationCoordinate[],
+  gpsAccuracyMeters: number | null,
+): { coordinate: NavigationCoordinate; distanceMeters: number; snapped: boolean } {
+  if (route.length < 2) {
+    return { coordinate, distanceMeters: Number.POSITIVE_INFINITY, snapped: false };
+  }
+
+  const referenceLat = coordinate.lat * Math.PI / 180;
+  const metersPerDegreeLat = 111_320;
+  const metersPerDegreeLng = Math.max(1, metersPerDegreeLat * Math.cos(referenceLat));
+  let best: NavigationCoordinate | null = null;
+  let bestDistance = Number.POSITIVE_INFINITY;
+
+  for (let index = 1; index < route.length; index += 1) {
+    const start = route[index - 1];
+    const end = route[index];
+    const ax = (start.lng - coordinate.lng) * metersPerDegreeLng;
+    const ay = (start.lat - coordinate.lat) * metersPerDegreeLat;
+    const bx = (end.lng - coordinate.lng) * metersPerDegreeLng;
+    const by = (end.lat - coordinate.lat) * metersPerDegreeLat;
+    const dx = bx - ax;
+    const dy = by - ay;
+    const denominator = dx * dx + dy * dy;
+    const ratio = denominator > 0 ? Math.min(1, Math.max(0, -(ax * dx + ay * dy) / denominator)) : 0;
+    const x = ax + dx * ratio;
+    const y = ay + dy * ratio;
+    const distance = Math.hypot(x, y);
+
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = {
+        lat: coordinate.lat + y / metersPerDegreeLat,
+        lng: coordinate.lng + x / metersPerDegreeLng,
+      };
+    }
+  }
+
+  const snapThreshold = Math.min(65, Math.max(22, (gpsAccuracyMeters ?? 20) * 1.5));
+  return best && bestDistance <= snapThreshold
+    ? { coordinate: best, distanceMeters: bestDistance, snapped: true }
+    : { coordinate, distanceMeters: bestDistance, snapped: false };
+}
+
+export function getArrivalThresholdMeters(
+  mode: VectorNavigationMode,
+  gpsAccuracyMeters: number | null,
+  speedKmh: number | null,
+) {
+  const base = mode === 'walking' ? 18 : mode === 'cycling' ? 24 : 32;
+  const accuracyAllowance = Math.min(18, Math.max(0, (gpsAccuracyMeters ?? 10) * 0.45));
+  const movingAllowance = mode === 'driving' && (speedKmh ?? 0) > 35 ? 12 : 0;
+  return Math.round(base + accuracyAllowance + movingAllowance);
+}
