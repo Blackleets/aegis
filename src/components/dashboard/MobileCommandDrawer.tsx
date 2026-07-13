@@ -3,6 +3,7 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronRight, LocateFixed, Map, Menu, Navigation, Search, Satellite, X } from 'lucide-react';
 import { useState, type ComponentType, type ReactNode } from 'react';
+import { useRealtimePresence } from '@/hooks/useRealtimePresence';
 
 type MobilePanel = 'layers' | 'markets' | 'intel' | 'search' | 'recon';
 type MobileNavGlyphProps = { className?: string };
@@ -46,6 +47,7 @@ export default function MobileCommandDrawer({
   onToggleMapStyle,
 }: MobileCommandDrawerProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const { onlineCount, status: presenceStatus } = useRealtimePresence();
   const activeTab = mobileNavTabs.find((tab) => tab.id === mobilePanel) ?? null;
   const isSearchPanel = mobilePanel === 'search';
 
@@ -81,7 +83,15 @@ export default function MobileCommandDrawer({
                       <span className="h-2 w-2 rounded-full bg-emerald-300 shadow-[0_0_10px_rgba(110,231,183,0.8)]" />
                       AEGIS en vivo
                     </div>
-                    <div className="mt-1.5 text-[14px] font-semibold text-white">Centro de control</div>
+                    <div className="mt-1.5 flex items-end justify-between gap-3">
+                      <div className="text-[14px] font-semibold text-white">Centro de control</div>
+                      {presenceStatus === 'live' && onlineCount !== null && (
+                        <div className="rounded-full border border-emerald-300/18 bg-emerald-300/[0.07] px-2.5 py-1 text-[8px] font-mono text-emerald-100">
+                          <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-emerald-300 shadow-[0_0_8px_rgba(110,231,183,0.85)]" />
+                          {onlineCount} {onlineCount === 1 ? 'en línea' : 'en línea'}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 p-3">
