@@ -8,7 +8,7 @@ const SITE_TITLE = "AEGIS — Verified Global Intelligence Surface";
 const SITE_DESCRIPTION = "Original intelligence surface for live flights, satellites, CCTV, seismic, markets and cyber telemetry. Correlate public signals, generate operator-ready briefings, and run in local mode or with your own AI key.";
 
 export const viewport: Viewport = {
-  themeColor: "#D4AF37",
+  themeColor: "#06121F",
   width: "device-width",
   initialScale: 1,
   maximumScale: 5,
@@ -16,6 +16,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
+  applicationName: SITE_NAME,
   metadataBase: new URL(SITE_URL),
   title: {
     default: SITE_TITLE,
@@ -50,6 +51,14 @@ export const metadata: Metadata = {
     shortcut: "/favicon.svg",
   },
   manifest: "/site.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: SITE_NAME,
+    statusBarStyle: "black-translucent",
+  },
+  formatDetection: {
+    telephone: false,
+  },
   alternates: {
     canonical: SITE_URL,
   },
@@ -83,7 +92,7 @@ export const metadata: Metadata = {
     "apple-mobile-web-app-status-bar-style": "black-translucent",
     "apple-mobile-web-app-title": "AEGIS",
     "mobile-web-app-capable": "yes",
-    "msapplication-TileColor": "#06060C",
+    "msapplication-TileColor": "#06121F",
     "msapplication-config": "none",
   },
 };
@@ -127,7 +136,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" dir="ltr">
+    <html lang="es" dir="ltr">
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />

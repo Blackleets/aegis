@@ -1,14 +1,36 @@
 {
-  "name": "AEGIS — Verified Global Intelligence Surface",
+  "id": "/",
+  "name": "AEGIS — Live Earth & Navigation",
   "short_name": "AEGIS",
+  "description": "Live Earth intelligence and GPS navigation with verified seismic, weather, wildfire, traffic and aviation signals.",
+  "lang": "es",
+  "dir": "ltr",
+  "start_url": "/?nosplash=1",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": [
+    "window-controls-overlay",
+    "standalone",
+    "minimal-ui"
+  ],
+  "orientation": "any",
+  "background_color": "#03070D",
+  "theme_color": "#06121F",
+  "categories": [
+    "navigation",
+    "travel",
+    "weather",
+    "utilities"
+  ],
   "icons": [
     {
       "src": "/favicon.svg",
       "sizes": "any",
-      "type": "image/svg+xml"
+      "type": "image/svg+xml",
+      "purpose": "any"
     }
   ],
-  "theme_color": "#D4AF37",
-  "background_color": "#03070D",
-  "display": "standalone"
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  }
 }
