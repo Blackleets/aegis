@@ -30,6 +30,7 @@ import {
   Gauge,
 } from 'lucide-react';
 import { type RouteRiskSummary, type RouteSnapshot, type RouteStep, formatRouteDistance, formatRouteDuration, formatStepDistance, localizeRouteInstruction } from '@/lib/routing-shell';
+import { requestNavigationNotificationPermission } from '@/lib/navigation-notifications';
 
 type NearbyEarthquakeAlert = {
   id: string;
@@ -192,6 +193,11 @@ export default function RouteCockpitMobile({
   const progressPercent = routeSnapshot
     ? Math.round(Math.max(0, Math.min(1, (routeSnapshot.distanceMeters - remainingRouteDistance) / routeSnapshot.distanceMeters)) * 100)
     : 0;
+
+  const handleNavigationFollow = () => {
+    if (!navigationActive) void requestNavigationNotificationPermission();
+    onToggleNavigationFollow();
+  };
 
   return (
     <>
@@ -385,7 +391,7 @@ export default function RouteCockpitMobile({
                 </button>
                 <button
                   type="button"
-                  onClick={onToggleNavigationFollow}
+                  onClick={handleNavigationFollow}
                   className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-cyan-300 text-slate-950 shadow-[0_8px_24px_rgba(34,211,238,0.22)] transition-transform active:scale-95"
                   aria-label="Pausar navegación"
                 >
@@ -443,7 +449,7 @@ export default function RouteCockpitMobile({
               <div className="flex items-center gap-2 p-3 pt-4">
                 <button
                   type="button"
-                  onClick={onToggleNavigationFollow}
+                  onClick={handleNavigationFollow}
                   disabled={routeLoading}
                   className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-full bg-cyan-300 px-5 text-[12px] font-bold uppercase tracking-[0.12em] text-slate-950 shadow-[0_8px_26px_rgba(34,211,238,0.2)] disabled:cursor-wait disabled:opacity-60"
                 >
