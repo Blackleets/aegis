@@ -366,6 +366,16 @@ interface NearbyEarthquakeAlert {
   source: 'USGS';
 }
 
+interface NearbyContextAlert {
+  id: string;
+  kind: 'traffic-camera' | 'wildfire' | 'volcano' | 'severe-weather';
+  title: string;
+  detail: string;
+  distanceMeters: number;
+  source: string;
+  severity: 'info' | 'warning' | 'critical';
+}
+
 interface UsageMetrics {
   onlineUsers: number;
   totalUsers: number;
@@ -494,6 +504,7 @@ export default function Dashboard() {
   const [navigationArrived, setNavigationArrived] = useState(false);
   const [navigationVoiceEnabled, setNavigationVoiceEnabled] = useState(true);
   const [nearbyEarthquakeAlert, setNearbyEarthquakeAlert] = useState<NearbyEarthquakeAlert | null>(null);
+  const [nearbyContextAlert, setNearbyContextAlert] = useState<NearbyContextAlert | null>(null);
   const [usageMetrics, setUsageMetrics] = useState<UsageMetrics | null>(null);
   const mouseCoordsRef = useRef<Coordinate | null>(null);
   const coordsDisplayRef = useRef<HTMLDivElement>(null);
@@ -534,6 +545,8 @@ export default function Dashboard() {
   const lastNearSpokenStepRef = useRef<number | null>(null);
   const lastSpokenEarthquakeRef = useRef<string | null>(null);
   const alertedEarthquakeIdsRef = useRef<Set<string>>(new Set());
+  const alertedContextIdsRef = useRef<Set<string>>(new Set());
+  const lastSpokenContextRef = useRef<string | null>(null);
   const arrivalSpokenRef = useRef(false);
   const preNavigationMapStateRef = useRef<{ projection: 'globe' | 'mercator'; style: 'dark' | 'satellite' } | null>(null);
   const lastGeocodedPos = useRef<{ lat: number; lng: number } | null>(null);
@@ -878,6 +891,24 @@ export default function Dashboard() {
       setBackendStatus('error');
     }
   }, []);
+
+  useEffect(() => {
+    if (!navigationActive) return;
+    const refreshNavigationHazards = () => {
+      void fetchEndpoint('/api/fires', (payload) => {
+        const value = payload as { fires?: DashboardEntity[] };
+        return { fires: value.fires || [] };
+      }, { cache: 'no-store' });
+      void fetchEndpoint('/api/weather', (payload) => {
+        const value = payload as { events?: DashboardEntity[] };
+        return { weather_events: value.events || [] };
+      }, { cache: 'no-store' });
+    };
+
+    refreshNavigationHazards();
+    const interval = window.setInterval(refreshNavigationHazards, 300000);
+    return () => window.clearInterval(interval);
+  }, [fetchEndpoint, navigationActive]);
 
   // ── PROGRESSIVE DATA LOADING (request-optimized) ──
   useEffect(() => {
@@ -1402,6 +1433,98 @@ export default function Dashboard() {
     });
   }, [data.earthquakes, navigationActive, userLocation]);
 
+  useEffect(() => {
+    if (!navigationActive || !userLocation) {
+      setNearbyContextAlert(null);
+      return;
+    }
+
+    const candidates: Array<NearbyContextAlert & { priority: number }> = [];
+    const near = (entity: DashboardEntity, latDelta: number, lngDelta: number) =>
+      typeof entity.lat === 'number' && typeof entity.lng === 'number'
+      && Math.abs(entity.lat - userLocation.lat) <= latDelta
+      && Math.abs(entity.lng - userLocation.lng) <= lngDelta;
+
+    for (const camera of data.cameras || []) {
+      if (!near(camera, 0.006, 0.009)) continue;
+      const distanceMeters = Math.round(distanceMetersBetween(userLocation, camera as Coordinate));
+      if (distanceMeters > 500) continue;
+      const id = `camera-${String(camera.id || `${camera.lat}-${camera.lng}`)}`;
+      candidates.push({
+        id,
+        kind: 'traffic-camera',
+        title: 'Cámara de tráfico próxima',
+        detail: String(camera.name || camera.city || 'Punto de observación vial'),
+        distanceMeters,
+        source: String(camera.source || 'organismo vial'),
+        severity: 'info',
+        priority: 1,
+      });
+    }
+
+    for (const event of data.fires || []) {
+      if (!near(event, 0.55, 0.75)) continue;
+      const distanceMeters = Math.round(distanceMetersBetween(userLocation, event as Coordinate));
+      const isVolcano = event.type === 'volcano';
+      const limit = isVolcano ? 50000 : 20000;
+      if (distanceMeters > limit) continue;
+      const id = `${isVolcano ? 'volcano' : 'fire'}-${String(event.date || '')}-${event.lat}-${event.lng}`;
+      candidates.push({
+        id,
+        kind: isVolcano ? 'volcano' : 'wildfire',
+        title: isVolcano ? 'Actividad volcánica registrada' : 'Foco térmico registrado',
+        detail: String(event.title || (isVolcano ? 'Evento activo NASA EONET' : `Confianza ${String(event.confidence || 'sin clasificar')}`)),
+        distanceMeters,
+        source: isVolcano ? 'NASA EONET' : 'NASA FIRMS',
+        severity: 'critical',
+        priority: 4,
+      });
+    }
+
+    for (const event of data.weather_events || []) {
+      if (!near(event, 0.75, 1)) continue;
+      const severity = String(event.severity || 'low');
+      if (severity !== 'high' && severity !== 'medium') continue;
+      const distanceMeters = Math.round(distanceMetersBetween(userLocation, event as Coordinate));
+      const limit = severity === 'high' ? 60000 : 25000;
+      if (distanceMeters > limit) continue;
+      candidates.push({
+        id: `weather-${String(event.id || `${event.lat}-${event.lng}-${event.title || ''}`)}`,
+        kind: 'severe-weather',
+        title: String(event.type || 'Alerta meteorológica'),
+        detail: String(event.title || event.area || 'Evento meteorológico activo'),
+        distanceMeters,
+        source: String(event.provider || 'NASA/NOAA'),
+        severity: severity === 'high' ? 'critical' : 'warning',
+        priority: severity === 'high' ? 3 : 2,
+      });
+    }
+
+    const selected = candidates
+      .sort((a, b) => b.priority - a.priority || a.distanceMeters - b.distanceMeters)[0];
+
+    if (!selected) {
+      setNearbyContextAlert(null);
+      return;
+    }
+
+    const { priority: _priority, ...alert } = selected;
+    void _priority;
+    setNearbyContextAlert((current) => {
+      if (current?.id === alert.id) return alert;
+      if (alertedContextIdsRef.current.has(alert.id)) return current;
+      alertedContextIdsRef.current.add(alert.id);
+      if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+        const distance = alert.distanceMeters < 1000 ? `${alert.distanceMeters} m` : `${(alert.distanceMeters / 1000).toFixed(1)} km`;
+        new Notification(`AEGIS · ${alert.title}`, {
+          body: `${distance} · Fuente: ${alert.source}`,
+          tag: `aegis-context-${alert.id}`,
+        });
+      }
+      return alert;
+    });
+  }, [data.cameras, data.fires, data.weather_events, navigationActive, userLocation]);
+
   const speakNavigationMessage = useCallback((message: string) => {
     if (!navigationVoiceEnabled || typeof window === 'undefined' || !('speechSynthesis' in window)) return;
     const utterance = new SpeechSynthesisUtterance(message);
@@ -1420,6 +1543,15 @@ export default function Dashboard() {
       : `${(nearbyEarthquakeAlert.distanceMeters / 1000).toFixed(1)} kilómetros`;
     speakNavigationMessage(`Aviso AEGIS. Terremoto de magnitud ${nearbyEarthquakeAlert.magnitude}, registrado a ${distance}. Fuente U S G S.`);
   }, [nearbyEarthquakeAlert, speakNavigationMessage]);
+
+  useEffect(() => {
+    if (!nearbyContextAlert || lastSpokenContextRef.current === nearbyContextAlert.id) return;
+    lastSpokenContextRef.current = nearbyContextAlert.id;
+    const distance = nearbyContextAlert.distanceMeters < 1000
+      ? `${nearbyContextAlert.distanceMeters} metros`
+      : `${(nearbyContextAlert.distanceMeters / 1000).toFixed(1)} kilómetros`;
+    speakNavigationMessage(`Aviso AEGIS. ${nearbyContextAlert.title}, a ${distance}. Fuente ${nearbyContextAlert.source}.`);
+  }, [nearbyContextAlert, speakNavigationMessage]);
 
   useEffect(() => {
     if (!navigationActive || !currentRouteStep || lastSpokenStepRef.current === currentRouteStep.index) return;
@@ -1921,6 +2053,8 @@ export default function Dashboard() {
               onSelectRouteOption={selectRouteOption}
               nearbyEarthquakeAlert={nearbyEarthquakeAlert}
               onDismissNearbyEarthquake={() => setNearbyEarthquakeAlert(null)}
+              nearbyContextAlert={nearbyContextAlert}
+              onDismissNearbyContext={() => setNearbyContextAlert(null)}
             />
           )}
 
