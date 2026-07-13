@@ -31,15 +31,19 @@ export function shouldRerouteNavigation({
   gpsAccuracyMeters,
   deviationDurationMs,
   cooldownElapsedMs,
+  consecutiveOffRouteFixes,
 }: {
   offRouteDistanceMeters: number;
   gpsAccuracyMeters: number | null;
   deviationDurationMs: number;
   cooldownElapsedMs: number;
+  consecutiveOffRouteFixes: number;
 }) {
-  return gpsAccuracyMeters !== null
-    && gpsAccuracyMeters <= 45
-    && offRouteDistanceMeters > 85
+  if (gpsAccuracyMeters === null || gpsAccuracyMeters > 45) return false;
+
+  const accuracyAwareDistance = Math.max(85, gpsAccuracyMeters * 2.25);
+  return offRouteDistanceMeters > accuracyAwareDistance
+    && consecutiveOffRouteFixes >= 3
     && deviationDurationMs > 7_000
     && cooldownElapsedMs > 30_000;
 }

@@ -26,9 +26,10 @@ describe('vector navigation camera', () => {
   });
 
   it('reroutes only after a sustained deviation with reliable GPS', () => {
-    expect(shouldRerouteNavigation({ offRouteDistanceMeters: 120, gpsAccuracyMeters: 12, deviationDurationMs: 8_000, cooldownElapsedMs: 31_000 })).toBe(true);
-    expect(shouldRerouteNavigation({ offRouteDistanceMeters: 120, gpsAccuracyMeters: 80, deviationDurationMs: 8_000, cooldownElapsedMs: 31_000 })).toBe(false);
-    expect(shouldRerouteNavigation({ offRouteDistanceMeters: 120, gpsAccuracyMeters: 12, deviationDurationMs: 2_000, cooldownElapsedMs: 31_000 })).toBe(false);
+    expect(shouldRerouteNavigation({ offRouteDistanceMeters: 120, gpsAccuracyMeters: 12, deviationDurationMs: 8_000, cooldownElapsedMs: 31_000, consecutiveOffRouteFixes: 3 })).toBe(true);
+    expect(shouldRerouteNavigation({ offRouteDistanceMeters: 120, gpsAccuracyMeters: 80, deviationDurationMs: 8_000, cooldownElapsedMs: 31_000, consecutiveOffRouteFixes: 3 })).toBe(false);
+    expect(shouldRerouteNavigation({ offRouteDistanceMeters: 120, gpsAccuracyMeters: 12, deviationDurationMs: 2_000, cooldownElapsedMs: 31_000, consecutiveOffRouteFixes: 3 })).toBe(false);
+    expect(shouldRerouteNavigation({ offRouteDistanceMeters: 120, gpsAccuracyMeters: 12, deviationDurationMs: 8_000, cooldownElapsedMs: 31_000, consecutiveOffRouteFixes: 1 })).toBe(false);
   });
 
   it('snaps reliable GPS positions to a nearby route without hiding real deviations', () => {

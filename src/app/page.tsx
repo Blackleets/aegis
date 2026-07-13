@@ -533,6 +533,7 @@ export default function Dashboard() {
   const lastNavigationBearingRef = useRef<number | null>(null);
   const lastAcceptedGpsAtRef = useRef(0);
   const offRouteSinceRef = useRef<number | null>(null);
+  const offRouteFixCountRef = useRef(0);
   const lastRerouteAtRef = useRef(0);
   const simulationIndexRef = useRef(0);
   const lastSpokenStepRef = useRef<number | null>(null);
@@ -1337,6 +1338,7 @@ export default function Dashboard() {
         const offRouteDistance = distanceToRoutePath(stabilizedLocation, routeSnapshot.coordinates);
         const gpsReliable = accuracy !== null && accuracy <= 45;
         if (gpsReliable && offRouteDistance > 85) {
+          offRouteFixCountRef.current += 1;
           offRouteSinceRef.current ??= Date.now();
           const deviationDuration = Date.now() - offRouteSinceRef.current;
           const rerouteCooldownElapsed = Date.now() - lastRerouteAtRef.current > 30_000;
@@ -1345,9 +1347,11 @@ export default function Dashboard() {
             gpsAccuracyMeters: accuracy,
             deviationDurationMs: deviationDuration,
             cooldownElapsedMs: Date.now() - lastRerouteAtRef.current,
+            consecutiveOffRouteFixes: offRouteFixCountRef.current,
           }) && rerouteCooldownElapsed && !navigationRerouting) {
             lastRerouteAtRef.current = Date.now();
             offRouteSinceRef.current = null;
+            offRouteFixCountRef.current = 0;
             setNavigationRerouting(true);
             void handleRouteRequest({
               origin: { ...stabilizedLocation, ts: Date.now(), label: 'GPS actual' },
@@ -1359,6 +1363,7 @@ export default function Dashboard() {
           }
         } else {
           offRouteSinceRef.current = null;
+          offRouteFixCountRef.current = 0;
         }
 
         const arrivalThreshold = getArrivalThresholdMeters(routeSnapshot.mode, accuracy, speedKmh);
@@ -1423,6 +1428,7 @@ export default function Dashboard() {
     setNavigationArrived(false);
     simulationIndexRef.current = 0;
     offRouteSinceRef.current = null;
+    offRouteFixCountRef.current = 0;
     lastNavigationLocationRef.current = null;
     lastNavigationBearingRef.current = null;
     lastAcceptedGpsAtRef.current = 0;
