@@ -1,6 +1,7 @@
 
 import { NextResponse } from 'next/server';
 import { stealthFetch } from '@/lib/stealthFetch';
+import { deriveAviationAlert, getPositionFreshness, type AviationAlert } from '@/lib/aviation-intelligence';
 
 /**
  * AEGIS — Flight Data API
@@ -69,6 +70,13 @@ interface RawFlight {
   r?: string;
   squawk?: string;
   nac_p?: number;
+  seen?: number;
+  seen_pos?: number;
+  messages?: number;
+  rssi?: number;
+  emergency?: string;
+  baro_rate?: number;
+  geom_rate?: number;
 }
 
 interface ClassifiedFlight {
@@ -87,6 +95,12 @@ interface ClassifiedFlight {
   category: 'commercial' | 'private' | 'jet' | 'military';
   grounded: boolean;
   nac_p?: number;
+  position_age_seconds: number | null;
+  freshness: 'live' | 'delayed' | 'stale' | 'unknown';
+  source: 'adsb.lol';
+  received_at: string;
+  vertical_rate_fpm: number | null;
+  alert: AviationAlert | null;
   type: 'flight';
 }
 
@@ -132,6 +146,17 @@ function classifyFlight(f: RawFlight): ClassifiedFlight | null {
   const heading = f.track || 0;
   const isHeli = HELI_TYPES.has(modelUpper);
   const isGrounded = typeof altRaw === 'number' && altRaw < 100;
+  const positionAgeSeconds = typeof f.seen_pos === 'number' ? Math.max(0, f.seen_pos) : null;
+  const verticalRateFpm = typeof f.baro_rate === 'number' ? f.baro_rate : typeof f.geom_rate === 'number' ? f.geom_rate : null;
+  const freshness = getPositionFreshness(positionAgeSeconds);
+  const alert = deriveAviationAlert({
+    squawk: f.squawk,
+    emergency: f.emergency,
+    verticalRateFpm,
+    altitudeFeet: typeof altRaw === 'number' ? altRaw : null,
+    grounded: isGrounded,
+    positionAgeSeconds,
+  });
 
   // Extract airline code
   const airlineMatch = AIRLINE_CODE_RE.exec(callsign);
@@ -163,6 +188,12 @@ function classifyFlight(f: RawFlight): ClassifiedFlight | null {
     category,
     grounded: isGrounded,
     nac_p: f.nac_p,
+    position_age_seconds: positionAgeSeconds,
+    freshness,
+    source: 'adsb.lol',
+    received_at: new Date().toISOString(),
+    vertical_rate_fpm: verticalRateFpm,
+    alert,
     type: 'flight',
   };
 }
@@ -231,12 +262,25 @@ export async function GET() {
     const jets: ClassifiedFlight[] = [];
     const military: ClassifiedFlight[] = [];
     const gpsJamming: JammingPoint[] = [];
+    const aviationAlerts: Array<AviationAlert & { callsign: string; icao24: string; lat: number; lng: number; observedAt: string; source: 'adsb.lol' }> = [];
 
     for (const raw of allRaw) {
       const flight = classifyFlight(raw);
-      if (!flight) continue;
+      if (!flight || flight.freshness === 'stale') continue;
 
-      // GPS jamming detection
+      if (flight.alert) {
+        aviationAlerts.push({
+          ...flight.alert,
+          callsign: flight.callsign,
+          icao24: flight.icao24,
+          lat: flight.lat,
+          lng: flight.lng,
+          observedAt: flight.received_at,
+          source: 'adsb.lol',
+        });
+      }
+
+      // Degraded ADS-B navigation integrity — this is evidence, not proof of jamming
       if (typeof flight.nac_p === 'number' && flight.nac_p <= JAMMING_NACAP_THRESHOLD && !flight.grounded) {
         gpsJamming.push({
           lat: flight.lat,
@@ -263,7 +307,16 @@ export async function GET() {
       private_jets: jets,
       military_flights: military,
       gps_jamming: jammingZones,
-      total: allRaw.length,
+      aviation_alerts: aviationAlerts,
+      total: commercial.length + privateFl.length + jets.length + military.length,
+      raw_tracks: allRaw.length,
+      source: 'adsb.lol',
+      source_url: 'https://adsb.lol',
+      coverage: {
+        requested_regions: REGIONS.length,
+        successful_regions: regionResults.filter((result) => result.status === 'fulfilled' && result.value.length > 0).length,
+      },
+      freshness_policy: { live_seconds: 15, delayed_seconds: 45, stale_tracks_excluded: true },
       timestamp: new Date().toISOString(),
     };
   })();
@@ -314,6 +367,11 @@ function aggregateJamming(points: JammingPoint[], threshold: number) {
       lng: z.lng,
       severity: Math.round((1 - (z.total_nac_p / z.count) / threshold) * 100),
       count: z.count,
+      status: 'suspected',
+      confidence: 'low',
+      label: 'Precisión de navegación ADS-B degradada',
+      evidence: `${z.count} aeronaves con NACp bajo; no confirma interferencia`,
+      source: 'adsb.lol',
     }));
 }
 
