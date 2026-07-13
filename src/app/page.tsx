@@ -384,6 +384,18 @@ interface RouteRecommendation {
   durationSeconds: number;
 }
 
+interface TrafficInsight {
+  status: 'loading' | 'live' | 'unavailable';
+  configured?: boolean;
+  source: string;
+  delaySeconds?: number;
+  trafficLengthMeters?: number;
+  travelTimeSeconds?: number;
+  freeFlowTimeSeconds?: number | null;
+  level?: 'clear' | 'light' | 'moderate' | 'heavy';
+  checkedAt?: string;
+}
+
 interface UsageMetrics {
   onlineUsers: number;
   totalUsers: number;
@@ -502,6 +514,7 @@ export default function Dashboard() {
   const [userLocation, setUserLocation] = useState<Coordinate | null>(null);
   const [routeLoading, setRouteLoading] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
+  const [trafficInsight, setTrafficInsight] = useState<TrafficInsight | null>(null);
   const [navigationActive, setNavigationActive] = useState(false);
   const [navigationBearing, setNavigationBearing] = useState<number | null>(null);
   const [currentRouteStepIndex, setCurrentRouteStepIndex] = useState(0);
@@ -789,6 +802,7 @@ export default function Dashboard() {
     const previousMapState = { projection: mapProjection, style: mapStyle };
     setRouteError(null);
     setRouteLoading(true);
+    setTrafficInsight(mode === 'driving' ? { status: 'loading', source: 'TomTom Traffic' } : null);
     try {
       const params = new URLSearchParams({
         fromLat: String(origin.lat),
@@ -800,6 +814,21 @@ export default function Dashboard() {
       waypoints.forEach((waypoint) => {
         params.append('via', `${waypoint.lat},${waypoint.lng}`);
       });
+
+      if (mode === 'driving') {
+        const trafficParams = new URLSearchParams({
+          fromLat: String(origin.lat),
+          fromLng: String(origin.lng),
+          toLat: String(destination.lat),
+          toLng: String(destination.lng),
+        });
+        void fetch(`/api/traffic/route?${trafficParams.toString()}`, { cache: 'no-store' })
+          .then(async (trafficResponse) => {
+            const payload = await trafficResponse.json() as TrafficInsight;
+            setTrafficInsight(payload.status === 'live' ? payload : { ...payload, status: 'unavailable' });
+          })
+          .catch(() => setTrafficInsight({ status: 'unavailable', source: 'TomTom Traffic' }));
+      }
 
       const response = await fetch(`/api/route?${params.toString()}`, { cache: 'no-store' });
       if (!response.ok) {
@@ -1324,6 +1353,7 @@ export default function Dashboard() {
     setRouteSnapshot(null);
     setUserLocation(null);
     setRouteError(null);
+    setTrafficInsight(null);
     setNavigationActive(false);
     setNavigationBearing(null);
     setCurrentRouteStepIndex(0);
@@ -2105,6 +2135,7 @@ export default function Dashboard() {
               onDismissNearbyContext={() => setNearbyContextAlert(null)}
               recommendedRouteId={routeRecommendation?.routeId ?? null}
               routeRecommendationLabel={routeRecommendation?.reason ?? null}
+              trafficInsight={trafficInsight}
             />
           )}
 
