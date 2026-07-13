@@ -287,6 +287,41 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
     map.addImage(id, { width: size, height: size, data: new Uint8Array(ctx.getImageData(0, 0, size, size).data) });
   }, []);
 
+  const createNavigationArrow = useCallback((map: maplibregl.Map) => {
+    if (map.hasImage('vector-position-arrow')) return;
+    const size = 96;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d')!;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(48, 9);
+    ctx.lineTo(78, 78);
+    ctx.lineTo(49, 65);
+    ctx.lineTo(27, 84);
+    ctx.lineTo(18, 75);
+    ctx.lineTo(31, 51);
+    ctx.closePath();
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.55)';
+    ctx.shadowBlur = 10;
+    ctx.strokeStyle = '#06131f';
+    ctx.lineWidth = 14;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = '#F0FDFA';
+    ctx.lineWidth = 8;
+    ctx.stroke();
+    ctx.fillStyle = '#34D399';
+    ctx.fill();
+    map.addImage('vector-position-arrow', {
+      width: size,
+      height: size,
+      data: new Uint8Array(ctx.getImageData(0, 0, size, size).data),
+    }, { pixelRatio: 2 });
+  }, []);
+
   const createDot = useCallback((map: maplibregl.Map, id: string, color: string, size: number) => {
     if (map.hasImage(id)) return;
     const canvas = document.createElement('canvas');
@@ -390,6 +425,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       createIcon(map, 'plane-pink', '#FF69B4', 24);
       createIcon(map, 'plane-red', '#FF3D3D', 24);
       createIcon(map, 'plane-grey', '#555555', 24);
+      createNavigationArrow(map);
       createDot(map, 'dot-gold', '#D4AF37', 8);
       createDot(map, 'dot-red', '#FF3D3D', 10);
       createDot(map, 'dot-orange', '#FF9500', 10);
@@ -412,21 +448,24 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
           layout: { visibility: 'none' },
           paint: {
             'fill-extrusion-color': [
-              'interpolate', ['linear'], ['zoom'],
-              14, '#172733',
-              16, '#285067',
-              18, '#3b7893',
+              'interpolate', ['linear'],
+              ['coalesce', ['to-number', ['get', 'render_height']], ['to-number', ['get', 'height']], ['*', ['to-number', ['get', 'levels']], 3], 8],
+              0, '#14232e',
+              12, '#23465a',
+              35, '#32677d',
+              80, '#43839a',
+              160, '#5b9bad',
             ],
             'fill-extrusion-height': [
               'interpolate', ['linear'], ['zoom'],
               14, 0,
-              15.2, [
-                'coalesce',
-                ['to-number', ['get', 'render_height']],
-                ['to-number', ['get', 'height']],
-                ['*', ['to-number', ['get', 'levels']], 3],
-                10,
-              ],
+              15.2, ['*', 0.82, [
+                  'coalesce',
+                  ['to-number', ['get', 'render_height']],
+                  ['to-number', ['get', 'height']],
+                  ['*', ['to-number', ['get', 'levels']], 3],
+                  10,
+                ]],
             ],
             'fill-extrusion-base': [
               'coalesce',
@@ -535,7 +574,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
         'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 2, 1.5, 8, 2.5],
         'circle-stroke-color': ['match', ['get', 'role'], 'origin', '#86EFAC', '#FDBA74'],
         'circle-stroke-opacity': 0.92,
-      }});
+      }, filter: ['==', ['get', 'role'], 'destination'] });
       map.addLayer({ id: 'route-markers-dots', type: 'circle', source: 'route-markers', paint: {
         'circle-radius': ['interpolate', ['linear'], ['zoom'], 2, 4.5, 6, 6.5, 10, 9.5, 15, 12],
         'circle-color': ['match', ['get', 'role'], 'origin', '#34D399', '#F97316'],
@@ -543,7 +582,22 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
         'circle-stroke-width': 2.4,
         'circle-stroke-color': '#F8FAFC',
         'circle-stroke-opacity': 0.84,
-      }});
+      }, filter: ['==', ['get', 'role'], 'destination'] });
+      map.addLayer({
+        id: 'route-position-arrow',
+        type: 'symbol',
+        source: 'route-markers',
+        filter: ['==', ['get', 'role'], 'origin'],
+        layout: {
+          'icon-image': 'vector-position-arrow',
+          'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.72, 16, 0.92, 18, 1.08],
+          'icon-rotate': ['coalesce', ['to-number', ['get', 'bearing']], 0],
+          'icon-rotation-alignment': 'map',
+          'icon-pitch-alignment': 'map',
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true,
+        },
+      });
       map.addLayer({ id: 'route-markers-label', type: 'symbol', source: 'route-markers', minzoom: 3.4, layout: {
         'text-field': ['get', 'label'],
         'text-size': ['interpolate', ['linear'], ['zoom'], 3.4, 9, 8, 11, 14, 13],
@@ -1393,7 +1447,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       mapRef.current = null;
       setMapReady(false);
     };
-  }, [applyAegisGlobeStyling, createDot, createIcon, onEntityClick, onMouseCoords, onRightClick, onViewStateChange]);
+  }, [applyAegisGlobeStyling, createDot, createIcon, createNavigationArrow, onEntityClick, onMouseCoords, onRightClick, onViewStateChange]);
 
   // Day/Night
   useEffect(() => {
@@ -2172,7 +2226,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
         markerFeatures.push({
           type: 'Feature',
           geometry: { type: 'Point', coordinates: [currentLocation.lng, currentLocation.lat] },
-          properties: { role: 'origin', label: window.innerWidth < 768 ? '' : 'FROM GPS' },
+          properties: { role: 'origin', label: window.innerWidth < 768 ? '' : 'FROM GPS', bearing: navigationBearing ?? 0 },
         });
       }
       if (routeDestination) {
@@ -2184,7 +2238,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       }
       markerSource.setData({ type: 'FeatureCollection', features: markerFeatures });
     }
-  }, [currentLocation, mapReady, navigationActive, routeDestination, routePath]);
+  }, [currentLocation, mapReady, navigationActive, navigationBearing, routeDestination, routePath]);
 
   useEffect(() => {
     if (!mapReady || !mapRef.current || !currentLocation || !navigationActive) return;
