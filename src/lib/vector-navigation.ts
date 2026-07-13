@@ -25,10 +25,10 @@ export function getVectorCameraPreset(mode: VectorNavigationMode, isMobile: bool
   }
 
   return {
-    zoom: isMobile ? 17.3 : 16.2,
-    pitch: isMobile ? 70 : 62,
-    lookAheadMeters: isMobile ? 82 : 145,
-    durationMs: isMobile ? 540 : 700,
+    zoom: isMobile ? 17.7 : 16.6,
+    pitch: isMobile ? 68 : 60,
+    lookAheadMeters: isMobile ? 68 : 125,
+    durationMs: isMobile ? 460 : 620,
   };
 }
 

@@ -1351,7 +1351,7 @@ export default function Dashboard() {
           data={dataWithSdk}
           activeLayers={activeLayers}
           projection={mapProjection}
-          mapStyle={mapStyle === 'satellite' ? 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' : 'dark'}
+          mapStyle={mapStyle}
           onEntityClick={handleEntityClick}
           onMouseCoords={handleMouseCoords}
           onRightClick={handleRightClick}
