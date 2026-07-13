@@ -438,33 +438,48 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       sources.forEach(s => map.addSource(s, { type: 'geojson', data: EMPTY_FC }));
 
       const firstLabelLayer = map.getStyle().layers?.find((layer) => layer.type === 'symbol')?.id;
+      if (map.getSource('carto') && !map.getLayer('vector-building-footprints')) {
+        map.addLayer({
+          id: 'vector-building-footprints',
+          type: 'line',
+          source: 'carto',
+          'source-layer': 'building',
+          minzoom: 13.8,
+          layout: { visibility: 'none' },
+          paint: {
+            'line-color': 'rgba(103, 200, 224, 0.24)',
+            'line-width': ['interpolate', ['linear'], ['zoom'], 13.8, 0.25, 16, 0.8, 19, 1.15],
+            'line-opacity': ['interpolate', ['linear'], ['zoom'], 13.8, 0.18, 16, 0.48, 19, 0.62],
+          },
+        }, firstLabelLayer);
+      }
       if (map.getSource('carto') && !map.getLayer('vector-3d-buildings')) {
         map.addLayer({
           id: 'vector-3d-buildings',
           type: 'fill-extrusion',
           source: 'carto',
           'source-layer': 'building',
-          minzoom: 14,
+          minzoom: 13.8,
           layout: { visibility: 'none' },
           paint: {
             'fill-extrusion-color': [
               'interpolate', ['linear'],
               ['coalesce', ['to-number', ['get', 'render_height']], ['to-number', ['get', 'height']], ['*', ['to-number', ['get', 'levels']], 3], 8],
-              0, '#14232e',
-              12, '#23465a',
-              35, '#32677d',
-              80, '#43839a',
-              160, '#5b9bad',
+              0, '#172832',
+              12, '#25414d',
+              35, '#315666',
+              80, '#3d6d7e',
+              160, '#56899a',
             ],
             'fill-extrusion-height': [
               'interpolate', ['linear'], ['zoom'],
               14, 0,
-              15.2, ['*', 0.82, [
+              15.2, ['*', 0.74, [
                   'coalesce',
                   ['to-number', ['get', 'render_height']],
                   ['to-number', ['get', 'height']],
                   ['*', ['to-number', ['get', 'levels']], 3],
-                  10,
+                  7,
                 ]],
             ],
             'fill-extrusion-base': [
@@ -473,7 +488,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
               ['to-number', ['get', 'min_height']],
               0,
             ],
-            'fill-extrusion-opacity': 0.9,
+            'fill-extrusion-opacity': 0.94,
             'fill-extrusion-vertical-gradient': true,
           },
         }, firstLabelLayer);
@@ -2274,6 +2289,9 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
     const buildingsVisible = navigationActive && projection === 'mercator';
     if (map.getLayer('vector-3d-buildings')) {
       map.setLayoutProperty('vector-3d-buildings', 'visibility', buildingsVisible ? 'visible' : 'none');
+    }
+    if (map.getLayer('vector-building-footprints')) {
+      map.setLayoutProperty('vector-building-footprints', 'visibility', buildingsVisible ? 'visible' : 'none');
     }
 
     // The navigation camera owns pitch. A second pitch-only easeTo here would

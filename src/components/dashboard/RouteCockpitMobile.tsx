@@ -26,6 +26,7 @@ import {
   Volume2,
   VolumeX,
   X,
+  Sparkles,
 } from 'lucide-react';
 import { type RouteRiskSummary, type RouteSnapshot, type RouteStep, formatRouteDistance, formatRouteDuration, formatStepDistance, localizeRouteInstruction } from '@/lib/routing-shell';
 
@@ -77,6 +78,8 @@ type RouteCockpitMobileProps = {
   onDismissNearbyEarthquake: () => void;
   nearbyContextAlert: NearbyContextAlert | null;
   onDismissNearbyContext: () => void;
+  recommendedRouteId: string | null;
+  routeRecommendationLabel: string | null;
 };
 
 function getModeMeta(mode: RouteSnapshot['mode']) {
@@ -131,6 +134,8 @@ export default function RouteCockpitMobile({
   onDismissNearbyEarthquake,
   nearbyContextAlert,
   onDismissNearbyContext,
+  recommendedRouteId,
+  routeRecommendationLabel,
 }: RouteCockpitMobileProps) {
   const destinationLabel = routeSnapshot?.destination.label ?? 'Preparando ruta';
   const distanceLabel = routeSnapshot ? formatRouteDistance(remainingRouteDistance || routeSnapshot.distanceMeters) : '--';
@@ -152,6 +157,7 @@ export default function RouteCockpitMobile({
   const activeRouteIndex = routeSnapshot ? Math.max(0, routeOptions.findIndex((option) => option.id === routeSnapshot.activeRouteId)) : 0;
   const activeRouteOption = routeOptions[activeRouteIndex] ?? null;
   const routeChoiceLabel = activeRouteOption?.label || `Ruta ${activeRouteIndex + 1}`;
+  const activeRouteRecommended = activeRouteOption?.id === recommendedRouteId;
   const riskLabel = routeRiskSummary?.level === 'high' ? 'riesgo alto' : routeRiskSummary?.level === 'medium' ? 'riesgo moderado' : 'riesgo bajo';
   const cycleRouteOption = () => {
     if (routeOptions.length < 2) return;
@@ -329,7 +335,7 @@ export default function RouteCockpitMobile({
                         className="inline-flex items-center gap-1 rounded-full border border-cyan-200/14 bg-cyan-300/[0.07] px-2 py-1 text-cyan-100/78 transition-colors active:bg-cyan-300/15 disabled:cursor-default"
                         aria-label={routeOptions.length > 1 ? `Cambiar ruta. Seleccionada ${routeChoiceLabel}` : `Ruta seleccionada: ${routeChoiceLabel}`}
                       >
-                        <Route className="h-3 w-3" />
+                        {activeRouteRecommended ? <Sparkles className="h-3 w-3 text-amber-200" /> : <Route className="h-3 w-3" />}
                         <span>{routeChoiceLabel}</span>
                         <span className="text-white/34">·</span>
                         <span>{riskLabel}</span>
@@ -382,6 +388,12 @@ export default function RouteCockpitMobile({
                   </div>
                   <h2 className="mt-1 truncate text-[17px] font-bold text-white">{routeLoading ? 'Buscando la mejor ruta' : destinationLabel}</h2>
                   {!routeLoading && <p className="mt-1 text-[10px] text-white/44">Desde tu ubicación actual · revisa la ruta antes de iniciar</p>}
+                  {!routeLoading && routeRecommendationLabel && (
+                    <div className="mt-2 inline-flex max-w-full items-center gap-1.5 rounded-full border border-amber-200/16 bg-amber-200/[0.07] px-2.5 py-1.5 text-[9px] font-medium text-amber-100/84">
+                      <Sparkles className="h-3 w-3 shrink-0" />
+                      <span className="truncate">AEGIS recomienda · {routeRecommendationLabel}</span>
+                    </div>
+                  )}
                   <div className="mt-2 flex items-center gap-2 text-[12px] text-white/62">
                     <span className="font-semibold text-white">{routeEtaLabel}</span>
                     <span>·</span><span>{distanceLabel}</span><span>·</span><span>{durationLabel}</span>
