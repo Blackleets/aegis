@@ -912,6 +912,28 @@ export default function Dashboard() {
     }
   }, [mapProjection, mapStyle]);
 
+  useEffect(() => {
+    if (!navigationActive || !userLocation || routeSnapshot?.mode !== 'driving') return;
+
+    const refreshLiveTraffic = () => {
+      const trafficParams = new URLSearchParams({
+        fromLat: String(userLocation.lat),
+        fromLng: String(userLocation.lng),
+        toLat: String(routeSnapshot.destination.lat),
+        toLng: String(routeSnapshot.destination.lng),
+      });
+      void fetch(`/api/traffic/route?${trafficParams.toString()}`, { cache: 'no-store' })
+        .then(async (response) => {
+          const payload = await response.json() as TrafficInsight;
+          setTrafficInsight(payload.status === 'live' ? payload : { ...payload, status: 'unavailable' });
+        })
+        .catch(() => setTrafficInsight({ status: 'unavailable', source: 'TomTom Traffic' }));
+    };
+
+    const interval = window.setInterval(refreshLiveTraffic, 120_000);
+    return () => window.clearInterval(interval);
+  }, [navigationActive, routeSnapshot, userLocation]);
+
   // ── SHARED FETCH UTILITY (Fixes #107 — single definition, not 3 copies) ──
   const fetchEndpoint = useCallback(async (url: string, transform?: (d: unknown) => Partial<DashboardData>, options?: RequestInit) => {
     if (typeof document !== 'undefined' && document.hidden) return;
