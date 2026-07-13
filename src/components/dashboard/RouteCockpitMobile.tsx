@@ -52,6 +52,7 @@ type RouteCockpitMobileProps = {
   onOpenSearch: () => void;
   onToggleSimulation: () => void;
   onToggleVoice: () => void;
+  onSelectRouteOption: (routeId: string) => void;
 };
 
 function getModeMeta(mode: RouteSnapshot['mode']) {
@@ -101,6 +102,7 @@ export default function RouteCockpitMobile({
   onOpenSearch,
   onToggleSimulation,
   onToggleVoice,
+  onSelectRouteOption,
 }: RouteCockpitMobileProps) {
   const destinationLabel = routeSnapshot?.destination.label ?? 'Preparando ruta';
   const distanceLabel = routeSnapshot ? formatRouteDistance(remainingRouteDistance || routeSnapshot.distanceMeters) : '--';
@@ -118,6 +120,15 @@ export default function RouteCockpitMobile({
       : gpsAccuracyMeters <= 40
         ? `GPS ±${Math.round(gpsAccuracyMeters)} m`
         : 'GPS débil';
+  const routeOptions = routeSnapshot?.alternatives ?? [];
+  const activeRouteIndex = routeSnapshot ? Math.max(0, routeOptions.findIndex((option) => option.id === routeSnapshot.activeRouteId)) : 0;
+  const activeRouteOption = routeOptions[activeRouteIndex] ?? null;
+  const routeChoiceLabel = activeRouteOption?.label || `Ruta ${activeRouteIndex + 1}`;
+  const riskLabel = routeRiskSummary?.level === 'high' ? 'riesgo alto' : routeRiskSummary?.level === 'medium' ? 'riesgo moderado' : 'riesgo bajo';
+  const cycleRouteOption = () => {
+    if (routeOptions.length < 2) return;
+    onSelectRouteOption(routeOptions[(activeRouteIndex + 1) % routeOptions.length].id);
+  };
   const progressPercent = routeSnapshot
     ? Math.round(Math.max(0, Math.min(1, (routeSnapshot.distanceMeters - remainingRouteDistance) / routeSnapshot.distanceMeters)) * 100)
     : 0;
@@ -207,11 +218,26 @@ export default function RouteCockpitMobile({
                     <span className="h-1 w-1 rounded-full bg-white/25" />
                     <span className="inline-flex items-center gap-1"><ModeIcon className="h-3.5 w-3.5" />{modeMeta?.label}</span>
                   </div>
-                  <div className="mt-1.5 flex items-center gap-2 text-[10px] font-medium text-cyan-100/52">
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] font-medium text-cyan-100/52">
                     <span>{gpsQualityLabel}</span>
                     {navigationSpeedKmh !== null && <><span>·</span><span>{Math.round(navigationSpeedKmh)} km/h</span></>}
                     {navigationRerouting && <><span>·</span><span className="text-amber-200">Buscando mejor ruta</span></>}
                     {navigationSimulationActive && <><span>·</span><span className="text-violet-200">Modo prueba</span></>}
+                    {activeRouteOption && (
+                      <button
+                        type="button"
+                        onClick={cycleRouteOption}
+                        disabled={routeOptions.length < 2 || navigationRerouting}
+                        className="inline-flex items-center gap-1 rounded-full border border-cyan-200/14 bg-cyan-300/[0.07] px-2 py-1 text-cyan-100/78 transition-colors active:bg-cyan-300/15 disabled:cursor-default"
+                        aria-label={routeOptions.length > 1 ? `Cambiar ruta. Seleccionada ${routeChoiceLabel}` : `Ruta seleccionada: ${routeChoiceLabel}`}
+                      >
+                        <Route className="h-3 w-3" />
+                        <span>{routeChoiceLabel}</span>
+                        <span className="text-white/34">·</span>
+                        <span>{riskLabel}</span>
+                        {routeOptions.length > 1 && <span className="text-cyan-200">({activeRouteIndex + 1}/{routeOptions.length})</span>}
+                      </button>
+                    )}
                   </div>
                 </div>
                 <button
