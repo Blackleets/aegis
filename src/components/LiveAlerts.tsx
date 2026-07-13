@@ -27,11 +27,15 @@ interface NewsItem {
 }
 
 interface EarthquakeItem {
+  id?: string;
   magnitude: number;
   place: string;
   lat: number;
   lng: number;
-  time?: string;
+  depth?: number;
+  tsunami?: boolean;
+  url?: string;
+  time?: string | number;
 }
 
 interface AlertItem {
@@ -41,7 +45,7 @@ interface AlertItem {
   source: string;
   lat?: number;
   lng?: number;
-  time?: string;
+  time?: string | number;
   severity: string;
   url?: string;
 }
@@ -65,13 +69,18 @@ const RISK_COLORS: Record<string, string> = {
   LOW: '#34D399',
 };
 
-function getTimeLabel(value?: string) {
+function getTimeLabel(value?: string | number) {
   if (!value) return '';
   try {
     return new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   } catch {
     return '';
   }
+}
+
+function getTimestamp(value?: string | number) {
+  if (typeof value === 'number') return value;
+  return value ? Date.parse(value) : 0;
 }
 
 function getLastUpdatedLabel(value?: string) {
@@ -118,8 +127,8 @@ export default function LiveAlerts({ data, onLocate, onWatchFeed }: LiveAlertsPr
         const nextQuakes = Array.isArray(nextQuakesPayload) ? nextQuakesPayload : nextQuakesPayload?.earthquakes;
 
         setLiveData((prev) => ({
-          news: nextNews ?? prev.news,
-          earthquakes: nextQuakes ?? prev.earthquakes,
+          news: nextNews ?? prev?.news,
+          earthquakes: nextQuakes ?? prev?.earthquakes,
         }));
         setLastUpdated(new Date().toISOString());
       } catch {
@@ -132,7 +141,7 @@ export default function LiveAlerts({ data, onLocate, onWatchFeed }: LiveAlertsPr
     void refresh();
     const interval = window.setInterval(() => {
       void refresh();
-    }, 60000);
+    }, 20000);
 
     return () => {
       cancelled = true;
@@ -167,11 +176,13 @@ export default function LiveAlerts({ data, onLocate, onWatchFeed }: LiveAlertsPr
         lat: quake.lat,
         lng: quake.lng,
         time: quake.time,
-        severity: quake.magnitude >= 6 ? 'CRITICAL' : quake.magnitude >= 4.5 ? 'HIGH' : 'MODERATE',
+        description: `${typeof quake.depth === 'number' ? `${quake.depth.toFixed(1)} km deep` : 'Depth unavailable'}${quake.tsunami ? ' · TSUNAMI FLAG' : ''}`,
+        severity: quake.tsunami || quake.magnitude >= 6 ? 'CRITICAL' : quake.magnitude >= 4.5 ? 'HIGH' : quake.magnitude >= 3.5 ? 'ELEVATED' : 'MODERATE',
+        url: quake.url || (quake.id ? `https://earthquake.usgs.gov/earthquakes/eventpage/${quake.id}` : undefined),
       });
     });
 
-    return unified.sort((a, b) => Date.parse(b.time || '') - Date.parse(a.time || ''));
+    return unified.sort((a, b) => getTimestamp(b.time) - getTimestamp(a.time));
   }, [effectiveData]);
 
   const filtered = filter === 'all'
