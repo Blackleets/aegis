@@ -27,6 +27,7 @@ import {
   VolumeX,
   X,
   Sparkles,
+  Gauge,
 } from 'lucide-react';
 import { type RouteRiskSummary, type RouteSnapshot, type RouteStep, formatRouteDistance, formatRouteDuration, formatStepDistance, localizeRouteInstruction } from '@/lib/routing-shell';
 
@@ -48,6 +49,15 @@ type NearbyContextAlert = {
   distanceMeters: number;
   source: string;
   severity: 'info' | 'warning' | 'critical';
+};
+
+type TrafficInsight = {
+  status: 'loading' | 'live' | 'unavailable';
+  configured?: boolean;
+  source: string;
+  delaySeconds?: number;
+  trafficLengthMeters?: number;
+  level?: 'clear' | 'light' | 'moderate' | 'heavy';
 };
 
 type RouteCockpitMobileProps = {
@@ -80,6 +90,7 @@ type RouteCockpitMobileProps = {
   onDismissNearbyContext: () => void;
   recommendedRouteId: string | null;
   routeRecommendationLabel: string | null;
+  trafficInsight: TrafficInsight | null;
 };
 
 function getModeMeta(mode: RouteSnapshot['mode']) {
@@ -136,6 +147,7 @@ export default function RouteCockpitMobile({
   onDismissNearbyContext,
   recommendedRouteId,
   routeRecommendationLabel,
+  trafficInsight,
 }: RouteCockpitMobileProps) {
   const destinationLabel = routeSnapshot?.destination.label ?? 'Preparando ruta';
   const distanceLabel = routeSnapshot ? formatRouteDistance(remainingRouteDistance || routeSnapshot.distanceMeters) : '--';
@@ -163,6 +175,20 @@ export default function RouteCockpitMobile({
     if (routeOptions.length < 2) return;
     onSelectRouteOption(routeOptions[(activeRouteIndex + 1) % routeOptions.length].id);
   };
+  const trafficDelayMinutes = trafficInsight?.status === 'live' ? Math.max(0, Math.round((trafficInsight.delaySeconds ?? 0) / 60)) : null;
+  const trafficLabel = trafficInsight?.status === 'loading'
+    ? 'Analizando tráfico…'
+    : trafficInsight?.status === 'live'
+      ? trafficInsight.level === 'heavy'
+        ? `Tráfico intenso · +${trafficDelayMinutes} min`
+        : trafficInsight.level === 'moderate'
+          ? `Tráfico moderado · +${trafficDelayMinutes} min`
+          : trafficInsight.level === 'light'
+            ? `Tráfico ligero · +${trafficDelayMinutes} min`
+            : 'Tráfico fluido'
+      : trafficInsight?.configured === false
+        ? 'Tráfico live pendiente de configurar'
+        : 'Tráfico live no disponible';
   const progressPercent = routeSnapshot
     ? Math.round(Math.max(0, Math.min(1, (routeSnapshot.distanceMeters - remainingRouteDistance) / routeSnapshot.distanceMeters)) * 100)
     : 0;
@@ -327,6 +353,11 @@ export default function RouteCockpitMobile({
                     {navigationSpeedKmh !== null && <><span>·</span><span>{Math.round(navigationSpeedKmh)} km/h</span></>}
                     {navigationRerouting && <><span>·</span><span className="text-amber-200">Buscando mejor ruta</span></>}
                     {navigationSimulationActive && <><span>·</span><span className="text-violet-200">Modo prueba</span></>}
+                    {trafficInsight && (
+                      <span className={`inline-flex items-center gap-1 ${trafficInsight.level === 'heavy' ? 'text-rose-200' : trafficInsight.level === 'moderate' ? 'text-amber-200' : 'text-cyan-100/58'}`}>
+                        <Gauge className="h-3 w-3" /> {trafficLabel}
+                      </span>
+                    )}
                     {activeRouteOption && (
                       <button
                         type="button"
@@ -388,6 +419,12 @@ export default function RouteCockpitMobile({
                   </div>
                   <h2 className="mt-1 truncate text-[17px] font-bold text-white">{routeLoading ? 'Buscando la mejor ruta' : destinationLabel}</h2>
                   {!routeLoading && <p className="mt-1 text-[10px] text-white/44">Desde tu ubicación actual · revisa la ruta antes de iniciar</p>}
+                  {!routeLoading && trafficInsight && (
+                    <div className={`mt-2 inline-flex max-w-full items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[9px] font-medium ${trafficInsight.level === 'heavy' ? 'border-rose-300/18 bg-rose-300/[0.08] text-rose-100' : 'border-cyan-200/14 bg-cyan-200/[0.06] text-cyan-100/76'}`}>
+                      <Gauge className="h-3 w-3 shrink-0" />
+                      <span className="truncate">{trafficLabel}{trafficInsight.status === 'live' ? ' · TomTom live' : ''}</span>
+                    </div>
+                  )}
                   {!routeLoading && routeRecommendationLabel && (
                     <div className="mt-2 inline-flex max-w-full items-center gap-1.5 rounded-full border border-amber-200/16 bg-amber-200/[0.07] px-2.5 py-1.5 text-[9px] font-medium text-amber-100/84">
                       <Sparkles className="h-3 w-3 shrink-0" />
