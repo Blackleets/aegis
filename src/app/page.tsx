@@ -376,6 +376,14 @@ interface NearbyContextAlert {
   severity: 'info' | 'warning' | 'critical';
 }
 
+interface RouteRecommendation {
+  routeId: string;
+  label: string;
+  reason: string;
+  nearbySignals: number;
+  durationSeconds: number;
+}
+
 interface UsageMetrics {
   onlineUsers: number;
   totalUsers: number;
@@ -1618,6 +1626,42 @@ export default function Dashboard() {
       counts: { incidents, earthquakes, weather, fires, jamming },
     };
   }, [routeSnapshot, data.news, data.gdelt, data.earthquakes, data.weather_events, data.fires, data.gps_jamming]);
+
+  const routeRecommendation = useMemo<RouteRecommendation | null>(() => {
+    if (!routeSnapshot?.alternatives?.length) return null;
+    const evaluated = routeSnapshot.alternatives.map((option) => {
+      const incidents = countSignalsNearRoute([...(data.news || []), ...(data.gdelt || [])], option.coordinates, 20000);
+      const earthquakes = countSignalsNearRoute(data.earthquakes, option.coordinates, 50000);
+      const weather = countSignalsNearRoute(data.weather_events, option.coordinates, 35000);
+      const fires = countSignalsNearRoute(data.fires, option.coordinates, 25000);
+      const jamming = countSignalsNearRoute(data.gps_jamming, option.coordinates, 60000);
+      const nearbySignals = incidents + earthquakes + weather + fires + jamming;
+      return { option, nearbySignals };
+    });
+    const fastestDuration = Math.min(...evaluated.map(({ option }) => option.durationSeconds));
+    const lowestSignals = Math.min(...evaluated.map(({ nearbySignals }) => nearbySignals));
+    const ranked = [...evaluated].sort((a, b) => {
+      const scoreA = a.option.durationSeconds / Math.max(1, fastestDuration) + Math.min(a.nearbySignals, 8) * 0.045;
+      const scoreB = b.option.durationSeconds / Math.max(1, fastestDuration) + Math.min(b.nearbySignals, 8) * 0.045;
+      return scoreA - scoreB;
+    });
+    const best = ranked[0];
+    const isFastest = best.option.durationSeconds === fastestDuration;
+    const reason = best.nearbySignals === 0 && isFastest
+      ? 'Más rápida · sin eventos próximos detectados'
+      : best.nearbySignals === lowestSignals && !isFastest
+        ? `Menos eventos próximos · +${Math.max(1, Math.round((best.option.durationSeconds - fastestDuration) / 60))} min`
+        : isFastest
+          ? 'Mejor tiempo estimado'
+          : 'Mejor equilibrio entre tiempo y entorno';
+    return {
+      routeId: best.option.id,
+      label: best.option.label || 'Ruta recomendada',
+      reason,
+      nearbySignals: best.nearbySignals,
+      durationSeconds: best.option.durationSeconds,
+    };
+  }, [routeSnapshot, data.news, data.gdelt, data.earthquakes, data.weather_events, data.fires, data.gps_jamming]);
   const earthNavigationMode = selectedCelestialBody === 'earth' && (navigationActive || routeSnapshot !== null || routeLoading);
   const mobileVectorStatusLabel = routeLoading
     ? 'CALCULANDO'
@@ -2059,6 +2103,8 @@ export default function Dashboard() {
               onDismissNearbyEarthquake={() => setNearbyEarthquakeAlert(null)}
               nearbyContextAlert={nearbyContextAlert}
               onDismissNearbyContext={() => setNearbyContextAlert(null)}
+              recommendedRouteId={routeRecommendation?.routeId ?? null}
+              routeRecommendationLabel={routeRecommendation?.reason ?? null}
             />
           )}
 
