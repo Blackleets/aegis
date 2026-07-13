@@ -520,6 +520,8 @@ export default function Dashboard() {
   const lastRerouteAtRef = useRef(0);
   const simulationIndexRef = useRef(0);
   const lastSpokenStepRef = useRef<number | null>(null);
+  const lastNearSpokenStepRef = useRef<number | null>(null);
+  const arrivalSpokenRef = useRef(false);
   const preNavigationMapStateRef = useRef<{ projection: 'globe' | 'mercator'; style: 'dark' | 'satellite' } | null>(null);
   const lastGeocodedPos = useRef<{ lat: number; lng: number } | null>(null);
   const lastGeocodeKeyRef = useRef<string>('');
@@ -1340,19 +1342,46 @@ export default function Dashboard() {
     ? Math.round(distanceMetersBetween(userLocation, { lat: currentRouteStep.maneuver.location[1], lng: currentRouteStep.maneuver.location[0] }))
     : currentRouteStep?.distanceMeters ?? null;
 
-  useEffect(() => {
-    if (!navigationActive || !navigationVoiceEnabled || !currentRouteStep || typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-    if (lastSpokenStepRef.current === currentRouteStep.index) return;
-    lastSpokenStepRef.current = currentRouteStep.index;
-    const distance = `${Math.max(10, Math.round(currentRouteStep.distanceMeters / 10) * 10)} metros. `;
-    const utterance = new SpeechSynthesisUtterance(`${distance}${localizeRouteInstruction(currentRouteStep.instruction)}`);
+  const speakNavigationMessage = useCallback((message: string) => {
+    if (!navigationVoiceEnabled || typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    const utterance = new SpeechSynthesisUtterance(message);
     utterance.lang = 'es-ES';
     utterance.rate = 0.96;
     utterance.pitch = 1;
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(utterance);
-    return () => window.speechSynthesis.cancel();
-  }, [currentRouteStep, navigationActive, navigationVoiceEnabled]);
+  }, [navigationVoiceEnabled]);
+
+  useEffect(() => {
+    if (!navigationActive || !currentRouteStep || lastSpokenStepRef.current === currentRouteStep.index) return;
+    lastSpokenStepRef.current = currentRouteStep.index;
+    lastNearSpokenStepRef.current = null;
+    arrivalSpokenRef.current = false;
+    const distanceMeters = currentStepDistanceMeters ?? currentRouteStep.distanceMeters;
+    const distance = `${Math.max(10, Math.round(distanceMeters / 10) * 10)} metros. `;
+    speakNavigationMessage(`${distance}${localizeRouteInstruction(currentRouteStep.instruction)}`);
+  }, [currentRouteStep, currentStepDistanceMeters, navigationActive, speakNavigationMessage]);
+
+  useEffect(() => {
+    if (!navigationActive || !currentRouteStep || currentStepDistanceMeters === null || currentStepDistanceMeters > 90 || currentStepDistanceMeters < 12) return;
+    if (lastNearSpokenStepRef.current === currentRouteStep.index) return;
+    lastNearSpokenStepRef.current = currentRouteStep.index;
+    speakNavigationMessage(`En ${Math.max(20, Math.round(currentStepDistanceMeters / 10) * 10)} metros, ${localizeRouteInstruction(currentRouteStep.instruction)}`);
+  }, [currentRouteStep, currentStepDistanceMeters, navigationActive, speakNavigationMessage]);
+
+  useEffect(() => {
+    if (!navigationArrived) {
+      arrivalSpokenRef.current = false;
+      return;
+    }
+    if (arrivalSpokenRef.current) return;
+    arrivalSpokenRef.current = true;
+    speakNavigationMessage('Has llegado a tu destino. La ruta ha finalizado.');
+  }, [navigationArrived, speakNavigationMessage]);
+
+  useEffect(() => {
+    if ((!navigationActive || !navigationVoiceEnabled) && typeof window !== 'undefined') window.speechSynthesis?.cancel();
+  }, [navigationActive, navigationVoiceEnabled]);
   const remainingRouteDistance = routeSnapshot
     ? routeSnapshot.steps.slice(currentRouteStepIndex).reduce((sum, step) => sum + step.distanceMeters, 0)
     : 0;
@@ -1820,6 +1849,7 @@ export default function Dashboard() {
               onOpenSearch={() => setMobilePanel('search')}
               onToggleSimulation={toggleNavigationSimulation}
               onToggleVoice={toggleNavigationVoice}
+              onSelectRouteOption={selectRouteOption}
             />
           )}
 
