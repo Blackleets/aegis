@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, memo } from 'react';
+import { useState, useCallback, useEffect, memo } from 'react';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -33,6 +33,28 @@ const TABS = [
   { id: 'github', label: 'GITHUB RECON', icon: Terminal, placeholder: 'GitHub username', color: '#87CEEB' },
   { id: 'sweep', label: 'IP SWEEP', icon: Crosshair, placeholder: 'Enter IP address (e.g. 8.8.8.8)', color: '#FF3D3D' },
 ];
+
+const PRIMARY_TOOL_IDS = ['dns', 'whois', 'certs', 'threats', 'shodan', 'scanner'];
+const SCANNER_TOOL_IDS = new Set(['scanner', 'headers', 'ssl', 'subdomains', 'tech']);
+const TOOL_DESCRIPTIONS: Record<string, string> = {
+  dns: 'Registros públicos del dominio',
+  whois: 'Registro y fechas del dominio',
+  certs: 'Certificados públicos observados',
+  threats: 'Reputación en fuentes disponibles',
+  shodan: 'Exposición pública conocida',
+  scanner: 'Puertos mediante motor protegido',
+  headers: 'Cabeceras de seguridad',
+  ssl: 'Configuración TLS',
+  subdomains: 'Subdominios observados',
+  tech: 'Tecnologías detectadas',
+  bgp: 'Ruta y sistema autónomo',
+  mac: 'Fabricante de la interfaz',
+  phone: 'Formato y región del número',
+  leaks: 'Exposición conocida de correo',
+  github: 'Perfil y repositorios públicos',
+  sweep: 'Inventario público de una subred',
+  vuln: 'Exposición conocida en InternetDB',
+};
 
 interface OsintPanelProps {
   isOpen?: boolean;
@@ -256,6 +278,21 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
   const [sweepCidr, setSweepCidr] = useState(24);
   const [cveCache, setCveCache] = useState<Record<string, CveCacheEntry>>({});
   const [expandedDevice, setExpandedDevice] = useState<string | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [scannerAvailable, setScannerAvailable] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    fetch('/api/scanner?status=1', { cache: 'no-store' })
+      .then((response) => response.json())
+      .then((data: { configured?: boolean }) => {
+        if (active) setScannerAvailable(Boolean(data.configured));
+      })
+      .catch(() => {
+        if (active) setScannerAvailable(false);
+      });
+    return () => { active = false; };
+  }, []);
 
   // Fetch CVE details when a device is expanded in full-screen mode
   const fetchCveDetails = useCallback(async (cveIds: string[]) => {
@@ -284,6 +321,10 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
 
   const runLookup = useCallback(async () => {
     if (!query.trim() || loading) return;
+    if (SCANNER_TOOL_IDS.has(activeTab) && scannerAvailable === false) {
+      setError('Motor de escaneo no configurado. Añade SCANNER_URL y SCANNER_KEY para activar esta herramienta.');
+      return;
+    }
     setLoading(true); setError(''); setResults(null);
 
     // IP Sweep / Vuln Scan — separate flow
@@ -409,7 +450,7 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
       }
     } catch { setError('Network error'); }
     finally { setLoading(false); }
-  }, [query, activeTab, scanType, loading, sweepCidr, onScanGeolocate]);
+  }, [query, activeTab, scanType, loading, sweepCidr, onScanGeolocate, scannerAvailable]);
 
   const currentTab = TABS.find(t => t.id === activeTab);
 
@@ -850,34 +891,99 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
 
   const renderContent = () => (
     <div className="flex flex-col gap-2.5">
-      {/* Tool Grid */}
-      <div className="flex flex-col gap-1">
-        {/* Sweep - Main Action */}
-        {TABS.filter(t => t.id === 'sweep').map(tab => (
-          <button key={tab.id} onClick={() => { setActiveTab(tab.id); setQuery(''); setResults(null); setError(''); }}
-            className={`flex items-center justify-center gap-2 px-3 py-3 rounded-lg text-[12px] font-mono tracking-widest font-bold transition-all border ${activeTab === tab.id ? 'border-opacity-60 bg-opacity-20' : 'border-[var(--border-secondary)] hover:bg-[var(--hover-accent)]'}`}
-            style={{ 
-              borderColor: activeTab === tab.id ? tab.color : 'rgba(255,61,61,0.3)', 
-              backgroundColor: activeTab === tab.id ? `${tab.color}20` : 'rgba(255,61,61,0.05)', 
-              color: activeTab === tab.id ? tab.color : tab.color,
-              boxShadow: activeTab === tab.id ? `0 0 15px ${tab.color}30` : 'none'
-            }}>
-            <tab.icon className="w-5 h-5" />
-            <span>GLOBAL {tab.label}</span>
-          </button>
-        ))}
-        {/* Other Tools */}
-        <div className="grid grid-cols-5 gap-1 mt-1">
-          {TABS.filter(t => t.id !== 'sweep').map(tab => (
-            <button key={tab.id} onClick={() => { setActiveTab(tab.id); setQuery(''); setResults(null); setError(''); }}
-              className={`flex flex-col items-center gap-1 px-1 py-2 rounded-lg text-[8px] font-mono tracking-wider transition-all border ${activeTab === tab.id ? 'border-opacity-40 bg-opacity-15' : 'border-transparent hover:bg-[var(--hover-accent)]'}`}
-              style={{ borderColor: activeTab === tab.id ? tab.color : 'transparent', backgroundColor: activeTab === tab.id ? `${tab.color}15` : undefined, color: activeTab === tab.id ? tab.color : 'var(--text-muted)' }}>
-              <tab.icon className="w-3.5 h-3.5" />
-              <span className="leading-none text-center truncate w-full">{tab.label}</span>
-            </button>
-          ))}
+      {/* Clear capability-first tool selector */}
+      <section className="rounded-2xl border border-white/10 bg-white/[0.025] p-3">
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2 text-[9px] font-mono uppercase tracking-[0.2em] text-cyan-200">
+              <Shield className="h-3.5 w-3.5" />
+              Reconocimiento
+            </div>
+            <p className="mt-1 text-[11px] leading-relaxed text-white/55">
+              Consulta fuentes públicas y analiza únicamente activos propios o autorizados.
+            </p>
+          </div>
+          <span className={`shrink-0 rounded-full border px-2 py-1 text-[8px] font-mono uppercase tracking-wider ${
+            scannerAvailable === true
+              ? 'border-emerald-300/25 bg-emerald-300/10 text-emerald-200'
+              : scannerAvailable === false
+                ? 'border-amber-300/25 bg-amber-300/10 text-amber-100'
+                : 'border-white/10 bg-white/5 text-white/45'
+          }`}>
+            {scannerAvailable === true ? 'Motor listo' : scannerAvailable === false ? 'Motor externo pendiente' : 'Comprobando'}
+          </span>
         </div>
-      </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          {TABS.filter((tab) => PRIMARY_TOOL_IDS.includes(tab.id)).map((tab) => {
+            const unavailable = SCANNER_TOOL_IDS.has(tab.id) && scannerAvailable === false;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => {
+                  if (unavailable) return;
+                  setActiveTab(tab.id); setQuery(''); setResults(null); setError('');
+                }}
+                disabled={unavailable}
+                className={`min-h-[64px] rounded-xl border p-2.5 text-left transition-all ${
+                  activeTab === tab.id
+                    ? 'border-cyan-200/45 bg-cyan-300/10'
+                    : 'border-white/8 bg-white/[0.025] active:bg-white/[0.07]'
+                } disabled:cursor-not-allowed disabled:opacity-40`}
+              >
+                <div className="flex items-center gap-2">
+                  <tab.icon className="h-4 w-4 shrink-0" style={{ color: tab.color }} />
+                  <span className="truncate text-[10px] font-semibold text-white">{tab.label}</span>
+                </div>
+                <span className="mt-1.5 block text-[9px] leading-snug text-white/45">
+                  {unavailable ? 'Requiere motor externo' : TOOL_DESCRIPTIONS[tab.id]}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setShowAdvanced((visible) => !visible)}
+          className="mt-2 flex w-full items-center justify-between rounded-xl border border-white/8 bg-white/[0.02] px-3 py-2.5 text-[9px] font-mono uppercase tracking-[0.16em] text-white/60"
+          aria-expanded={showAdvanced}
+        >
+          Más herramientas
+          <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
+        </button>
+
+        {showAdvanced && (
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            {TABS.filter((tab) => !PRIMARY_TOOL_IDS.includes(tab.id)).map((tab) => {
+              const unavailable = SCANNER_TOOL_IDS.has(tab.id) && scannerAvailable === false;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => {
+                    if (unavailable) return;
+                    setActiveTab(tab.id); setQuery(''); setResults(null); setError('');
+                  }}
+                  disabled={unavailable}
+                  className={`flex min-h-[50px] items-center gap-2 rounded-xl border px-2.5 py-2 text-left ${
+                    activeTab === tab.id ? 'border-cyan-200/40 bg-cyan-300/10' : 'border-white/8 bg-white/[0.02]'
+                  } disabled:opacity-35`}
+                >
+                  <tab.icon className="h-3.5 w-3.5 shrink-0" style={{ color: tab.color }} />
+                  <span className="min-w-0">
+                    <span className="block truncate text-[9px] font-semibold text-white">{tab.label}</span>
+                    <span className="block truncate text-[8px] text-white/40">
+                      {unavailable ? 'Motor pendiente' : TOOL_DESCRIPTIONS[tab.id]}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </section>
 
       {/* Input Area */}
       <div className="flex flex-col gap-1.5">

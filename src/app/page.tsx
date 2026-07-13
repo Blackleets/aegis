@@ -2203,7 +2203,6 @@ export default function Dashboard() {
               <MobileReconPanel
                 osintPanel={(
                   <>
-                    <AegisAnalystDockButton />
                     <OsintPanel isOpen={true} onClose={() => setMobilePanel(null)} isMobile={true} onSweepVisualize={setSweepData} />
                   </>
                 )}
