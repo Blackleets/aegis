@@ -84,6 +84,34 @@ export function formatStepDistance(distanceMeters: number) {
   return distanceMeters >= 1000 ? `${(distanceMeters / 1000).toFixed(1)} km` : `${Math.max(1, Math.round(distanceMeters))} m`;
 }
 
+export function localizeRouteInstruction(instruction: string) {
+  if (!instruction) return 'Sigue la ruta';
+  return instruction
+    .replace(/^Head straight on /i, 'Sigue recto por ')
+    .replace(/^Head right on /i, 'Sigue por la derecha en ')
+    .replace(/^Head left on /i, 'Sigue por la izquierda en ')
+    .replace(/^Continue straight on /i, 'Continúa recto por ')
+    .replace(/^Continue /i, 'Continúa ')
+    .replace(/^Keep /i, 'Mantente ')
+    .replace(/^Turn left on /i, 'Gira a la izquierda por ')
+    .replace(/^Turn right on /i, 'Gira a la derecha por ')
+    .replace(/^Turn left /i, 'Gira a la izquierda ')
+    .replace(/^Turn right /i, 'Gira a la derecha ')
+    .replace(/^Slight left /i, 'Desvíate a la izquierda ')
+    .replace(/^Slight right /i, 'Desvíate a la derecha ')
+    .replace(/^Sharp left /i, 'Giro pronunciado a la izquierda ')
+    .replace(/^Sharp right /i, 'Giro pronunciado a la derecha ')
+    .replace(/^Take the ramp /i, 'Toma la rampa ')
+    .replace(/^Merge /i, 'Incorpórate ')
+    .replace(/^You have arrived at your destination/i, 'Has llegado a tu destino')
+    .replace(/^Arrive at your destination/i, 'Has llegado a tu destino')
+    .replace(/^Destination is on the left/i, 'Tu destino está a la izquierda')
+    .replace(/^Destination is on the right/i, 'Tu destino está a la derecha')
+    .replace(/ on the left/i, ' a la izquierda')
+    .replace(/ on the right/i, ' a la derecha')
+    .replace(/ onto /i, ' hacia ');
+}
+
 export function formatRouteModeLabel(mode: 'driving' | 'walking' | 'cycling') {
   if (mode === 'walking') return 'WALK';
   if (mode === 'cycling') return 'CYCLE';

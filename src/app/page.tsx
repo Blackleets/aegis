@@ -31,7 +31,7 @@ import RouteCockpitMobile from '@/components/dashboard/RouteCockpitMobile';
 import SplashScreen from '@/components/dashboard/SplashScreen';
 import TopHudOverlays from '@/components/dashboard/TopHudOverlays';
 import { DEFAULT_LOCALE, getDashboardCopy, isLocale, type Locale } from '@/lib/i18n';
-import { type ActiveLayers, type BoundingBox, type Coordinate, type FlyToLocation, type MapView, type RouteOption, type RouteRiskSummary, type RouteSnapshot, type RouteStep, computeBearing, countSignalsNearRoute, distanceMetersBetween, distanceToRoutePath, formatEtaLabel, formatProgressLabel, getClosestStepIndex, getYouTubeWatchUrl } from '@/lib/routing-shell';
+import { type ActiveLayers, type BoundingBox, type Coordinate, type FlyToLocation, type MapView, type RouteOption, type RouteRiskSummary, type RouteSnapshot, type RouteStep, computeBearing, countSignalsNearRoute, distanceMetersBetween, distanceToRoutePath, formatEtaLabel, formatProgressLabel, getClosestStepIndex, getYouTubeWatchUrl, localizeRouteInstruction } from '@/lib/routing-shell';
 import { getNextSimulationIndex, shouldRerouteNavigation } from '@/lib/vector-navigation';
 
 const AegisMap = dynamic(() => import('@/components/AegisMap'), { ssr: false });
@@ -482,6 +482,7 @@ export default function Dashboard() {
   const [navigationRerouting, setNavigationRerouting] = useState(false);
   const [navigationSimulationActive, setNavigationSimulationActive] = useState(false);
   const [navigationArrived, setNavigationArrived] = useState(false);
+  const [navigationVoiceEnabled, setNavigationVoiceEnabled] = useState(true);
   const [usageMetrics, setUsageMetrics] = useState<UsageMetrics | null>(null);
   const mouseCoordsRef = useRef<Coordinate | null>(null);
   const coordsDisplayRef = useRef<HTMLDivElement>(null);
@@ -518,6 +519,7 @@ export default function Dashboard() {
   const offRouteSinceRef = useRef<number | null>(null);
   const lastRerouteAtRef = useRef(0);
   const simulationIndexRef = useRef(0);
+  const lastSpokenStepRef = useRef<number | null>(null);
   const preNavigationMapStateRef = useRef<{ projection: 'globe' | 'mercator'; style: 'dark' | 'satellite' } | null>(null);
   const lastGeocodedPos = useRef<{ lat: number; lng: number } | null>(null);
   const lastGeocodeKeyRef = useRef<string>('');
@@ -1325,11 +1327,32 @@ export default function Dashboard() {
     });
   }, [routeSnapshot]);
 
+  const toggleNavigationVoice = useCallback(() => {
+    setNavigationVoiceEnabled((enabled) => {
+      if (enabled && typeof window !== 'undefined') window.speechSynthesis?.cancel();
+      return !enabled;
+    });
+  }, []);
+
   const currentRouteStep = routeSnapshot?.steps?.[currentRouteStepIndex] ?? null;
   const nextRouteStep = routeSnapshot?.steps?.[currentRouteStepIndex + 1] ?? null;
   const currentStepDistanceMeters = currentRouteStep?.maneuver.location && userLocation
     ? Math.round(distanceMetersBetween(userLocation, { lat: currentRouteStep.maneuver.location[1], lng: currentRouteStep.maneuver.location[0] }))
     : currentRouteStep?.distanceMeters ?? null;
+
+  useEffect(() => {
+    if (!navigationActive || !navigationVoiceEnabled || !currentRouteStep || typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    if (lastSpokenStepRef.current === currentRouteStep.index) return;
+    lastSpokenStepRef.current = currentRouteStep.index;
+    const distance = `${Math.max(10, Math.round(currentRouteStep.distanceMeters / 10) * 10)} metros. `;
+    const utterance = new SpeechSynthesisUtterance(`${distance}${localizeRouteInstruction(currentRouteStep.instruction)}`);
+    utterance.lang = 'es-ES';
+    utterance.rate = 0.96;
+    utterance.pitch = 1;
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utterance);
+    return () => window.speechSynthesis.cancel();
+  }, [currentRouteStep, navigationActive, navigationVoiceEnabled]);
   const remainingRouteDistance = routeSnapshot
     ? routeSnapshot.steps.slice(currentRouteStepIndex).reduce((sum, step) => sum + step.distanceMeters, 0)
     : 0;
@@ -1791,10 +1814,12 @@ export default function Dashboard() {
               navigationRerouting={navigationRerouting}
               navigationSimulationActive={navigationSimulationActive}
               navigationArrived={navigationArrived}
+              navigationVoiceEnabled={navigationVoiceEnabled}
               onToggleNavigationFollow={toggleNavigationFollow}
               onClearNavigationState={clearNavigationState}
               onOpenSearch={() => setMobilePanel('search')}
               onToggleSimulation={toggleNavigationSimulation}
+              onToggleVoice={toggleNavigationVoice}
             />
           )}
 
