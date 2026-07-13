@@ -1258,8 +1258,9 @@ export default function Dashboard() {
   const activeIntelAlerts = useMemo(() => {
     const highRiskNews = (data.news || []).filter((item) => typeof item.risk_score === 'number' && item.risk_score >= 6).length;
     const significantQuakes = (data.earthquakes || []).filter((item) => typeof item.magnitude === 'number' && item.magnitude >= 4.5).length;
-    return highRiskNews + significantQuakes;
-  }, [data.news, data.earthquakes]);
+    const verifiedAviationAlerts = (data.aviation_alerts || []).filter((item) => item.level === 'critical').length;
+    return highRiskNews + significantQuakes + verifiedAviationAlerts;
+  }, [data.news, data.earthquakes, data.aviation_alerts]);
 
   const maritimePressure = useMemo(() => {
     const congestedPorts = (data.maritime_ports || []).filter((port) => port.congestion === 'SEVERE' || port.congestion === 'CONGESTED').length;
