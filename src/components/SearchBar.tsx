@@ -347,8 +347,8 @@ function SearchBar({ onLocate, onRoute, defaultOpen = false, variant = 'default'
 
 
 
-      <div className={`rounded-[1.15rem] border border-cyan-300/15 bg-[linear-gradient(180deg,rgba(6,18,27,0.88),rgba(7,15,24,0.58))] px-3 py-3 shadow-[0_12px_28px_rgba(0,0,0,0.16)] ${isMobileNav ? 'rounded-[1.55rem] border-cyan-300/22 bg-[linear-gradient(180deg,rgba(7,20,30,0.98),rgba(4,12,20,0.90))] px-3.5 py-3.5 shadow-[0_24px_48px_rgba(0,0,0,0.28),inset_0_1px_0_rgba(255,255,255,0.03)]' : ''}`}>
-        <div className="flex items-start justify-between gap-3">
+      <div className={`rounded-[1.15rem] border border-cyan-300/15 bg-[linear-gradient(180deg,rgba(6,18,27,0.88),rgba(7,15,24,0.58))] px-3 py-3 shadow-[0_12px_28px_rgba(0,0,0,0.16)] ${isMobileNav ? 'rounded-[1.25rem] border-cyan-300/18 bg-[rgba(5,16,25,0.82)] px-3 py-2.5 shadow-[0_24px_48px_rgba(0,0,0,0.28),inset_0_1px_0_rgba(255,255,255,0.03)]' : ''}`}>
+        <div className={isMobileNav ? 'hidden' : 'flex items-start justify-between gap-3'}>
           <div>
             <div className="text-[7px] font-mono uppercase tracking-[0.22em] text-cyan-300">{isMobileNav ? 'Ruta' : 'Ruta'}</div>
             <div className="mt-1 text-[10px] font-semibold tracking-[0.02em] text-white">{isMobileNav ? 'Usa tu GPS y elige cómo moverte.' : 'Usa tu GPS y elige cómo moverte.'}</div>
@@ -361,7 +361,7 @@ function SearchBar({ onLocate, onRoute, defaultOpen = false, variant = 'default'
           </div>
         </div>
 
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className={`${isMobileNav ? 'mt-0' : 'mt-3'} flex flex-wrap gap-2`}>
           <button
             type="button"
             onClick={() => void handleLocateMe()}
@@ -383,7 +383,7 @@ Limpiar paradas
           )}
         </div>
 
-        <div className={`mt-3 grid gap-2 ${isMobileNav ? 'grid-cols-3' : 'sm:grid-cols-3'}`}>
+        <div className={`mt-2 grid gap-2 ${isMobileNav ? 'grid-cols-3' : 'sm:grid-cols-3'}`}>
           {((['driving', 'walking', 'cycling'] as const)).map((mode) => {
             const meta = ROUTE_MODE_META[mode];
             const Icon = meta.Icon;
@@ -392,7 +392,7 @@ Limpiar paradas
                 key={mode}
                 type="button"
                 onClick={() => setRouteMode(mode)}
-                className={`rounded-2xl border px-3 py-2 text-left transition-all ${routeMode === mode ? 'border-cyan-300/38 bg-[linear-gradient(180deg,rgba(34,211,238,0.14),rgba(34,211,238,0.07))] text-cyan-100 shadow-[0_0_18px_rgba(34,211,238,0.12),inset_0_1px_0_rgba(255,255,255,0.03)]' : 'border-white/10 bg-white/[0.03] text-[var(--text-muted)] hover:border-cyan-300/20 hover:text-[var(--text-primary)]'} ${isMobileNav ? 'min-h-[88px]' : ''}`}
+                className={`rounded-2xl border px-3 py-2 text-left transition-all ${routeMode === mode ? 'border-cyan-300/38 bg-[linear-gradient(180deg,rgba(34,211,238,0.14),rgba(34,211,238,0.07))] text-cyan-100 shadow-[0_0_18px_rgba(34,211,238,0.12),inset_0_1px_0_rgba(255,255,255,0.03)]' : 'border-white/10 bg-white/[0.03] text-[var(--text-muted)] hover:border-cyan-300/20 hover:text-[var(--text-primary)]'} ${isMobileNav ? 'min-h-[54px] px-2 py-2' : ''}`}
               >
                 <div className="flex items-center gap-2">
                   <span className={`rounded-full border p-1.5 ${routeMode === mode ? 'border-cyan-300/35 bg-cyan-300/10 text-cyan-200' : 'border-white/10 bg-white/[0.03]'}`}>
@@ -400,7 +400,7 @@ Limpiar paradas
                   </span>
                   <span>
                     <span className="block text-[8px] font-mono uppercase tracking-[0.2em]">{meta.label}</span>
-                    <span className="mt-0.5 block text-[8px] font-medium tracking-[0.03em] opacity-80">{meta.detail}</span>
+                    <span className={`${isMobileNav ? 'hidden' : 'mt-0.5 block'} text-[8px] font-medium tracking-[0.03em] opacity-80`}>{meta.detail}</span>
                   </span>
                 </div>
               </button>
