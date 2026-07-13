@@ -509,6 +509,7 @@ export default function Dashboard() {
   const geocodeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const geocodeAbortRef = useRef<AbortController | null>(null);
   const lastNavigationLocationRef = useRef<Coordinate | null>(null);
+  const preNavigationMapStateRef = useRef<{ projection: 'globe' | 'mercator'; style: 'dark' | 'satellite' } | null>(null);
   const lastGeocodedPos = useRef<{ lat: number; lng: number } | null>(null);
   const lastGeocodeKeyRef = useRef<string>('');
   const lastLocationLabelRef = useRef<string>('');
@@ -738,6 +739,7 @@ export default function Dashboard() {
   }, [loadRegionDossier]);
 
   const handleRouteRequest = useCallback(async ({ origin, destination, mode, waypoints }: RouteRequest) => {
+    const previousMapState = { projection: mapProjection, style: mapStyle };
     setRouteError(null);
     setRouteLoading(true);
     try {
@@ -808,6 +810,9 @@ export default function Dashboard() {
         steps: route.steps ?? [],
         alternatives: routeOptions,
       });
+      if (!preNavigationMapStateRef.current) {
+        preNavigationMapStateRef.current = previousMapState;
+      }
       setDashboardMode('earth');
       setSelectedCelestialBody('earth');
       setMapProjection('mercator');
@@ -829,7 +834,7 @@ export default function Dashboard() {
     } finally {
       setRouteLoading(false);
     }
-  }, []);
+  }, [mapProjection, mapStyle]);
 
   // ── SHARED FETCH UTILITY (Fixes #107 — single definition, not 3 copies) ──
   const fetchEndpoint = useCallback(async (url: string, transform?: (d: unknown) => Partial<DashboardData>, options?: RequestInit) => {
@@ -1190,6 +1195,12 @@ export default function Dashboard() {
     setNavigationBearing(null);
     setCurrentRouteStepIndex(0);
     lastNavigationLocationRef.current = null;
+    const previousMapState = preNavigationMapStateRef.current;
+    if (previousMapState) {
+      setMapProjection(previousMapState.projection);
+      setMapStyle(previousMapState.style);
+      preNavigationMapStateRef.current = null;
+    }
   }, []);
 
   const selectRouteOption = useCallback((routeId: string) => {
@@ -1353,6 +1364,7 @@ export default function Dashboard() {
           routePath={routeSnapshot?.coordinates ?? []}
           navigationActive={navigationActive}
           navigationBearing={navigationBearing}
+          navigationMode={routeSnapshot?.mode ?? 'driving'}
         />
       </ErrorBoundary>
 
