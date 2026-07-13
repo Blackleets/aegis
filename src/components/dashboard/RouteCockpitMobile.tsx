@@ -23,9 +23,11 @@ import {
   ShieldAlert,
   Signpost,
   FlaskConical,
+  Volume2,
+  VolumeX,
   X,
 } from 'lucide-react';
-import { type RouteRiskSummary, type RouteSnapshot, type RouteStep, formatRouteDistance, formatRouteDuration, formatStepDistance } from '@/lib/routing-shell';
+import { type RouteRiskSummary, type RouteSnapshot, type RouteStep, formatRouteDistance, formatRouteDuration, formatStepDistance, localizeRouteInstruction } from '@/lib/routing-shell';
 
 type RouteCockpitMobileProps = {
   routeLoading: boolean;
@@ -44,10 +46,12 @@ type RouteCockpitMobileProps = {
   navigationRerouting: boolean;
   navigationSimulationActive: boolean;
   navigationArrived: boolean;
+  navigationVoiceEnabled: boolean;
   onToggleNavigationFollow: () => void;
   onClearNavigationState: () => void;
   onOpenSearch: () => void;
   onToggleSimulation: () => void;
+  onToggleVoice: () => void;
 };
 
 function getModeMeta(mode: RouteSnapshot['mode']) {
@@ -74,34 +78,6 @@ function renderManeuverIcon(step: RouteStep | null) {
   return <ArrowUp className={iconClass} strokeWidth={strokeWidth} />;
 }
 
-function localizeInstruction(instruction: string) {
-  if (!instruction) return 'Sigue la ruta';
-
-  return instruction
-    .replace(/^Head straight on /i, 'Sigue recto por ')
-    .replace(/^Head right on /i, 'Sigue por la derecha en ')
-    .replace(/^Head left on /i, 'Sigue por la izquierda en ')
-    .replace(/^Continue straight on /i, 'Continúa recto por ')
-    .replace(/^Continue /i, 'Continúa ')
-    .replace(/^Keep /i, 'Mantente ')
-    .replace(/^Turn left on /i, 'Gira a la izquierda por ')
-    .replace(/^Turn right on /i, 'Gira a la derecha por ')
-    .replace(/^Turn left /i, 'Gira a la izquierda ')
-    .replace(/^Turn right /i, 'Gira a la derecha ')
-    .replace(/^Slight left /i, 'Desvíate a la izquierda ')
-    .replace(/^Slight right /i, 'Desvíate a la derecha ')
-    .replace(/^Sharp left /i, 'Giro pronunciado a la izquierda ')
-    .replace(/^Sharp right /i, 'Giro pronunciado a la derecha ')
-    .replace(/^Take the ramp /i, 'Toma la rampa ')
-    .replace(/^Merge /i, 'Incorpórate ')
-    .replace(/^Arrive at your destination/i, 'Has llegado a tu destino')
-    .replace(/^Destination is on the left/i, 'Tu destino está a la izquierda')
-    .replace(/^Destination is on the right/i, 'Tu destino está a la derecha')
-    .replace(/ on the left/i, ' a la izquierda')
-    .replace(/ on the right/i, ' a la derecha')
-    .replace(/ onto /i, ' hacia ');
-}
-
 export default function RouteCockpitMobile({
   routeLoading,
   routeSnapshot,
@@ -119,20 +95,22 @@ export default function RouteCockpitMobile({
   navigationRerouting,
   navigationSimulationActive,
   navigationArrived,
+  navigationVoiceEnabled,
   onToggleNavigationFollow,
   onClearNavigationState,
   onOpenSearch,
   onToggleSimulation,
+  onToggleVoice,
 }: RouteCockpitMobileProps) {
   const destinationLabel = routeSnapshot?.destination.label ?? 'Preparando ruta';
   const distanceLabel = routeSnapshot ? formatRouteDistance(remainingRouteDistance || routeSnapshot.distanceMeters) : '--';
   const durationLabel = routeSnapshot ? formatRouteDuration(routeSnapshot.durationSeconds) : 'Calculando…';
   const modeMeta = routeSnapshot ? getModeMeta(routeSnapshot.mode) : null;
   const ModeIcon = modeMeta?.Icon ?? Navigation2;
-  const stepInstruction = currentRouteStep ? localizeInstruction(currentRouteStep.instruction) : 'Sigue la ruta';
+  const stepInstruction = currentRouteStep ? localizeRouteInstruction(currentRouteStep.instruction) : 'Sigue la ruta';
   const stepDistance = currentStepDistanceMeters !== null ? formatStepDistance(currentStepDistanceMeters) : null;
   const statusLabel = routeLoading ? 'Calculando ruta…' : navigationArrived ? 'Has llegado' : navigationRerouting ? 'Recalculando…' : navigationSimulationActive ? 'Simulación GPS' : navigationActive ? 'Copiloto activo' : 'Ruta lista';
-  const nextInstruction = nextRouteStep ? localizeInstruction(nextRouteStep.instruction) : null;
+  const nextInstruction = nextRouteStep ? localizeRouteInstruction(nextRouteStep.instruction) : null;
   const gpsQualityLabel = gpsAccuracyMeters === null
     ? 'GPS'
     : gpsAccuracyMeters <= 15
@@ -187,11 +165,11 @@ export default function RouteCockpitMobile({
 
                 <button
                   type="button"
-                  onClick={onOpenSearch}
+                  onClick={onToggleVoice}
                   className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-white/76 transition-colors active:bg-white/15"
-                  aria-label="Editar destino"
+                  aria-label={navigationVoiceEnabled ? 'Silenciar instrucciones' : 'Activar instrucciones por voz'}
                 >
-                  <Search className="h-[18px] w-[18px]" />
+                  {navigationVoiceEnabled ? <Volume2 className="h-[18px] w-[18px]" /> : <VolumeX className="h-[18px] w-[18px]" />}
                 </button>
               </div>
             </div>
