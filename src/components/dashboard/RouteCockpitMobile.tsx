@@ -29,6 +29,16 @@ import {
 } from 'lucide-react';
 import { type RouteRiskSummary, type RouteSnapshot, type RouteStep, formatRouteDistance, formatRouteDuration, formatStepDistance, localizeRouteInstruction } from '@/lib/routing-shell';
 
+type NearbyEarthquakeAlert = {
+  id: string;
+  magnitude: number;
+  place: string;
+  distanceMeters: number;
+  depth?: number;
+  time: number;
+  source: 'USGS';
+};
+
 type RouteCockpitMobileProps = {
   routeLoading: boolean;
   routeSnapshot: RouteSnapshot | null;
@@ -53,6 +63,8 @@ type RouteCockpitMobileProps = {
   onToggleSimulation: () => void;
   onToggleVoice: () => void;
   onSelectRouteOption: (routeId: string) => void;
+  nearbyEarthquakeAlert: NearbyEarthquakeAlert | null;
+  onDismissNearbyEarthquake: () => void;
 };
 
 function getModeMeta(mode: RouteSnapshot['mode']) {
@@ -103,6 +115,8 @@ export default function RouteCockpitMobile({
   onToggleSimulation,
   onToggleVoice,
   onSelectRouteOption,
+  nearbyEarthquakeAlert,
+  onDismissNearbyEarthquake,
 }: RouteCockpitMobileProps) {
   const destinationLabel = routeSnapshot?.destination.label ?? 'Preparando ruta';
   const distanceLabel = routeSnapshot ? formatRouteDistance(remainingRouteDistance || routeSnapshot.distanceMeters) : '--';
@@ -183,6 +197,42 @@ export default function RouteCockpitMobile({
                   {navigationVoiceEnabled ? <Volume2 className="h-[18px] w-[18px]" /> : <VolumeX className="h-[18px] w-[18px]" />}
                 </button>
               </div>
+              <AnimatePresence>
+                {nearbyEarthquakeAlert && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="border-t border-amber-300/14 bg-[linear-gradient(90deg,rgba(245,158,11,0.14),rgba(251,113,133,0.08))]"
+                  >
+                    <div className="flex items-center gap-2.5 px-3 py-2.5">
+                      <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-300/16 text-amber-200">
+                        <ShieldAlert className="h-5 w-5" />
+                        <span className="absolute inset-0 animate-ping rounded-xl border border-amber-300/25" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 text-[9px] font-mono uppercase tracking-[0.16em] text-amber-200">
+                          Evento sísmico cercano · USGS
+                        </div>
+                        <div className="mt-0.5 truncate text-[12px] font-bold text-white">
+                          M{nearbyEarthquakeAlert.magnitude} · {formatStepDistance(nearbyEarthquakeAlert.distanceMeters)} de distancia
+                        </div>
+                        <div className="mt-0.5 truncate text-[9px] text-white/48">
+                          {nearbyEarthquakeAlert.place}{typeof nearbyEarthquakeAlert.depth === 'number' ? ` · ${nearbyEarthquakeAlert.depth.toFixed(1)} km profundidad` : ''}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={onDismissNearbyEarthquake}
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-black/15 text-white/60"
+                        aria-label="Cerrar alerta sísmica"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </motion.section>
         )}
