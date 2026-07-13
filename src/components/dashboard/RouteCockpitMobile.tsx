@@ -39,6 +39,16 @@ type NearbyEarthquakeAlert = {
   source: 'USGS';
 };
 
+type NearbyContextAlert = {
+  id: string;
+  kind: 'traffic-camera' | 'wildfire' | 'volcano' | 'severe-weather';
+  title: string;
+  detail: string;
+  distanceMeters: number;
+  source: string;
+  severity: 'info' | 'warning' | 'critical';
+};
+
 type RouteCockpitMobileProps = {
   routeLoading: boolean;
   routeSnapshot: RouteSnapshot | null;
@@ -65,6 +75,8 @@ type RouteCockpitMobileProps = {
   onSelectRouteOption: (routeId: string) => void;
   nearbyEarthquakeAlert: NearbyEarthquakeAlert | null;
   onDismissNearbyEarthquake: () => void;
+  nearbyContextAlert: NearbyContextAlert | null;
+  onDismissNearbyContext: () => void;
 };
 
 function getModeMeta(mode: RouteSnapshot['mode']) {
@@ -117,6 +129,8 @@ export default function RouteCockpitMobile({
   onSelectRouteOption,
   nearbyEarthquakeAlert,
   onDismissNearbyEarthquake,
+  nearbyContextAlert,
+  onDismissNearbyContext,
 }: RouteCockpitMobileProps) {
   const destinationLabel = routeSnapshot?.destination.label ?? 'Preparando ruta';
   const distanceLabel = routeSnapshot ? formatRouteDistance(remainingRouteDistance || routeSnapshot.distanceMeters) : '--';
@@ -226,6 +240,40 @@ export default function RouteCockpitMobile({
                         onClick={onDismissNearbyEarthquake}
                         className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-black/15 text-white/60"
                         aria-label="Cerrar alerta sísmica"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+              <AnimatePresence>
+                {nearbyContextAlert && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className={`border-t ${nearbyContextAlert.severity === 'info' ? 'border-cyan-300/14 bg-cyan-300/[0.08]' : 'border-orange-300/16 bg-orange-300/[0.09]'}`}
+                  >
+                    <div className="flex items-center gap-2.5 px-3 py-2.5">
+                      <div className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${nearbyContextAlert.severity === 'info' ? 'bg-cyan-300/14 text-cyan-200' : 'bg-orange-300/14 text-orange-200'}`}>
+                        <ShieldAlert className="h-5 w-5" />
+                        <span className="absolute inset-0 animate-pulse rounded-xl border border-current opacity-20" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[9px] font-mono uppercase tracking-[0.16em] text-cyan-100/68">
+                          Aviso en ruta · {nearbyContextAlert.source}
+                        </div>
+                        <div className="mt-0.5 truncate text-[12px] font-bold text-white">
+                          {nearbyContextAlert.title} · {formatStepDistance(nearbyContextAlert.distanceMeters)}
+                        </div>
+                        <div className="mt-0.5 truncate text-[9px] text-white/48">{nearbyContextAlert.detail}</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={onDismissNearbyContext}
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-black/15 text-white/60"
+                        aria-label="Cerrar aviso en ruta"
                       >
                         <X className="h-4 w-4" />
                       </button>
