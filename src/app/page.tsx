@@ -31,7 +31,8 @@ import RouteCockpitMobile from '@/components/dashboard/RouteCockpitMobile';
 import SplashScreen from '@/components/dashboard/SplashScreen';
 import TopHudOverlays from '@/components/dashboard/TopHudOverlays';
 import { DEFAULT_LOCALE, getDashboardCopy, isLocale, type Locale } from '@/lib/i18n';
-import { type ActiveLayers, type BoundingBox, type Coordinate, type FlyToLocation, type MapView, type RouteOption, type RouteRiskSummary, type RouteSnapshot, type RouteStep, computeBearing, countSignalsNearRoute, formatEtaLabel, formatProgressLabel, getClosestStepIndex, getYouTubeWatchUrl } from '@/lib/routing-shell';
+import { type ActiveLayers, type BoundingBox, type Coordinate, type FlyToLocation, type MapView, type RouteOption, type RouteRiskSummary, type RouteSnapshot, type RouteStep, computeBearing, countSignalsNearRoute, distanceMetersBetween, distanceToRoutePath, formatEtaLabel, formatProgressLabel, getClosestStepIndex, getYouTubeWatchUrl } from '@/lib/routing-shell';
+import { shouldRerouteNavigation } from '@/lib/vector-navigation';
 
 const AegisMap = dynamic(() => import('@/components/AegisMap'), { ssr: false });
 const LayerPanel = dynamic(() => import('@/components/LayerPanel'));
@@ -476,6 +477,9 @@ export default function Dashboard() {
   const [navigationActive, setNavigationActive] = useState(false);
   const [navigationBearing, setNavigationBearing] = useState<number | null>(null);
   const [currentRouteStepIndex, setCurrentRouteStepIndex] = useState(0);
+  const [gpsAccuracyMeters, setGpsAccuracyMeters] = useState<number | null>(null);
+  const [navigationSpeedKmh, setNavigationSpeedKmh] = useState<number | null>(null);
+  const [navigationRerouting, setNavigationRerouting] = useState(false);
   const [usageMetrics, setUsageMetrics] = useState<UsageMetrics | null>(null);
   const mouseCoordsRef = useRef<Coordinate | null>(null);
   const coordsDisplayRef = useRef<HTMLDivElement>(null);
@@ -509,6 +513,8 @@ export default function Dashboard() {
   const geocodeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const geocodeAbortRef = useRef<AbortController | null>(null);
   const lastNavigationLocationRef = useRef<Coordinate | null>(null);
+  const offRouteSinceRef = useRef<number | null>(null);
+  const lastRerouteAtRef = useRef(0);
   const preNavigationMapStateRef = useRef<{ projection: 'globe' | 'mercator'; style: 'dark' | 'satellite' } | null>(null);
   const lastGeocodedPos = useRef<{ lat: number; lng: number } | null>(null);
   const lastGeocodeKeyRef = useRef<string>('');
@@ -1161,8 +1167,14 @@ export default function Dashboard() {
         const heading = typeof position.coords.heading === 'number' && Number.isFinite(position.coords.heading)
           ? position.coords.heading
           : null;
+        const accuracy = Number.isFinite(position.coords.accuracy) ? position.coords.accuracy : null;
+        const speedKmh = typeof position.coords.speed === 'number' && Number.isFinite(position.coords.speed)
+          ? Math.max(0, position.coords.speed * 3.6)
+          : null;
 
         setUserLocation(nextLocation);
+        setGpsAccuracyMeters(accuracy);
+        setNavigationSpeedKmh(speedKmh);
 
         const previous = lastNavigationLocationRef.current;
         const computedBearing = heading ?? (previous ? computeBearing(previous, nextLocation) : null);
@@ -1171,6 +1183,32 @@ export default function Dashboard() {
         if (routeSnapshot.steps.length > 0) {
           const closestStepIndex = getClosestStepIndex(nextLocation, routeSnapshot.steps);
           setCurrentRouteStepIndex((currentIndex) => Math.max(currentIndex, Math.min(currentIndex + 1, closestStepIndex)));
+        }
+
+        const offRouteDistance = distanceToRoutePath(nextLocation, routeSnapshot.coordinates);
+        const gpsReliable = accuracy !== null && accuracy <= 45;
+        if (gpsReliable && offRouteDistance > 85) {
+          offRouteSinceRef.current ??= Date.now();
+          const deviationDuration = Date.now() - offRouteSinceRef.current;
+          const rerouteCooldownElapsed = Date.now() - lastRerouteAtRef.current > 30_000;
+          if (shouldRerouteNavigation({
+            offRouteDistanceMeters: offRouteDistance,
+            gpsAccuracyMeters: accuracy,
+            deviationDurationMs: deviationDuration,
+            cooldownElapsedMs: Date.now() - lastRerouteAtRef.current,
+          }) && rerouteCooldownElapsed && !navigationRerouting) {
+            lastRerouteAtRef.current = Date.now();
+            offRouteSinceRef.current = null;
+            setNavigationRerouting(true);
+            void handleRouteRequest({
+              origin: { ...nextLocation, ts: Date.now(), label: 'GPS actual' },
+              destination: routeSnapshot.destination,
+              mode: routeSnapshot.mode,
+              waypoints: routeSnapshot.waypoints,
+            }).finally(() => setNavigationRerouting(false));
+          }
+        } else {
+          offRouteSinceRef.current = null;
         }
 
         lastNavigationLocationRef.current = nextLocation;
@@ -1186,7 +1224,7 @@ export default function Dashboard() {
     );
 
     return () => navigator.geolocation.clearWatch(watchId);
-  }, [navigationActive, routeSnapshot]);
+  }, [handleRouteRequest, navigationActive, navigationRerouting, routeSnapshot]);
 
   const clearNavigationState = useCallback(() => {
     setRouteSnapshot(null);
@@ -1195,6 +1233,10 @@ export default function Dashboard() {
     setNavigationActive(false);
     setNavigationBearing(null);
     setCurrentRouteStepIndex(0);
+    setGpsAccuracyMeters(null);
+    setNavigationSpeedKmh(null);
+    setNavigationRerouting(false);
+    offRouteSinceRef.current = null;
     lastNavigationLocationRef.current = null;
     const previousMapState = preNavigationMapStateRef.current;
     if (previousMapState) {
@@ -1237,6 +1279,10 @@ export default function Dashboard() {
   }, [routeSnapshot]);
 
   const currentRouteStep = routeSnapshot?.steps?.[currentRouteStepIndex] ?? null;
+  const nextRouteStep = routeSnapshot?.steps?.[currentRouteStepIndex + 1] ?? null;
+  const currentStepDistanceMeters = currentRouteStep?.maneuver.location && userLocation
+    ? Math.round(distanceMetersBetween(userLocation, { lat: currentRouteStep.maneuver.location[1], lng: currentRouteStep.maneuver.location[0] }))
+    : currentRouteStep?.distanceMeters ?? null;
   const remainingRouteDistance = routeSnapshot
     ? routeSnapshot.steps.slice(currentRouteStepIndex).reduce((sum, step) => sum + step.distanceMeters, 0)
     : 0;
@@ -1691,6 +1737,11 @@ export default function Dashboard() {
               remainingRouteDistance={remainingRouteDistance}
               routeRiskSummary={routeRiskSummary}
               currentRouteStep={currentRouteStep}
+              nextRouteStep={nextRouteStep}
+              currentStepDistanceMeters={currentStepDistanceMeters}
+              gpsAccuracyMeters={gpsAccuracyMeters}
+              navigationSpeedKmh={navigationSpeedKmh}
+              navigationRerouting={navigationRerouting}
               onToggleNavigationFollow={toggleNavigationFollow}
               onClearNavigationState={clearNavigationState}
               onOpenSearch={() => setMobilePanel('search')}

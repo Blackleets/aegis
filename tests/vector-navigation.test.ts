@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { getNavigationCameraTarget, getVectorCameraPreset, shouldUpdateNavigationCamera, smoothNavigationBearing } from '../src/lib/vector-navigation';
+import { getNavigationCameraTarget, getVectorCameraPreset, shouldRerouteNavigation, shouldUpdateNavigationCamera, smoothNavigationBearing } from '../src/lib/vector-navigation';
 
 describe('vector navigation camera', () => {
   it('uses a closer camera for walking than driving', () => {
@@ -23,6 +23,12 @@ describe('vector navigation camera', () => {
 
   it('smooths bearing changes across north without spinning the long way', () => {
     expect(smoothNavigationBearing(350, 10, 0.5)).toBeCloseTo(0);
+  });
+
+  it('reroutes only after a sustained deviation with reliable GPS', () => {
+    expect(shouldRerouteNavigation({ offRouteDistanceMeters: 120, gpsAccuracyMeters: 12, deviationDurationMs: 8_000, cooldownElapsedMs: 31_000 })).toBe(true);
+    expect(shouldRerouteNavigation({ offRouteDistanceMeters: 120, gpsAccuracyMeters: 80, deviationDurationMs: 8_000, cooldownElapsedMs: 31_000 })).toBe(false);
+    expect(shouldRerouteNavigation({ offRouteDistanceMeters: 120, gpsAccuracyMeters: 12, deviationDurationMs: 2_000, cooldownElapsedMs: 31_000 })).toBe(false);
   });
 
   it('looks ahead in the current direction instead of always shifting north', () => {

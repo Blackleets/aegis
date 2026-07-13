@@ -36,6 +36,11 @@ type RouteCockpitMobileProps = {
   remainingRouteDistance: number;
   routeRiskSummary: RouteRiskSummary | null;
   currentRouteStep: RouteStep | null;
+  nextRouteStep: RouteStep | null;
+  currentStepDistanceMeters: number | null;
+  gpsAccuracyMeters: number | null;
+  navigationSpeedKmh: number | null;
+  navigationRerouting: boolean;
   onToggleNavigationFollow: () => void;
   onClearNavigationState: () => void;
   onOpenSearch: () => void;
@@ -103,6 +108,11 @@ export default function RouteCockpitMobile({
   remainingRouteDistance,
   routeRiskSummary,
   currentRouteStep,
+  nextRouteStep,
+  currentStepDistanceMeters,
+  gpsAccuracyMeters,
+  navigationSpeedKmh,
+  navigationRerouting,
   onToggleNavigationFollow,
   onClearNavigationState,
   onOpenSearch,
@@ -113,8 +123,16 @@ export default function RouteCockpitMobile({
   const modeMeta = routeSnapshot ? getModeMeta(routeSnapshot.mode) : null;
   const ModeIcon = modeMeta?.Icon ?? Navigation2;
   const stepInstruction = currentRouteStep ? localizeInstruction(currentRouteStep.instruction) : 'Sigue la ruta';
-  const stepDistance = currentRouteStep ? formatStepDistance(currentRouteStep.distanceMeters) : null;
-  const statusLabel = routeLoading ? 'Calculando ruta…' : navigationActive ? 'GPS en vivo' : 'Ruta lista';
+  const stepDistance = currentStepDistanceMeters !== null ? formatStepDistance(currentStepDistanceMeters) : null;
+  const statusLabel = routeLoading ? 'Calculando ruta…' : navigationRerouting ? 'Recalculando…' : navigationActive ? 'Copiloto activo' : 'Ruta lista';
+  const nextInstruction = nextRouteStep ? localizeInstruction(nextRouteStep.instruction) : null;
+  const gpsQualityLabel = gpsAccuracyMeters === null
+    ? 'GPS'
+    : gpsAccuracyMeters <= 15
+      ? 'GPS preciso'
+      : gpsAccuracyMeters <= 40
+        ? `GPS ±${Math.round(gpsAccuracyMeters)} m`
+        : 'GPS débil';
   const progressPercent = routeSnapshot
     ? Math.round(Math.max(0, Math.min(1, (routeSnapshot.distanceMeters - remainingRouteDistance) / routeSnapshot.distanceMeters)) * 100)
     : 0;
@@ -155,6 +173,9 @@ export default function RouteCockpitMobile({
                   </div>
                   <h2 className="line-clamp-2 text-[17px] font-bold leading-[1.18] tracking-[-0.02em] text-white">{stepInstruction}</h2>
                   <p className="mt-1 truncate text-[11px] text-white/48">Hacia {destinationLabel}</p>
+                  {nextInstruction && (
+                    <p className="mt-1.5 truncate border-t border-white/8 pt-1.5 text-[10px] text-cyan-100/58">Después · {nextInstruction}</p>
+                  )}
                 </div>
 
                 <button
@@ -200,6 +221,11 @@ export default function RouteCockpitMobile({
                     <span>{durationLabel}</span>
                     <span className="h-1 w-1 rounded-full bg-white/25" />
                     <span className="inline-flex items-center gap-1"><ModeIcon className="h-3.5 w-3.5" />{modeMeta?.label}</span>
+                  </div>
+                  <div className="mt-1.5 flex items-center gap-2 text-[10px] font-medium text-cyan-100/52">
+                    <span>{gpsQualityLabel}</span>
+                    {navigationSpeedKmh !== null && <><span>·</span><span>{Math.round(navigationSpeedKmh)} km/h</span></>}
+                    {navigationRerouting && <><span>·</span><span className="text-amber-200">Buscando mejor ruta</span></>}
                   </div>
                 </div>
                 <button

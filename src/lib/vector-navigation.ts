@@ -26,6 +26,24 @@ export function smoothNavigationBearing(previous: number | null, next: number, f
   return ((previous + delta * factor) % 360 + 360) % 360;
 }
 
+export function shouldRerouteNavigation({
+  offRouteDistanceMeters,
+  gpsAccuracyMeters,
+  deviationDurationMs,
+  cooldownElapsedMs,
+}: {
+  offRouteDistanceMeters: number;
+  gpsAccuracyMeters: number | null;
+  deviationDurationMs: number;
+  cooldownElapsedMs: number;
+}) {
+  return gpsAccuracyMeters !== null
+    && gpsAccuracyMeters <= 45
+    && offRouteDistanceMeters > 85
+    && deviationDurationMs > 7_000
+    && cooldownElapsedMs > 30_000;
+}
+
 export function getVectorCameraPreset(mode: VectorNavigationMode, isMobile: boolean) {
   if (mode === 'walking') {
     return {
