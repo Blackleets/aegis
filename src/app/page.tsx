@@ -72,7 +72,6 @@ type MobileLayersPanelProps = {
 
 type MobileSearchPanelProps = {
   searchBar: ReactNode;
-  sharePanel: ReactNode;
   routeError: string | null;
 };
 
@@ -245,16 +244,9 @@ function MobileLayersPanel({ metrics, layerPanel, presets }: MobileLayersPanelPr
   );
 }
 
-function MobileSearchPanel({ searchBar, sharePanel, routeError }: MobileSearchPanelProps) {
+function MobileSearchPanel({ searchBar, routeError }: MobileSearchPanelProps) {
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between gap-2 rounded-2xl border border-cyan-300/14 bg-[linear-gradient(135deg,rgba(10,22,34,0.82),rgba(4,12,20,0.68))] px-3 py-2.5">
-        <div>
-          <div className="text-[7px] font-mono uppercase tracking-[0.22em] text-cyan-200">GPS</div>
-          <div className="mt-1 text-[9px] font-semibold text-white">Busca un destino y empieza la ruta.</div>
-        </div>
-        <div className="shrink-0">{sharePanel}</div>
-      </div>
       {routeError && (
         <div className="rounded-2xl border border-rose-400/20 bg-rose-500/8 px-3 py-2 text-[8px] font-mono uppercase tracking-[0.14em] text-rose-300">
           {routeError}
@@ -2182,7 +2174,6 @@ export default function Dashboard() {
               <MobileSearchPanel
                 routeError={routeError}
                 searchBar={<SearchBar variant="mobile-nav" defaultOpen onLocate={(result) => { setFlyToLocation({ lat: result.lat, lng: result.lng, zoom: result.zoom, bbox: result.bbox, label: result.label, ts: Date.now() }); setMobilePanel(null); }} onRoute={async (request) => { await handleRouteRequest(request); setMobilePanel(null); }} />}
-                sharePanel={<SharePanel mapView={mapView} activeLayers={activeLayers} mouseCoords={null} />}
               />
             )}
             reconContent={(
