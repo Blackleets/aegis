@@ -32,7 +32,7 @@ import SplashScreen from '@/components/dashboard/SplashScreen';
 import TopHudOverlays from '@/components/dashboard/TopHudOverlays';
 import { DEFAULT_LOCALE, getDashboardCopy, isLocale, type Locale } from '@/lib/i18n';
 import { type ActiveLayers, type BoundingBox, type Coordinate, type FlyToLocation, type MapView, type RouteOption, type RouteRiskSummary, type RouteSnapshot, type RouteStep, computeBearing, countSignalsNearRoute, distanceMetersBetween, distanceToRoutePath, formatEtaLabel, formatProgressLabel, getClosestStepIndex, getYouTubeWatchUrl, localizeRouteInstruction } from '@/lib/routing-shell';
-import { getNextSimulationIndex, shouldRerouteNavigation } from '@/lib/vector-navigation';
+import { getArrivalThresholdMeters, getNextSimulationIndex, shouldRerouteNavigation, snapNavigationToRoute, stabilizeNavigationCoordinate } from '@/lib/vector-navigation';
 
 const AegisMap = dynamic(() => import('@/components/AegisMap'), { ssr: false });
 const LayerPanel = dynamic(() => import('@/components/LayerPanel'));
@@ -1243,7 +1243,7 @@ export default function Dashboard() {
 
     const watchId = navigator.geolocation.watchPosition(
       (position) => {
-        const nextLocation = {
+        const rawLocation = {
           lat: position.coords.latitude,
           lng: position.coords.longitude,
         };
@@ -1255,11 +1255,15 @@ export default function Dashboard() {
           ? Math.max(0, position.coords.speed * 3.6)
           : null;
 
+        const previous = lastNavigationLocationRef.current;
+        const stabilizedLocation = stabilizeNavigationCoordinate(previous, rawLocation, accuracy, speedKmh);
+        const routeMatch = snapNavigationToRoute(stabilizedLocation, routeSnapshot.coordinates, accuracy);
+        const nextLocation = routeMatch.coordinate;
+
         setUserLocation(nextLocation);
         setGpsAccuracyMeters(accuracy);
         setNavigationSpeedKmh(speedKmh);
 
-        const previous = lastNavigationLocationRef.current;
         const computedBearing = heading ?? (previous ? computeBearing(previous, nextLocation) : null);
         if (computedBearing !== null) setNavigationBearing(computedBearing);
 
@@ -1268,7 +1272,9 @@ export default function Dashboard() {
           setCurrentRouteStepIndex((currentIndex) => Math.max(currentIndex, Math.min(currentIndex + 1, closestStepIndex)));
         }
 
-        const offRouteDistance = distanceToRoutePath(nextLocation, routeSnapshot.coordinates);
+        // Deviation is measured from the stabilized raw fix, never the snapped marker,
+        // so map matching cannot hide a genuine departure from the route.
+        const offRouteDistance = distanceToRoutePath(stabilizedLocation, routeSnapshot.coordinates);
         const gpsReliable = accuracy !== null && accuracy <= 45;
         if (gpsReliable && offRouteDistance > 85) {
           offRouteSinceRef.current ??= Date.now();
@@ -1284,7 +1290,7 @@ export default function Dashboard() {
             offRouteSinceRef.current = null;
             setNavigationRerouting(true);
             void handleRouteRequest({
-              origin: { ...nextLocation, ts: Date.now(), label: 'GPS actual' },
+              origin: { ...stabilizedLocation, ts: Date.now(), label: 'GPS actual' },
               destination: routeSnapshot.destination,
               mode: routeSnapshot.mode,
               waypoints: routeSnapshot.waypoints,
@@ -1295,7 +1301,8 @@ export default function Dashboard() {
           offRouteSinceRef.current = null;
         }
 
-        if (distanceMetersBetween(nextLocation, routeSnapshot.destination) <= 30) {
+        const arrivalThreshold = getArrivalThresholdMeters(routeSnapshot.mode, accuracy, speedKmh);
+        if (distanceMetersBetween(stabilizedLocation, routeSnapshot.destination) <= arrivalThreshold) {
           setNavigationArrived(true);
           setNavigationActive(false);
         }
