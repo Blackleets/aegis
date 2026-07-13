@@ -892,7 +892,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       ];
       flightLayers.forEach(l => {
         map.addLayer({ id: l.id, type: 'symbol', source: l.src, layout: {
-          'icon-image': l.icon, 'icon-size': ['interpolate',['linear'],['zoom'], 1,0.4, 5,0.7, 10,1],
+          'icon-image': ['case', ['==', ['get', 'alert_level'], 'critical'], 'plane-red', l.icon], 'icon-size': ['interpolate',['linear'],['zoom'], 1,0.4, 5,0.7, 10,1],
           'icon-rotate': ['get','heading'], 'icon-rotation-alignment': 'map', 'icon-allow-overlap': true, 'icon-ignore-placement': true,
         }, paint: { 'icon-opacity': 0.85 }});
       });
@@ -1060,6 +1060,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
             <span style="color:#D4AF37;font-size:16px;font-weight:700;letter-spacing:0.1em;">${cs}</span>
             <span style="color:#5C5A54;font-size:10px;">${p.icao24||''}</span>
           </div>
+          ${p.alert_title ? `<div style="margin-bottom:10px;padding:8px 10px;border:1px solid rgba(255,61,61,.35);border-radius:8px;background:rgba(255,61,61,.08);color:#ffb4b4;font-size:10px;"><strong>${p.alert_title}</strong><br/><span style="color:#c8c8c8;font-size:9px;">${p.alert_evidence || 'Evidencia ADS-B'}</span></div>` : ''}
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:11px;">
             <div><span style="color:#5C5A54;font-size:9px;">MODEL</span><br/><span style="color:#E8E6E0;">${p.model||'—'}</span></div>
             <div><span style="color:#5C5A54;font-size:9px;">ALT</span><br/><span style="color:#00E5FF;">${p.alt?Math.round(p.alt)+'m':'—'}</span></div>
@@ -1537,7 +1538,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
     const toFeatures = (arr: MapEntity[] = []) => validFlights(arr).map((f) => ({
       type: 'Feature' as const,
       geometry: { type: 'Point' as const, coordinates: [f.lng as number, f.lat as number] },
-      properties: { callsign: f.callsign, heading: f.heading || 0, alt: f.alt, model: f.model, speed_knots: f.speed_knots, registration: f.registration, icao24: f.icao24 },
+      properties: { callsign: f.callsign, heading: f.heading || 0, alt: f.alt, model: f.model, speed_knots: f.speed_knots, registration: f.registration, icao24: f.icao24, squawk: f.squawk, source: f.source || 'adsb.lol', freshness: f.freshness || 'unknown', position_age_seconds: f.position_age_seconds, alert_level: (f.alert as { level?: string } | null)?.level || 'none', alert_title: (f.alert as { title?: string } | null)?.title || '', alert_evidence: (f.alert as { evidence?: string } | null)?.evidence || '' },
     }));
     const toTrailFeatures = (arr: MapEntity[] = []) => validFlights(arr).map((f) => {
       const coordinates = getFlightTrailCoordinates(f);
