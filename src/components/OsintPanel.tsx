@@ -14,24 +14,24 @@ import type { LucideIcon } from 'lucide-react';
 import { ipToNumber, numberToIp, calculateSubnetStart, classifyDevice, assessRisk, batchFetch, ShodanInternetDBResponse, SweepDevice, SweepResult } from '@/lib/osint-utils';
 
 const TABS = [
-  { id: 'scanner', label: 'PORT SCAN', icon: Radar, placeholder: 'IP or hostname', color: '#00E5FF' },
-  { id: 'vuln', label: 'VULN SWEEP', icon: Bug, placeholder: 'IP or hostname', color: '#FF3D3D' },
+  { id: 'scanner', label: 'PUERTOS', icon: Radar, placeholder: 'IP or hostname', color: '#00E5FF' },
+  { id: 'vuln', label: 'EXPOSICIÓN', icon: Bug, placeholder: 'IP or hostname', color: '#FF3D3D' },
 
   { id: 'dns', label: 'DNS', icon: Server, placeholder: 'Domain name', color: '#448AFF' },
   { id: 'whois', label: 'WHOIS', icon: FileText, placeholder: 'Domain name', color: '#FFD700' },
-  { id: 'certs', label: 'CERTS', icon: Lock, placeholder: 'Domain name', color: '#E040FB' },
-  { id: 'threats', label: 'THREATS', icon: AlertTriangle, placeholder: 'IP, domain, or hash', color: '#FF9500' },
-  { id: 'headers', label: 'HEADERS', icon: Code, placeholder: 'URL to inspect', color: '#87CEEB' },
+  { id: 'certs', label: 'CERTIFICADOS', icon: Lock, placeholder: 'Domain name', color: '#E040FB' },
+  { id: 'threats', label: 'REPUTACIÓN', icon: AlertTriangle, placeholder: 'IP, domain, or hash', color: '#FF9500' },
+  { id: 'headers', label: 'CABECERAS', icon: Code, placeholder: 'URL to inspect', color: '#87CEEB' },
   { id: 'ssl', label: 'SSL/TLS', icon: Shield, placeholder: 'Domain name', color: '#76FF03' },
-  { id: 'subdomains', label: 'SUBDOMAINS', icon: Layers, placeholder: 'Domain to enumerate', color: '#00BCD4' },
-  { id: 'tech', label: 'TECH DETECT', icon: Code, placeholder: 'URL to fingerprint', color: '#9C27B0' },
-  { id: 'shodan', label: 'SHODAN IOT', icon: Network, placeholder: 'IP address', color: '#FF3D3D' },
-  { id: 'bgp', label: 'BGP ROUTE', icon: Globe, placeholder: 'IP or ASN', color: '#00E5FF' },
-  { id: 'mac', label: 'MAC ADDR', icon: Fingerprint, placeholder: 'MAC address', color: '#FFD700' },
-  { id: 'phone', label: 'PHONE INTEL', icon: Phone, placeholder: 'Phone number (e.g. +1...)', color: '#FF9500' },
-  { id: 'leaks', label: 'DATA LEAKS', icon: ShieldAlert, placeholder: 'Email address', color: '#E040FB' },
-  { id: 'github', label: 'GITHUB RECON', icon: Terminal, placeholder: 'GitHub username', color: '#87CEEB' },
-  { id: 'sweep', label: 'IP SWEEP', icon: Crosshair, placeholder: 'Enter IP address (e.g. 8.8.8.8)', color: '#FF3D3D' },
+  { id: 'subdomains', label: 'SUBDOMINIOS', icon: Layers, placeholder: 'Domain to enumerate', color: '#00BCD4' },
+  { id: 'tech', label: 'TECNOLOGÍAS', icon: Code, placeholder: 'URL to fingerprint', color: '#9C27B0' },
+  { id: 'shodan', label: 'INTERNETDB', icon: Network, placeholder: 'IP address', color: '#FF3D3D' },
+  { id: 'bgp', label: 'RUTA BGP', icon: Globe, placeholder: 'IP or ASN', color: '#00E5FF' },
+  { id: 'mac', label: 'FABRICANTE MAC', icon: Fingerprint, placeholder: 'MAC address', color: '#FFD700' },
+  { id: 'phone', label: 'TELÉFONO', icon: Phone, placeholder: 'Phone number (e.g. +1...)', color: '#FF9500' },
+  { id: 'leaks', label: 'BRECHAS', icon: ShieldAlert, placeholder: 'Email address', color: '#E040FB' },
+  { id: 'github', label: 'GITHUB', icon: Terminal, placeholder: 'GitHub username', color: '#87CEEB' },
+  { id: 'sweep', label: 'INVENTARIO RED', icon: Crosshair, placeholder: 'Enter IP address (e.g. 8.8.8.8)', color: '#FF3D3D' },
 ];
 
 const PRIMARY_TOOL_IDS = ['dns', 'whois', 'certs', 'threats', 'shodan', 'scanner'];
@@ -54,6 +54,26 @@ const TOOL_DESCRIPTIONS: Record<string, string> = {
   github: 'Perfil y repositorios públicos',
   sweep: 'Inventario público de una subred',
   vuln: 'Exposición conocida en InternetDB',
+};
+
+const TOOL_SOURCES: Record<string, { name: string; evidence: string }> = {
+  dns: { name: 'DNS público', evidence: 'Registros publicados por el dominio' },
+  whois: { name: 'RDAP / WHOIS', evidence: 'Registro público del dominio' },
+  certs: { name: 'Certificate Transparency', evidence: 'Certificados observados públicamente' },
+  threats: { name: 'Fuentes de reputación', evidence: 'Coincidencias disponibles; no confirma actividad maliciosa' },
+  shodan: { name: 'Shodan InternetDB', evidence: 'Exposición pública previamente observada' },
+  scanner: { name: 'AEGIS Scanner', evidence: 'Observación activa autorizada' },
+  headers: { name: 'AEGIS Scanner', evidence: 'Respuesta HTTP del objetivo autorizado' },
+  ssl: { name: 'AEGIS Scanner', evidence: 'Negociación TLS del objetivo autorizado' },
+  subdomains: { name: 'AEGIS Scanner', evidence: 'Descubrimiento sobre fuentes disponibles' },
+  tech: { name: 'AEGIS Scanner', evidence: 'Huella tecnológica observada' },
+  bgp: { name: 'BGP público', evidence: 'Anuncios de red publicados' },
+  mac: { name: 'Registro OUI', evidence: 'Fabricante registrado del prefijo' },
+  phone: { name: 'libphonenumber', evidence: 'Validación de formato; no localización en vivo' },
+  leaks: { name: 'Fuentes de brechas', evidence: 'Coincidencias públicas disponibles' },
+  github: { name: 'GitHub público', evidence: 'Perfil y repositorios visibles' },
+  sweep: { name: 'Shodan InternetDB', evidence: 'Inventario pasivo; no es un escaneo en vivo' },
+  vuln: { name: 'Shodan InternetDB + NVD', evidence: 'CVEs asociadas a observaciones públicas' },
 };
 
 interface OsintPanelProps {
@@ -280,6 +300,7 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
   const [expandedDevice, setExpandedDevice] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [scannerAvailable, setScannerAvailable] = useState<boolean | null>(null);
+  const [resultReceivedAt, setResultReceivedAt] = useState<Date | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -387,6 +408,7 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
           sweep_time_ms: Date.now() - t0
         });
         setSweepProgress(null);
+        setResultReceivedAt(new Date());
         setHistory(prev => [{ tab: activeTab, query, time: new Date().toLocaleTimeString() }, ...prev.slice(0, 9)]);
       } catch (err) {
         setError(getErrorMessage(err));
@@ -420,13 +442,15 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
       }
       const res = await fetch(url, activeTab === 'shodan' ? { cache: 'no-store' } : undefined);
       if (activeTab === 'shodan' && res.status === 404) {
-        setResults({ ip: query, status: 'No Shodan InternetDB records found', ports: [], cpes: [], hostnames: [], tags: [], vulns: [] });
+        setResults({ ip: query, status: 'No se encontraron observaciones en Shodan InternetDB', ports: [], cpes: [], hostnames: [], tags: [], vulns: [] });
+        setResultReceivedAt(new Date());
         setLoading(false);
         return;
       }
       const data = await res.json() as GenericResult;
       if (res.ok) {
         setResults(data);
+        setResultReceivedAt(new Date());
         setHistory(prev => [{ tab: activeTab, query, time: new Date().toLocaleTimeString() }, ...prev.slice(0, 9)]);
         
         // Geolocate the target in the background
@@ -453,6 +477,8 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
   }, [query, activeTab, scanType, loading, sweepCidr, onScanGeolocate, scannerAvailable]);
 
   const currentTab = TABS.find(t => t.id === activeTab);
+  const currentSource = TOOL_SOURCES[activeTab] || { name: 'Fuente pública', evidence: 'Datos devueltos por la fuente indicada' };
+  const sourceLabel = typeof results?.source === 'string' ? results.source : currentSource.name;
 
   // ── Shodan-style structured result renderers ──
 
@@ -1254,10 +1280,24 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
       )}
 
       {results && !(sweepResult && !loading) && (
-        <div className="bg-[var(--bg-primary)]/40 border border-[var(--border-primary)] rounded-lg p-3 max-h-[50vh] overflow-y-auto styled-scrollbar">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[9px] font-mono tracking-widest" style={{ color: currentTab?.color }}>{currentTab?.label} RESULTS</span>
-            <span className="text-[8px] font-mono text-[var(--text-muted)] flex items-center gap-1"><Clock className="w-2.5 h-2.5" />{new Date().toLocaleTimeString()}</span>
+        <div className="max-h-[50vh] overflow-y-auto rounded-2xl border border-[var(--border-primary)] bg-[var(--bg-primary)]/40 p-3 styled-scrollbar">
+          <div className="mb-3 rounded-xl border border-emerald-300/15 bg-emerald-300/[0.045] p-2.5">
+            <div className="flex items-center justify-between gap-3">
+              <span className="flex items-center gap-1.5 text-[9px] font-mono uppercase tracking-[0.16em] text-emerald-200">
+                <CheckCircle className="h-3 w-3" />
+                Fuente real
+              </span>
+              <span className="flex items-center gap-1 text-[8px] font-mono text-white/45">
+                <Clock className="h-2.5 w-2.5" />
+                {resultReceivedAt?.toLocaleTimeString() || 'ahora'}
+              </span>
+            </div>
+            <div className="mt-1.5 text-[11px] font-semibold text-white">{sourceLabel}</div>
+            <div className="mt-0.5 text-[9px] leading-relaxed text-white/45">{currentSource.evidence}</div>
+          </div>
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-[9px] font-mono uppercase tracking-widest" style={{ color: currentTab?.color }}>{currentTab?.label}</span>
+            <span className="rounded-full border border-emerald-300/20 bg-emerald-300/[0.07] px-2 py-0.5 text-[8px] font-mono text-emerald-100">RECIBIDO</span>
           </div>
           {renderStructuredResults()}
         </div>
