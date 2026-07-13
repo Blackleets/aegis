@@ -346,6 +346,7 @@ interface DashboardData extends Record<string, unknown> {
   radiation?: DashboardEntity[];
   fires?: DashboardEntity[];
   gps_jamming?: DashboardEntity[];
+  aviation_alerts?: DashboardEntity[];
   sdk_entities?: unknown[];
 }
 
@@ -1088,7 +1089,7 @@ export default function Dashboard() {
   useEffect(() => {
     const intervals: ReturnType<typeof setInterval>[] = [];
     if (activeLayers.flights || activeLayers.military || activeLayers.jets || activeLayers.private) {
-      intervals.push(setInterval(() => fetchEndpoint('/api/flights'), 300000)); // 5 min (was 2 min)
+      intervals.push(setInterval(() => fetchEndpoint('/api/flights'), 45000)); // ADS-B positions: 45s freshness window
     }
 
     if (activeLayers.balloons) {
@@ -1140,7 +1141,7 @@ export default function Dashboard() {
       if (!f.lat || !f.lng) continue;
       computedSdkEntities.push({
         type: 'Feature', geometry: { type: 'Point', coordinates: [f.lng, f.lat] },
-        properties: { domain: 'AIR', name: typeof f.callsign === 'string' ? f.callsign.trim() || 'TRACK' : 'TRACK', source: 'ADS-B / OpenSky' },
+        properties: { domain: 'AIR', name: typeof f.callsign === 'string' ? f.callsign.trim() || 'TRACK' : 'TRACK', source: typeof f.source === 'string' ? f.source : 'adsb.lol' },
       });
     }
 
@@ -1257,8 +1258,9 @@ export default function Dashboard() {
   const activeIntelAlerts = useMemo(() => {
     const highRiskNews = (data.news || []).filter((item) => typeof item.risk_score === 'number' && item.risk_score >= 6).length;
     const significantQuakes = (data.earthquakes || []).filter((item) => typeof item.magnitude === 'number' && item.magnitude >= 4.5).length;
-    return highRiskNews + significantQuakes;
-  }, [data.news, data.earthquakes]);
+    const verifiedAviationAlerts = (data.aviation_alerts || []).filter((item) => item.level === 'critical').length;
+    return highRiskNews + significantQuakes + verifiedAviationAlerts;
+  }, [data.news, data.earthquakes, data.aviation_alerts]);
 
   const maritimePressure = useMemo(() => {
     const congestedPorts = (data.maritime_ports || []).filter((port) => port.congestion === 'SEVERE' || port.congestion === 'CONGESTED').length;
