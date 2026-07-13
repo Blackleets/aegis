@@ -913,12 +913,13 @@ export default function Dashboard() {
   }, [mapProjection, mapStyle]);
 
   useEffect(() => {
-    if (!navigationActive || !userLocation || routeSnapshot?.mode !== 'driving') return;
+    if (!navigationActive || routeSnapshot?.mode !== 'driving') return;
 
     const refreshLiveTraffic = () => {
+      const currentLocation = lastNavigationLocationRef.current ?? routeSnapshot.origin;
       const trafficParams = new URLSearchParams({
-        fromLat: String(userLocation.lat),
-        fromLng: String(userLocation.lng),
+        fromLat: String(currentLocation.lat),
+        fromLng: String(currentLocation.lng),
         toLat: String(routeSnapshot.destination.lat),
         toLng: String(routeSnapshot.destination.lng),
       });
@@ -932,7 +933,7 @@ export default function Dashboard() {
 
     const interval = window.setInterval(refreshLiveTraffic, 120_000);
     return () => window.clearInterval(interval);
-  }, [navigationActive, routeSnapshot, userLocation]);
+  }, [navigationActive, routeSnapshot]);
 
   // ── SHARED FETCH UTILITY (Fixes #107 — single definition, not 3 copies) ──
   const fetchEndpoint = useCallback(async (url: string, transform?: (d: unknown) => Partial<DashboardData>, options?: RequestInit) => {
