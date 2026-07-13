@@ -256,6 +256,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
   const lastViewStateRef = useRef<{ zoom: number; latitude: number } | null>(null);
   const lastNavCameraCenterRef = useRef<{ lat: number; lng: number } | null>(null);
   const lastNavCameraBearingRef = useRef<number | null>(null);
+  const preNavigationLayerVisibilityRef = useRef<Map<string, string>>(new Map());
   const globeSpinPauseUntilRef = useRef(0);
   const seenEarthquakeIdsRef = useRef<Set<string> | null>(null);
   const earthquakePulsesRef = useRef<EarthquakePulse[]>([]);
@@ -412,9 +413,9 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
           paint: {
             'fill-extrusion-color': [
               'interpolate', ['linear'], ['zoom'],
-              14, '#101b25',
-              16, '#163447',
-              18, '#1d536c',
+              14, '#172733',
+              16, '#285067',
+              18, '#3b7893',
             ],
             'fill-extrusion-height': [
               'interpolate', ['linear'], ['zoom'],
@@ -433,7 +434,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
               ['to-number', ['get', 'min_height']],
               0,
             ],
-            'fill-extrusion-opacity': 0.84,
+            'fill-extrusion-opacity': 0.9,
             'fill-extrusion-vertical-gradient': true,
           },
         }, firstLabelLayer);
@@ -484,20 +485,20 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
 
       // User route overlay (additive only — high contrast, does not affect Earth logic)
       map.addLayer({ id: 'user-route-glow', type: 'line', source: 'user-route', paint: {
-        'line-color': ['match', ['get', 'mode'], 'follow', '#67E8F9', '#22D3EE'],
-        'line-width': ['interpolate', ['linear'], ['zoom'], 2, 8, 5, 12, 10, 18, 15, 22],
-        'line-opacity': ['interpolate', ['linear'], ['zoom'], 2, 0.24, 8, 0.18],
-        'line-blur': 1.1,
+        'line-color': ['match', ['get', 'mode'], 'follow', '#22D3EE', '#22D3EE'],
+        'line-width': ['interpolate', ['linear'], ['zoom'], 2, 8, 5, 12, 10, 18, 15, 24],
+        'line-opacity': ['interpolate', ['linear'], ['zoom'], 2, 0.22, 8, 0.32, 15, 0.42],
+        'line-blur': 1.4,
       }});
       map.addLayer({ id: 'user-route-casing', type: 'line', source: 'user-route', paint: {
-        'line-color': 'rgba(2, 7, 18, 0.94)',
-        'line-width': ['interpolate', ['linear'], ['zoom'], 2, 5.2, 5, 7.2, 10, 10.4, 15, 13],
-        'line-opacity': 0.78,
+        'line-color': 'rgba(3, 15, 32, 0.98)',
+        'line-width': ['interpolate', ['linear'], ['zoom'], 2, 5.2, 5, 7.2, 10, 11, 15, 14.5],
+        'line-opacity': 0.96,
         'line-blur': 0.05,
       }});
       map.addLayer({ id: 'user-route-line', type: 'line', source: 'user-route', paint: {
-        'line-color': ['match', ['get', 'mode'], 'follow', '#F8FAFC', '#22D3EE'],
-        'line-width': ['interpolate', ['linear'], ['zoom'], 2, 2.9, 5, 4.5, 10, 6.8, 15, 8.5],
+        'line-color': ['match', ['get', 'mode'], 'follow', '#38BDF8', '#22D3EE'],
+        'line-width': ['interpolate', ['linear'], ['zoom'], 2, 2.9, 5, 4.5, 10, 7.2, 15, 9.5],
         'line-opacity': 0.96,
         'line-blur': 0,
       }});
@@ -2230,12 +2231,38 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       map.setLayoutProperty('vector-3d-buildings', 'visibility', buildingsVisible ? 'visible' : 'none');
     }
 
-    if (buildingsVisible) {
-      const isMobileNavigation = window.innerWidth < 768;
-      const cameraPreset = getVectorCameraPreset(navigationMode, isMobileNavigation);
-      map.easeTo({ pitch: cameraPreset.pitch, duration: 650, essential: true });
-    }
+    // The navigation camera owns pitch. A second pitch-only easeTo here would
+    // cancel the center/zoom transition and strand VECTOR in overview.
   }, [mapReady, navigationActive, navigationMode, projection]);
+
+  useEffect(() => {
+    if (!mapReady || !mapRef.current) return;
+    const map = mapRef.current;
+    const operationalSources = new Set([
+      'flights', 'military', 'jets', 'private-fl', 'flight-trails', 'military-trails',
+      'jet-trails', 'private-trails', 'satellites', 'gdelt', 'gdelt-hotspots',
+      'gps-jamming', 'cctv', 'fires', 'weather', 'infrastructure', 'maritime',
+      'maritime-choke', 'maritime-ships', 'live-news', 'sigint-news', 'conflict-zones',
+      'war-alerts-targets', 'war-alerts-lines', 'balloons', 'radiation', 'sdk-entities',
+      'sdk-links', 'ip-sweep-devices', 'ip-sweep-pulse', 'ip-sweep-connections', 'scan-targets',
+    ]);
+
+    if (navigationActive) {
+      for (const layer of map.getStyle().layers ?? []) {
+        const source = typeof layer.source === 'string' ? layer.source : '';
+        if (!operationalSources.has(source)) continue;
+        const visibility = map.getLayoutProperty(layer.id, 'visibility');
+        preNavigationLayerVisibilityRef.current.set(layer.id, typeof visibility === 'string' ? visibility : 'visible');
+        map.setLayoutProperty(layer.id, 'visibility', 'none');
+      }
+      return;
+    }
+
+    for (const [layerId, visibility] of preNavigationLayerVisibilityRef.current) {
+      if (map.getLayer(layerId)) map.setLayoutProperty(layerId, 'visibility', visibility);
+    }
+    preNavigationLayerVisibilityRef.current.clear();
+  }, [mapReady, navigationActive]);
 
   useEffect(() => {
 
