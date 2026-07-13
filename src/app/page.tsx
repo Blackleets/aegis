@@ -130,43 +130,6 @@ function AegisVectorGlyph({ className }: MobileNavGlyphProps) {
   );
 }
 
-function AegisAnalystDockButton() {
-  return (
-    <div className="mb-2 overflow-hidden rounded-2xl border border-cyan-300/18 bg-[linear-gradient(135deg,rgba(34,211,238,0.11),rgba(212,175,55,0.06)_52%,rgba(5,10,18,0.82))] p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-[7px] font-mono uppercase tracking-[0.24em] text-cyan-200/80">AEGIS CORTEX</div>
-          <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-white">IA organizada dentro de RECON</div>
-          <div className="mt-1 text-[8px] font-mono uppercase tracking-[0.12em] text-[var(--text-secondary)]">No flota sobre el globo · abre briefing o dossier</div>
-        </div>
-        <div className="flex shrink-0 gap-1.5">
-          <button
-            type="button"
-            onClick={() => window.dispatchEvent(new CustomEvent('aegis:ai-analyst', { detail: { action: 'briefing' } }))}
-            className="rounded-full border border-cyan-300/25 bg-cyan-300/10 px-2.5 py-1.5 text-[7px] font-mono uppercase tracking-[0.16em] text-cyan-100"
-          >
-            Brief
-          </button>
-          <button
-            type="button"
-            onClick={() => window.dispatchEvent(new CustomEvent('aegis:ai-analyst', { detail: { action: 'fusion' } }))}
-            className="rounded-full border border-amber-300/25 bg-amber-300/10 px-2.5 py-1.5 text-[7px] font-mono uppercase tracking-[0.16em] text-amber-100"
-          >
-            Fusion
-          </button>
-          <button
-            type="button"
-            onClick={() => window.dispatchEvent(new CustomEvent('aegis:ai-analyst', { detail: { action: 'hermes' } }))}
-            className="rounded-full border border-emerald-300/25 bg-emerald-300/10 px-2.5 py-1.5 text-[7px] font-mono uppercase tracking-[0.16em] text-emerald-100"
-          >
-            Hermes
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function MobileDrawerHeaderSummary({
   commandPanelLabel,
   panelTitle,
@@ -1459,7 +1422,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!navigationActive || !userLocation) {
-      setNearbyEarthquakeAlert(null);
+      queueMicrotask(() => setNearbyEarthquakeAlert(null));
       return;
     }
 
@@ -1484,7 +1447,7 @@ export default function Dashboard() {
       .sort((a, b) => a.distanceMeters - b.distanceMeters || b.magnitude - a.magnitude)[0];
 
     if (!nearby) {
-      setNearbyEarthquakeAlert(null);
+      queueMicrotask(() => setNearbyEarthquakeAlert(null));
       return;
     }
 
@@ -1506,7 +1469,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!navigationActive || !userLocation) {
-      setNearbyContextAlert(null);
+      queueMicrotask(() => setNearbyContextAlert(null));
       return;
     }
 
@@ -1575,7 +1538,7 @@ export default function Dashboard() {
       .sort((a, b) => b.priority - a.priority || a.distanceMeters - b.distanceMeters)[0];
 
     if (!selected) {
-      setNearbyContextAlert(null);
+      queueMicrotask(() => setNearbyContextAlert(null));
       return;
     }
 
@@ -2203,7 +2166,6 @@ export default function Dashboard() {
               <MobileReconPanel
                 osintPanel={(
                   <>
-                    <AegisAnalystDockButton />
                     <OsintPanel isOpen={true} onClose={() => setMobilePanel(null)} isMobile={true} onSweepVisualize={setSweepData} />
                   </>
                 )}

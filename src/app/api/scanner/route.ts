@@ -37,6 +37,16 @@ const ALLOWED_SCANS: Record<string, { endpoint: string; timeout: number }> = {
 //   ports    → arbitrary port range scanning
 
 export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+
+  // Lightweight capability check for the UI. Never exposes credentials.
+  if (searchParams.get('status') === '1') {
+    return NextResponse.json({
+      configured: Boolean(SCANNER_URL && SCANNER_KEY),
+      available_scans: Object.keys(ALLOWED_SCANS),
+    });
+  }
+
   // 1. Check scanner is configured
   if (!SCANNER_KEY) {
     return NextResponse.json({ error: 'Scanner not configured', hint: 'Set SCANNER_URL and SCANNER_KEY in .env' }, { status: 503 });
@@ -52,7 +62,6 @@ export async function GET(req: Request) {
   }
 
   // 3. Validate params
-  const { searchParams } = new URL(req.url);
   const target = searchParams.get('target')?.trim();
   const scanType = searchParams.get('type') || 'quick';
 

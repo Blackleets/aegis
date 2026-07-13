@@ -42,7 +42,6 @@ export default function MobileCommandDrawer({
   reconContent,
   headerSummary,
   isGlobeView,
-  isSatelliteView,
   onToggleProjection,
   onToggleMapStyle,
 }: MobileCommandDrawerProps) {
@@ -50,6 +49,7 @@ export default function MobileCommandDrawer({
   const { onlineCount, status: presenceStatus } = useRealtimePresence();
   const activeTab = mobileNavTabs.find((tab) => tab.id === mobilePanel) ?? null;
   const isSearchPanel = mobilePanel === 'search';
+  const isReconPanel = mobilePanel === 'recon';
 
   const openPanel = (panel: MobilePanel) => {
     setMenuOpen(false);
@@ -163,6 +163,19 @@ export default function MobileCommandDrawer({
                     <div className="mt-0.5 text-[11px] font-semibold text-white">Destino y ruta</div>
                   </div>
                   <button type="button" onClick={() => onTogglePanel('search')} className="grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-white/[0.035] text-white/65" aria-label="Cerrar navegación">
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : isReconPanel ? (
+                <div className="sticky top-0 z-10 -mx-3 mb-2 flex items-center justify-between border-b border-white/8 bg-[rgba(6,17,27,0.96)] px-4 py-2 backdrop-blur-2xl">
+                  <div>
+                    <div className="flex items-center gap-2 text-[8px] font-mono uppercase tracking-[0.22em] text-cyan-200">
+                      <Satellite className="h-3.5 w-3.5" />
+                      AEGIS RECON
+                    </div>
+                    <div className="mt-0.5 text-[11px] font-semibold text-white">Inteligencia de fuentes públicas</div>
+                  </div>
+                  <button type="button" onClick={() => onTogglePanel('recon')} className="grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-white/[0.035] text-white/65" aria-label="Cerrar reconocimiento">
                     <X className="h-4 w-4" />
                   </button>
                 </div>
