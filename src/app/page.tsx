@@ -1380,7 +1380,7 @@ export default function Dashboard() {
         locale={locale}
       />
 
-      <ModeDock
+      {(!isMobile || !navigationActive) && <ModeDock
         mode={dashboardMode}
         locale={locale}
         isMobile={isMobile}
@@ -1404,7 +1404,7 @@ export default function Dashboard() {
           setSelectedCelestialBody('earth');
           setMobileModeDockCollapsed(isMobile);
         }}
-      />
+      />}
 
       {!isMobile && isEarthOps && selectedCelestialBody === 'earth' && !routeSnapshot && (
         <>
@@ -1696,7 +1696,7 @@ export default function Dashboard() {
             />
           )}
 
-          <MobileCommandDrawer
+          {!navigationActive && <MobileCommandDrawer
             mobileNavTabs={mobileNavTabs}
             mobilePanel={mobilePanel}
             onTogglePanel={(panel) => setMobilePanel(mobilePanel === panel ? null : panel)}
@@ -1748,7 +1748,7 @@ export default function Dashboard() {
                 )}
               />
             )}
-          />
+          />}
         </>
       )}
 
