@@ -72,6 +72,7 @@ interface AegisMapProps {
   navigationActive?: boolean;
   navigationBearing?: number | null;
   navigationMode?: VectorNavigationMode;
+  ambientMotionEnabled?: boolean;
 }
 
 function computeSolarTerminator(): [number, number][] {
@@ -241,7 +242,7 @@ function takeTopEntities<T>(items: T[] | undefined, limit: number, score: (item:
   return [...items].sort((a, b) => score(b) - score(a)).slice(0, limit);
 }
 
-function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightClick, onViewStateChange, flyToLocation, projection = 'globe', mapStyle = 'dark', sweepData, scanTargets = [], currentLocation = null, routeDestination = null, routePath = [], navigationActive = false, navigationBearing = null, navigationMode = 'driving' }: AegisMapProps) {
+function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightClick, onViewStateChange, flyToLocation, projection = 'globe', mapStyle = 'dark', sweepData, scanTargets = [], currentLocation = null, routeDestination = null, routePath = [], navigationActive = false, navigationBearing = null, navigationMode = 'driving', ambientMotionEnabled = true }: AegisMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const popupRef = useRef<maplibregl.Popup | null>(null);
@@ -1051,7 +1052,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       syncAdaptiveZoom();
     });
     const pauseGlobeSpin = () => {
-      globeSpinPauseUntilRef.current = Date.now() + 5000;
+      globeSpinPauseUntilRef.current = Date.now() + 20000;
     };
     map.on('mousedown', pauseGlobeSpin);
     map.on('touchstart', pauseGlobeSpin);
@@ -2373,14 +2374,15 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
   }, [mapReady, navigationActive]);
 
   useEffect(() => {
-    if (!mapReady || !mapRef.current || projection !== 'globe' || navigationActive) return;
-    if (window.innerWidth < 1024 || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (!mapReady || !mapRef.current || projection !== 'globe' || navigationActive || !ambientMotionEnabled) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
     const map = mapRef.current;
     let frame = 0;
     let lastTime = performance.now();
     const MAX_IDLE_SPIN_ZOOM = 2.4;
-    globeSpinPauseUntilRef.current = Math.max(globeSpinPauseUntilRef.current, Date.now() + 12000);
+    const spinDegreesPerSecond = window.innerWidth < 1024 ? 0.045 : 0.08;
+    globeSpinPauseUntilRef.current = Math.max(globeSpinPauseUntilRef.current, Date.now() + 20000);
 
     const spin = (timestamp: number) => {
       if (!mapRef.current) return;
@@ -2402,12 +2404,12 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       if (deltaSeconds <= 0) return;
 
       const center = map.getCenter();
-      map.jumpTo({ center: [normalizeLongitude(center.lng - deltaSeconds * 0.08), center.lat] });
+      map.jumpTo({ center: [normalizeLongitude(center.lng - deltaSeconds * spinDegreesPerSecond), center.lat] });
     };
 
     frame = window.requestAnimationFrame(spin);
     return () => window.cancelAnimationFrame(frame);
-  }, [adaptiveZoom, mapReady, navigationActive, projection]);
+  }, [adaptiveZoom, ambientMotionEnabled, mapReady, navigationActive, projection]);
 
   // Fly-to
   useEffect(() => {
