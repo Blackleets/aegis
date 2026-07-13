@@ -32,7 +32,7 @@ import SplashScreen from '@/components/dashboard/SplashScreen';
 import TopHudOverlays from '@/components/dashboard/TopHudOverlays';
 import { DEFAULT_LOCALE, getDashboardCopy, isLocale, type Locale } from '@/lib/i18n';
 import { type ActiveLayers, type BoundingBox, type Coordinate, type FlyToLocation, type MapView, type RouteOption, type RouteRiskSummary, type RouteSnapshot, type RouteStep, computeBearing, countSignalsNearRoute, distanceMetersBetween, distanceToRoutePath, formatEtaLabel, formatProgressLabel, getClosestStepIndex, getYouTubeWatchUrl } from '@/lib/routing-shell';
-import { shouldRerouteNavigation } from '@/lib/vector-navigation';
+import { getNextSimulationIndex, shouldRerouteNavigation } from '@/lib/vector-navigation';
 
 const AegisMap = dynamic(() => import('@/components/AegisMap'), { ssr: false });
 const LayerPanel = dynamic(() => import('@/components/LayerPanel'));
@@ -480,6 +480,8 @@ export default function Dashboard() {
   const [gpsAccuracyMeters, setGpsAccuracyMeters] = useState<number | null>(null);
   const [navigationSpeedKmh, setNavigationSpeedKmh] = useState<number | null>(null);
   const [navigationRerouting, setNavigationRerouting] = useState(false);
+  const [navigationSimulationActive, setNavigationSimulationActive] = useState(false);
+  const [navigationArrived, setNavigationArrived] = useState(false);
   const [usageMetrics, setUsageMetrics] = useState<UsageMetrics | null>(null);
   const mouseCoordsRef = useRef<Coordinate | null>(null);
   const coordsDisplayRef = useRef<HTMLDivElement>(null);
@@ -515,6 +517,7 @@ export default function Dashboard() {
   const lastNavigationLocationRef = useRef<Coordinate | null>(null);
   const offRouteSinceRef = useRef<number | null>(null);
   const lastRerouteAtRef = useRef(0);
+  const simulationIndexRef = useRef(0);
   const preNavigationMapStateRef = useRef<{ projection: 'globe' | 'mercator'; style: 'dark' | 'satellite' } | null>(null);
   const lastGeocodedPos = useRef<{ lat: number; lng: number } | null>(null);
   const lastGeocodeKeyRef = useRef<string>('');
@@ -1156,7 +1159,7 @@ export default function Dashboard() {
   }, [data.maritime_ports, data.maritime_chokepoints]);
 
   useEffect(() => {
-    if (!navigationActive || !routeSnapshot || typeof navigator === 'undefined' || !navigator.geolocation) return;
+    if (!navigationActive || navigationSimulationActive || !routeSnapshot || typeof navigator === 'undefined' || !navigator.geolocation) return;
 
     const watchId = navigator.geolocation.watchPosition(
       (position) => {
@@ -1211,6 +1214,11 @@ export default function Dashboard() {
           offRouteSinceRef.current = null;
         }
 
+        if (distanceMetersBetween(nextLocation, routeSnapshot.destination) <= 30) {
+          setNavigationArrived(true);
+          setNavigationActive(false);
+        }
+
         lastNavigationLocationRef.current = nextLocation;
       },
       (error) => {
@@ -1224,7 +1232,33 @@ export default function Dashboard() {
     );
 
     return () => navigator.geolocation.clearWatch(watchId);
-  }, [handleRouteRequest, navigationActive, navigationRerouting, routeSnapshot]);
+  }, [handleRouteRequest, navigationActive, navigationRerouting, navigationSimulationActive, routeSnapshot]);
+
+  useEffect(() => {
+    if (!navigationSimulationActive || !navigationActive || !routeSnapshot || routeSnapshot.coordinates.length < 2) return;
+    const timer = window.setInterval(() => {
+      const currentIndex = simulationIndexRef.current;
+      const nextIndex = getNextSimulationIndex(currentIndex, routeSnapshot.coordinates.length);
+      const [lng, lat] = routeSnapshot.coordinates[nextIndex];
+      const [previousLng, previousLat] = routeSnapshot.coordinates[Math.max(0, nextIndex - 1)];
+      const nextLocation = { lat, lng };
+
+      setUserLocation(nextLocation);
+      setGpsAccuracyMeters(4);
+      setNavigationSpeedKmh(routeSnapshot.mode === 'walking' ? 5 : routeSnapshot.mode === 'cycling' ? 18 : 42);
+      setNavigationBearing(computeBearing({ lat: previousLat, lng: previousLng }, nextLocation));
+      const closestStepIndex = getClosestStepIndex(nextLocation, routeSnapshot.steps);
+      setCurrentRouteStepIndex((currentIndexValue) => Math.max(currentIndexValue, Math.min(currentIndexValue + 1, closestStepIndex)));
+      simulationIndexRef.current = nextIndex;
+
+      if (nextIndex >= routeSnapshot.coordinates.length - 1) {
+        setNavigationArrived(true);
+        setNavigationSimulationActive(false);
+        setNavigationActive(false);
+      }
+    }, 900);
+    return () => window.clearInterval(timer);
+  }, [navigationActive, navigationSimulationActive, routeSnapshot]);
 
   const clearNavigationState = useCallback(() => {
     setRouteSnapshot(null);
@@ -1236,6 +1270,9 @@ export default function Dashboard() {
     setGpsAccuracyMeters(null);
     setNavigationSpeedKmh(null);
     setNavigationRerouting(false);
+    setNavigationSimulationActive(false);
+    setNavigationArrived(false);
+    simulationIndexRef.current = 0;
     offRouteSinceRef.current = null;
     lastNavigationLocationRef.current = null;
     const previousMapState = preNavigationMapStateRef.current;
@@ -1276,6 +1313,16 @@ export default function Dashboard() {
   const toggleNavigationFollow = useCallback(() => {
     if (!routeSnapshot) return;
     setNavigationActive((value) => !value);
+  }, [routeSnapshot]);
+
+  const toggleNavigationSimulation = useCallback(() => {
+    if (!routeSnapshot) return;
+    setNavigationArrived(false);
+    setNavigationActive(true);
+    setNavigationSimulationActive((active) => {
+      if (!active) simulationIndexRef.current = 0;
+      return !active;
+    });
   }, [routeSnapshot]);
 
   const currentRouteStep = routeSnapshot?.steps?.[currentRouteStepIndex] ?? null;
@@ -1742,9 +1789,12 @@ export default function Dashboard() {
               gpsAccuracyMeters={gpsAccuracyMeters}
               navigationSpeedKmh={navigationSpeedKmh}
               navigationRerouting={navigationRerouting}
+              navigationSimulationActive={navigationSimulationActive}
+              navigationArrived={navigationArrived}
               onToggleNavigationFollow={toggleNavigationFollow}
               onClearNavigationState={clearNavigationState}
               onOpenSearch={() => setMobilePanel('search')}
+              onToggleSimulation={toggleNavigationSimulation}
             />
           )}
 
