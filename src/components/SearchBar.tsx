@@ -19,7 +19,8 @@ export interface SearchResult {
 
 export interface RouteRequest {
   destination: SearchResult;
-  origin: { lat: number; lng: number };
+  origin: { lat: number; lng: number; accuracy?: number };
+  startImmediately?: boolean;
   mode: 'driving' | 'walking' | 'cycling';
   waypoints: SearchResult[];
 }
@@ -75,7 +76,7 @@ function SearchBar({ onLocate, onRoute, defaultOpen = false, variant = 'default'
   const [loading, setLoading] = useState(false);
   const [geoState, setGeoState] = useState<GeoState>('idle');
   const [geoError, setGeoError] = useState('');
-  const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number; accuracy?: number } | null>(null);
   const [routingLabel, setRoutingLabel] = useState<string | null>(null);
   const [routeMode, setRouteMode] = useState<'driving' | 'walking' | 'cycling'>('driving');
   const [draftWaypoints, setDraftWaypoints] = useState<SearchResult[]>([]);
@@ -157,12 +158,13 @@ function SearchBar({ onLocate, onRoute, defaultOpen = false, variant = 'default'
     setGeoState('locating');
     setGeoError('');
 
-    return new Promise<{ lat: number; lng: number } | null>((resolve) => {
+    return new Promise<{ lat: number; lng: number; accuracy?: number } | null>((resolve) => {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const nextLocation = {
             lat: position.coords.latitude,
             lng: position.coords.longitude,
+            accuracy: Number.isFinite(position.coords.accuracy) ? Math.round(position.coords.accuracy) : undefined,
           };
           setCurrentLocation(nextLocation);
           setGeoState('ready');
@@ -276,7 +278,7 @@ function SearchBar({ onLocate, onRoute, defaultOpen = false, variant = 'default'
     if (!location) return;
     setRoutingLabel(result.label);
     try {
-      await onRoute({ origin: location, destination: result, mode: routeMode, waypoints: draftWaypoints });
+      await onRoute({ origin: location, destination: result, mode: routeMode, waypoints: draftWaypoints, startImmediately: false });
       resetAndClose();
     } finally {
       setRoutingLabel(null);
@@ -468,7 +470,7 @@ Limpiar paradas
 
       {currentLocation && (
         <div className="rounded-2xl border border-cyan-300/20 bg-cyan-400/[0.07] px-3 py-2 text-[8px] font-mono uppercase tracking-[0.14em] text-cyan-100/75">
-          {isMobileNav ? `Ubicación activa · ${formatCoordinateChip(currentLocation.lat, currentLocation.lng)}` : `AEGIS VECTOR origin locked to live GPS · ${formatCoordinateChip(currentLocation.lat, currentLocation.lng)}`}
+          {isMobileNav ? `GPS confirmado${currentLocation.accuracy ? ` · precisión ±${currentLocation.accuracy} m` : ''}` : `AEGIS VECTOR origin locked · ${formatCoordinateChip(currentLocation.lat, currentLocation.lng)}${currentLocation.accuracy ? ` · ±${currentLocation.accuracy} m` : ''}`}
         </div>
       )}
 

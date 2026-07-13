@@ -777,7 +777,7 @@ export default function Dashboard() {
     }
   }, [loadRegionDossier]);
 
-  const handleRouteRequest = useCallback(async ({ origin, destination, mode, waypoints }: RouteRequest) => {
+  const handleRouteRequest = useCallback(async ({ origin, destination, mode, waypoints, startImmediately = false }: RouteRequest) => {
     const previousMapState = { projection: mapProjection, style: mapStyle };
     setRouteError(null);
     setRouteLoading(true);
@@ -825,7 +825,10 @@ export default function Dashboard() {
           }];
 
       setUserLocation(origin);
-      setNavigationActive(true);
+      setGpsAccuracyMeters(origin.accuracy ?? null);
+      setNavigationActive(startImmediately);
+      setNavigationSimulationActive(false);
+      setNavigationArrived(false);
       setNavigationBearing(route.steps?.[0]?.maneuver.bearingAfter ?? null);
       setCurrentRouteStepIndex(0);
       lastNavigationLocationRef.current = origin;
@@ -1256,6 +1259,7 @@ export default function Dashboard() {
               destination: routeSnapshot.destination,
               mode: routeSnapshot.mode,
               waypoints: routeSnapshot.waypoints,
+              startImmediately: true,
             }).finally(() => setNavigationRerouting(false));
           }
         } else {
