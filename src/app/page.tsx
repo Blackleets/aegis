@@ -342,7 +342,7 @@ interface DashboardData extends Record<string, unknown> {
   maritime_ships?: DashboardEntity[];
   maritime_ports?: DashboardEntity[];
   maritime_chokepoints?: DashboardEntity[];
-  earthquakes?: (DashboardEntity & { magnitude?: number; place?: string })[];
+  earthquakes?: (DashboardEntity & { id?: string; magnitude?: number; place?: string; depth?: number; time?: number })[];
   gdelt?: (DashboardEntity & { name?: string })[];
   news?: DashboardNews[];
   satellites?: DashboardEntity[];
@@ -354,6 +354,16 @@ interface DashboardData extends Record<string, unknown> {
   fires?: DashboardEntity[];
   gps_jamming?: DashboardEntity[];
   sdk_entities?: unknown[];
+}
+
+interface NearbyEarthquakeAlert {
+  id: string;
+  magnitude: number;
+  place: string;
+  distanceMeters: number;
+  depth?: number;
+  time: number;
+  source: 'USGS';
 }
 
 interface UsageMetrics {
@@ -483,6 +493,7 @@ export default function Dashboard() {
   const [navigationSimulationActive, setNavigationSimulationActive] = useState(false);
   const [navigationArrived, setNavigationArrived] = useState(false);
   const [navigationVoiceEnabled, setNavigationVoiceEnabled] = useState(true);
+  const [nearbyEarthquakeAlert, setNearbyEarthquakeAlert] = useState<NearbyEarthquakeAlert | null>(null);
   const [usageMetrics, setUsageMetrics] = useState<UsageMetrics | null>(null);
   const mouseCoordsRef = useRef<Coordinate | null>(null);
   const coordsDisplayRef = useRef<HTMLDivElement>(null);
@@ -521,6 +532,8 @@ export default function Dashboard() {
   const simulationIndexRef = useRef(0);
   const lastSpokenStepRef = useRef<number | null>(null);
   const lastNearSpokenStepRef = useRef<number | null>(null);
+  const lastSpokenEarthquakeRef = useRef<string | null>(null);
+  const alertedEarthquakeIdsRef = useRef<Set<string>>(new Set());
   const arrivalSpokenRef = useRef(false);
   const preNavigationMapStateRef = useRef<{ projection: 'globe' | 'mercator'; style: 'dark' | 'satellite' } | null>(null);
   const lastGeocodedPos = useRef<{ lat: number; lng: number } | null>(null);
@@ -1342,6 +1355,53 @@ export default function Dashboard() {
     ? Math.round(distanceMetersBetween(userLocation, { lat: currentRouteStep.maneuver.location[1], lng: currentRouteStep.maneuver.location[0] }))
     : currentRouteStep?.distanceMeters ?? null;
 
+  useEffect(() => {
+    if (!navigationActive || !userLocation) {
+      setNearbyEarthquakeAlert(null);
+      return;
+    }
+
+    const now = Date.now();
+    const nearby = (data.earthquakes || [])
+      .flatMap((earthquake) => {
+        if (typeof earthquake.lat !== 'number' || typeof earthquake.lng !== 'number' || typeof earthquake.magnitude !== 'number' || typeof earthquake.time !== 'number') return [];
+        const ageMs = now - earthquake.time;
+        if (ageMs < -300000 || ageMs > 86400000) return [];
+        const distanceMeters = Math.round(distanceMetersBetween(userLocation, earthquake));
+        if (distanceMeters > 25000) return [];
+        return [{
+          id: earthquake.id || `${earthquake.time}-${earthquake.lat}-${earthquake.lng}`,
+          magnitude: earthquake.magnitude,
+          place: earthquake.place || 'ubicación sin nombre',
+          distanceMeters,
+          depth: earthquake.depth,
+          time: earthquake.time,
+          source: 'USGS' as const,
+        }];
+      })
+      .sort((a, b) => a.distanceMeters - b.distanceMeters || b.magnitude - a.magnitude)[0];
+
+    if (!nearby) {
+      setNearbyEarthquakeAlert(null);
+      return;
+    }
+
+    setNearbyEarthquakeAlert((current) => {
+      if (current?.id === nearby.id) return nearby;
+      if (alertedEarthquakeIdsRef.current.has(nearby.id)) return current;
+      alertedEarthquakeIdsRef.current.add(nearby.id);
+
+      if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+        const distance = nearby.distanceMeters < 1000 ? `${nearby.distanceMeters} m` : `${(nearby.distanceMeters / 1000).toFixed(1)} km`;
+        new Notification(`AEGIS · Terremoto M${nearby.magnitude}`, {
+          body: `Registrado a ${distance}. Fuente: USGS.`,
+          tag: `aegis-earthquake-${nearby.id}`,
+        });
+      }
+      return nearby;
+    });
+  }, [data.earthquakes, navigationActive, userLocation]);
+
   const speakNavigationMessage = useCallback((message: string) => {
     if (!navigationVoiceEnabled || typeof window === 'undefined' || !('speechSynthesis' in window)) return;
     const utterance = new SpeechSynthesisUtterance(message);
@@ -1351,6 +1411,15 @@ export default function Dashboard() {
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(utterance);
   }, [navigationVoiceEnabled]);
+
+  useEffect(() => {
+    if (!nearbyEarthquakeAlert || lastSpokenEarthquakeRef.current === nearbyEarthquakeAlert.id) return;
+    lastSpokenEarthquakeRef.current = nearbyEarthquakeAlert.id;
+    const distance = nearbyEarthquakeAlert.distanceMeters < 1000
+      ? `${nearbyEarthquakeAlert.distanceMeters} metros`
+      : `${(nearbyEarthquakeAlert.distanceMeters / 1000).toFixed(1)} kilómetros`;
+    speakNavigationMessage(`Aviso AEGIS. Terremoto de magnitud ${nearbyEarthquakeAlert.magnitude}, registrado a ${distance}. Fuente U S G S.`);
+  }, [nearbyEarthquakeAlert, speakNavigationMessage]);
 
   useEffect(() => {
     if (!navigationActive || !currentRouteStep || lastSpokenStepRef.current === currentRouteStep.index) return;
@@ -1850,6 +1919,8 @@ export default function Dashboard() {
               onToggleSimulation={toggleNavigationSimulation}
               onToggleVoice={toggleNavigationVoice}
               onSelectRouteOption={selectRouteOption}
+              nearbyEarthquakeAlert={nearbyEarthquakeAlert}
+              onDismissNearbyEarthquake={() => setNearbyEarthquakeAlert(null)}
             />
           )}
 
