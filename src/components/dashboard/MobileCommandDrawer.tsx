@@ -1,7 +1,7 @@
 'use client';
 
 import { AnimatePresence, motion } from 'framer-motion';
-import { ChevronUp, LocateFixed, Map, Search, Settings2, Satellite, X } from 'lucide-react';
+import { BellRing, ChevronRight, LocateFixed, Map, Menu, Navigation, Search, Satellite, SlidersHorizontal, X } from 'lucide-react';
 import { useState, type ComponentType, type ReactNode } from 'react';
 
 type MobilePanel = 'layers' | 'markets' | 'intel' | 'search' | 'recon';
@@ -48,6 +48,9 @@ export default function MobileCommandDrawer({
   const [menuOpen, setMenuOpen] = useState(false);
   const activeTab = mobileNavTabs.find((tab) => tab.id === mobilePanel) ?? null;
   const isSearchPanel = mobilePanel === 'search';
+  const layersTab = mobileNavTabs.find((tab) => tab.id === 'layers');
+  const intelTab = mobileNavTabs.find((tab) => tab.id === 'intel');
+  const reconTab = mobileNavTabs.find((tab) => tab.id === 'recon');
 
   const openPanel = (panel: MobilePanel) => {
     setMenuOpen(false);
@@ -57,80 +60,102 @@ export default function MobileCommandDrawer({
   return (
     <>
       {!mobilePanel && (
-        <motion.button
-          type="button"
-          initial={{ opacity: 0, y: -12 }}
-          animate={{ opacity: 1, y: 0 }}
-          onClick={() => openPanel('search')}
-          className="fixed left-4 right-4 top-[max(1rem,env(safe-area-inset-top))] z-[390] flex min-h-[64px] items-center gap-3 rounded-[22px] border border-cyan-200/20 bg-[linear-gradient(135deg,rgba(5,18,29,0.94),rgba(5,12,21,0.90))] px-4 text-left shadow-[0_16px_44px_rgba(0,0,0,0.38),0_0_24px_rgba(34,211,238,0.10)] backdrop-blur-xl"
-          aria-label="Buscar destino"
-        >
-          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-cyan-300 text-[#031019] shadow-[0_0_20px_rgba(34,211,238,0.28)]">
-            <Search className="h-5 w-5" strokeWidth={2.4} />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-[15px] font-semibold text-white">¿A dónde vas?</span>
-            <span className="mt-0.5 flex items-center gap-1.5 text-[10px] text-cyan-100/60">
-              <LocateFixed className="h-3 w-3 text-emerald-300" />
-              Desde tu ubicación actual
-            </span>
-          </span>
-          <ChevronUp className="h-5 w-5 rotate-90 text-white/45" />
-        </motion.button>
-      )}
+        <>
+          <div className="fixed left-4 top-[max(1rem,env(safe-area-inset-top))] z-[392]">
+            <button
+              type="button"
+              onClick={() => setMenuOpen((open) => !open)}
+              className={`grid h-14 w-14 place-items-center rounded-[20px] border shadow-[0_12px_32px_rgba(0,0,0,0.38)] backdrop-blur-xl transition-all ${menuOpen ? 'border-cyan-200/40 bg-cyan-300 text-[#031019]' : 'border-white/15 bg-[rgba(5,15,25,0.91)] text-white'}`}
+              aria-label="Abrir menú AEGIS"
+            >
+              {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-6 w-6" />}
+            </button>
 
-      {!mobilePanel && (
-        <div className="fixed bottom-[max(1.25rem,env(safe-area-inset-bottom))] right-4 z-[391] flex flex-col items-end gap-2">
-          <AnimatePresence>
-            {menuOpen && (
-              <motion.div
-                initial={{ opacity: 0, y: 12, scale: 0.96 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 10, scale: 0.96 }}
-                className="w-[min(19rem,calc(100vw-2rem))] rounded-[24px] border border-white/12 bg-[rgba(4,13,22,0.94)] p-3 shadow-[0_22px_60px_rgba(0,0,0,0.48)] backdrop-blur-xl"
-              >
-                <div className="mb-3 flex items-center justify-between px-1">
-                  <div>
-                    <div className="text-[8px] font-mono uppercase tracking-[0.24em] text-cyan-200">Controles</div>
-                    <div className="mt-1 text-[12px] font-semibold text-white">Vista y herramientas</div>
+            <AnimatePresence>
+              {menuOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: -8, scale: 0.96 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -6, scale: 0.97 }}
+                  className="mt-3 w-[min(19rem,calc(100vw-2rem))] overflow-hidden rounded-[26px] border border-white/12 bg-[rgba(4,13,22,0.96)] shadow-[0_24px_64px_rgba(0,0,0,0.52)] backdrop-blur-2xl"
+                >
+                  <div className="border-b border-white/8 px-4 py-3.5">
+                    <div className="flex items-center gap-2 text-[8px] font-mono uppercase tracking-[0.25em] text-cyan-200">
+                      <span className="h-2 w-2 rounded-full bg-emerald-300 shadow-[0_0_10px_rgba(110,231,183,0.8)]" />
+                      AEGIS en vivo
+                    </div>
+                    <div className="mt-1.5 text-[14px] font-semibold text-white">Centro de control</div>
                   </div>
-                  <button type="button" onClick={() => setMenuOpen(false)} className="grid h-9 w-9 place-items-center rounded-full border border-white/10 text-white/60" aria-label="Cerrar controles">
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
 
-                <div className="mb-3 grid grid-cols-2 gap-2">
-                  <button type="button" onClick={onToggleProjection} className="flex min-h-[54px] items-center gap-2 rounded-2xl border border-cyan-300/18 bg-cyan-300/[0.07] px-3 text-left">
-                    <Map className="h-4 w-4 text-cyan-200" />
-                    <span><span className="block text-[10px] font-semibold text-white">{isGlobeView ? 'Globo 3D' : 'Mapa 2D'}</span><span className="block text-[8px] text-white/45">Cambiar vista</span></span>
-                  </button>
-                  <button type="button" onClick={onToggleMapStyle} className="flex min-h-[54px] items-center gap-2 rounded-2xl border border-emerald-300/18 bg-emerald-300/[0.06] px-3 text-left">
-                    <Satellite className="h-4 w-4 text-emerald-200" />
-                    <span><span className="block text-[10px] font-semibold text-white">{isSatelliteView ? 'Satélite' : 'Tierra'}</span><span className="block text-[8px] text-white/45">Color del mapa</span></span>
-                  </button>
-                </div>
+                  <div className="grid grid-cols-2 gap-2 p-3">
+                    {mobileNavTabs.filter((tab) => tab.id !== 'search').map((tab) => (
+                      <button key={tab.id} type="button" onClick={() => openPanel(tab.id)} className="flex min-h-[58px] items-center gap-3 rounded-2xl border border-white/9 bg-white/[0.035] px-3 text-left transition-colors active:bg-white/[0.1]">
+                        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/[0.055]">
+                          <tab.icon className={`h-4 w-4 ${tab.accent ? 'text-cyan-300' : 'text-white/70'}`} />
+                        </span>
+                        <span className="text-[9px] font-mono uppercase tracking-[0.13em] text-white/85">{tab.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
 
-                <div className="grid grid-cols-2 gap-2">
-                  {mobileNavTabs.filter((tab) => tab.id !== 'search').map((tab) => (
-                    <button key={tab.id} type="button" onClick={() => openPanel(tab.id)} className="flex min-h-[48px] items-center gap-2.5 rounded-2xl border border-white/10 bg-white/[0.035] px-3 text-left transition-colors active:bg-white/[0.09]">
-                      <tab.icon className={`h-4 w-4 ${tab.accent ? 'text-cyan-300' : 'text-white/65'}`} />
-                      <span className="text-[9px] font-mono uppercase tracking-[0.14em] text-white/80">{tab.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          <div className="fixed right-4 top-[max(1rem,env(safe-area-inset-top))] z-[391] flex flex-col gap-2.5">
+            <button type="button" onClick={onToggleProjection} className="grid h-14 w-14 place-items-center rounded-full border border-white/15 bg-[rgba(5,15,25,0.91)] text-cyan-100 shadow-[0_12px_30px_rgba(0,0,0,0.36)] backdrop-blur-xl" aria-label="Cambiar proyección">
+              {isGlobeView ? <Navigation className="h-5 w-5 fill-cyan-200/20" /> : <Map className="h-5 w-5" />}
+            </button>
+            <button type="button" onClick={onToggleMapStyle} className="grid h-14 w-14 place-items-center rounded-full border border-white/15 bg-[rgba(5,15,25,0.91)] text-emerald-200 shadow-[0_12px_30px_rgba(0,0,0,0.36)] backdrop-blur-xl" aria-label="Cambiar estilo del mapa">
+              <Satellite className="h-5 w-5" />
+            </button>
+          </div>
 
-          <button
-            type="button"
-            onClick={() => setMenuOpen((open) => !open)}
-            className={`grid h-14 w-14 place-items-center rounded-full border shadow-[0_14px_35px_rgba(0,0,0,0.4)] backdrop-blur-xl transition-colors ${menuOpen ? 'border-cyan-300/45 bg-cyan-300 text-[#04121c]' : 'border-white/15 bg-[rgba(5,15,25,0.90)] text-cyan-100'}`}
-            aria-label="Abrir vista y configuración"
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="fixed inset-x-0 bottom-0 z-[390] rounded-t-[30px] border-t border-white/14 bg-[linear-gradient(180deg,rgba(7,17,27,0.95),rgba(3,10,17,0.98))] px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2.5 shadow-[0_-18px_54px_rgba(0,0,0,0.46)] backdrop-blur-2xl"
           >
-            <Settings2 className="h-5 w-5" />
-          </button>
-        </div>
+            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-white/28" />
+            <button
+              type="button"
+              onClick={() => openPanel('search')}
+              className="flex min-h-[62px] w-full items-center gap-3 rounded-[22px] border border-cyan-200/18 bg-white/[0.065] px-4 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+              aria-label="Buscar destino"
+            >
+              <Search className="h-6 w-6 shrink-0 text-cyan-200" strokeWidth={2.2} />
+              <span className="min-w-0 flex-1">
+                <span className="block text-[16px] font-medium text-white">¿A dónde vas?</span>
+                <span className="mt-0.5 flex items-center gap-1.5 text-[9px] text-white/42">
+                  <LocateFixed className="h-3 w-3 text-emerald-300" />
+                  Ruta desde tu ubicación
+                </span>
+              </span>
+              <ChevronRight className="h-5 w-5 text-white/35" />
+            </button>
+
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              {layersTab && (
+                <button type="button" onClick={() => openPanel('layers')} className="flex min-h-[46px] items-center justify-center gap-2 rounded-2xl border border-white/9 bg-white/[0.035] px-2 text-white/72">
+                  <layersTab.icon className="h-4 w-4 text-cyan-200" />
+                  <span className="text-[8px] font-mono uppercase tracking-[0.12em]">Capas</span>
+                </button>
+              )}
+              {intelTab && (
+                <button type="button" onClick={() => openPanel('intel')} className="flex min-h-[46px] items-center justify-center gap-2 rounded-2xl border border-amber-300/12 bg-amber-300/[0.045] px-2 text-white/72">
+                  <BellRing className="h-4 w-4 text-amber-200" />
+                  <span className="text-[8px] font-mono uppercase tracking-[0.12em]">Alertas</span>
+                </button>
+              )}
+              {reconTab && (
+                <button type="button" onClick={() => openPanel('recon')} className="flex min-h-[46px] items-center justify-center gap-2 rounded-2xl border border-cyan-300/12 bg-cyan-300/[0.045] px-2 text-white/72">
+                  <SlidersHorizontal className="h-4 w-4 text-cyan-200" />
+                  <span className="text-[8px] font-mono uppercase tracking-[0.12em]">Cortex</span>
+                </button>
+              )}
+            </div>
+          </motion.div>
+        </>
       )}
 
       <AnimatePresence>
@@ -140,18 +165,21 @@ export default function MobileCommandDrawer({
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={{ type: 'spring', damping: 32, stiffness: 320 }}
-            className="fixed inset-x-0 bottom-0 z-[400] overflow-y-auto rounded-t-[28px] border-t border-cyan-200/15 bg-[linear-gradient(180deg,rgba(6,17,27,0.97),rgba(3,10,17,0.98))] shadow-[0_-20px_60px_rgba(0,0,0,0.48)] backdrop-blur-xl styled-scrollbar"
-            style={{ maxHeight: isSearchPanel ? 'min(76vh, calc(100dvh - 88px))' : 'min(68vh, calc(100dvh - 96px))', paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}
+            className="fixed inset-x-0 bottom-0 z-[400] overflow-y-auto rounded-t-[30px] border-t border-cyan-200/15 bg-[linear-gradient(180deg,rgba(6,17,27,0.98),rgba(3,10,17,0.99))] shadow-[0_-22px_64px_rgba(0,0,0,0.52)] backdrop-blur-2xl styled-scrollbar"
+            style={{ maxHeight: isSearchPanel ? 'min(79vh, calc(100dvh - 74px))' : 'min(72vh, calc(100dvh - 84px))', paddingBottom: 'max(14px, env(safe-area-inset-bottom))' }}
           >
-            <div className="mx-auto mt-2.5 h-1 w-10 rounded-full bg-white/20" />
+            <div className="mx-auto mt-2.5 h-1 w-10 rounded-full bg-white/26" />
             <div className={`px-3 pb-3 ${isSearchPanel ? 'pt-2' : ''}`}>
               {isSearchPanel ? (
-                <div className="sticky top-0 z-10 -mx-3 mb-2 flex items-center justify-between border-b border-white/8 bg-[rgba(6,17,27,0.94)] px-4 py-2 backdrop-blur-xl">
+                <div className="sticky top-0 z-10 -mx-3 mb-2 flex items-center justify-between border-b border-white/8 bg-[rgba(6,17,27,0.96)] px-4 py-2.5 backdrop-blur-2xl">
                   <div>
-                    <div className="text-[8px] font-mono uppercase tracking-[0.22em] text-cyan-200">Navegación</div>
-                    <div className="mt-0.5 text-[12px] font-semibold text-white">Elige tu destino</div>
+                    <div className="flex items-center gap-2 text-[8px] font-mono uppercase tracking-[0.22em] text-cyan-200">
+                      <Navigation className="h-3.5 w-3.5" />
+                      AEGIS GPS
+                    </div>
+                    <div className="mt-1 text-[13px] font-semibold text-white">Busca un destino</div>
                   </div>
-                  <button type="button" onClick={() => onTogglePanel('search')} className="grid h-10 w-10 place-items-center rounded-full border border-white/10 text-white/65" aria-label="Cerrar navegación">
+                  <button type="button" onClick={() => onTogglePanel('search')} className="grid h-11 w-11 place-items-center rounded-full border border-white/10 bg-white/[0.035] text-white/65" aria-label="Cerrar navegación">
                     <X className="h-4 w-4" />
                   </button>
                 </div>
