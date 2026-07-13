@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { getArrivalThresholdMeters, getNavigationCameraTarget, getNextSimulationIndex, getVectorCameraPreset, shouldRerouteNavigation, shouldUpdateNavigationCamera, smoothNavigationBearing, snapNavigationToRoute, stabilizeNavigationCoordinate } from '../src/lib/vector-navigation';
+import { getArrivalThresholdMeters, getNavigationCameraTarget, getNextSimulationIndex, getVectorCameraPreset, resolveNavigationBearing, shouldAcceptNavigationFix, shouldRerouteNavigation, shouldUpdateNavigationCamera, smoothNavigationBearing, snapNavigationToRoute, stabilizeNavigationCoordinate } from '../src/lib/vector-navigation';
 
 describe('vector navigation camera', () => {
   it('uses a closer camera for walking than driving', () => {
@@ -42,6 +42,53 @@ describe('vector navigation camera', () => {
     expect(nearRoute.snapped).toBe(true);
     expect(nearRoute.coordinate.lat).toBeCloseTo(40.4168, 5);
     expect(offRoute.snapped).toBe(false);
+  });
+
+  it('rejects inaccurate or physically implausible GPS fixes', () => {
+    const previous = { lat: 40.4168, lng: -3.7038 };
+    expect(shouldAcceptNavigationFix({
+      previous,
+      next: { lat: 40.4169, lng: -3.7037 },
+      gpsAccuracyMeters: 12,
+      speedKmh: 35,
+      elapsedMs: 1_000,
+    })).toBe(true);
+    expect(shouldAcceptNavigationFix({
+      previous,
+      next: { lat: 40.4268, lng: -3.6938 },
+      gpsAccuracyMeters: 8,
+      speedKmh: 0,
+      elapsedMs: 1_000,
+    })).toBe(false);
+    expect(shouldAcceptNavigationFix({
+      previous,
+      next: { lat: 40.4169, lng: -3.7037 },
+      gpsAccuracyMeters: 180,
+      speedKmh: 20,
+      elapsedMs: 1_000,
+    })).toBe(false);
+  });
+
+  it('does not rotate from an unreliable stationary device heading', () => {
+    const previous = { lat: 40.4168, lng: -3.7038 };
+    expect(resolveNavigationBearing({
+      previousBearing: 90,
+      deviceHeading: 270,
+      previousCoordinate: previous,
+      currentCoordinate: { lat: 40.41681, lng: -3.7038 },
+      gpsAccuracyMeters: 12,
+      speedKmh: 1,
+    })).toBe(90);
+
+    const moving = resolveNavigationBearing({
+      previousBearing: 350,
+      deviceHeading: 10,
+      previousCoordinate: previous,
+      currentCoordinate: { lat: 40.417, lng: -3.7038 },
+      gpsAccuracyMeters: 8,
+      speedKmh: 28,
+    });
+    expect(moving).toBeGreaterThan(350);
   });
 
   it('smooths normal GPS noise and rejects a stationary one-sample jump', () => {

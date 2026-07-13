@@ -106,6 +106,71 @@ export function getNavigationCameraTarget(
 }
 
 
+export function shouldAcceptNavigationFix({
+  previous,
+  next,
+  gpsAccuracyMeters,
+  speedKmh,
+  elapsedMs,
+}: {
+  previous: NavigationCoordinate | null;
+  next: NavigationCoordinate;
+  gpsAccuracyMeters: number | null;
+  speedKmh: number | null;
+  elapsedMs: number;
+}) {
+  if (!Number.isFinite(next.lat) || !Number.isFinite(next.lng)) return false;
+  if (Math.abs(next.lat) > 90 || Math.abs(next.lng) > 180) return false;
+  if (gpsAccuracyMeters === null || gpsAccuracyMeters > 100) return false;
+  if (!previous) return true;
+
+  const distanceMeters = navigationDistanceMeters(previous, next);
+  const elapsedSeconds = Math.max(0.25, elapsedMs / 1000);
+  const reportedSpeedMps = Math.max(0, (speedKmh ?? 0) / 3.6);
+  const physicallyPlausibleDistance = Math.max(
+    45,
+    gpsAccuracyMeters * 2.5,
+    reportedSpeedMps * elapsedSeconds + 35,
+  );
+
+  return distanceMeters <= physicallyPlausibleDistance;
+}
+
+export function resolveNavigationBearing({
+  previousBearing,
+  deviceHeading,
+  previousCoordinate,
+  currentCoordinate,
+  gpsAccuracyMeters,
+  speedKmh,
+}: {
+  previousBearing: number | null;
+  deviceHeading: number | null;
+  previousCoordinate: NavigationCoordinate | null;
+  currentCoordinate: NavigationCoordinate;
+  gpsAccuracyMeters: number | null;
+  speedKmh: number | null;
+}) {
+  const reliableHeading = deviceHeading !== null
+    && Number.isFinite(deviceHeading)
+    && (speedKmh ?? 0) >= 7
+    && (gpsAccuracyMeters ?? Number.POSITIVE_INFINITY) <= 35;
+
+  if (reliableHeading) {
+    return smoothNavigationBearing(previousBearing, deviceHeading, 0.24);
+  }
+
+  if (previousCoordinate && navigationDistanceMeters(previousCoordinate, currentCoordinate) >= 6) {
+    const movementBearing = Math.atan2(
+      (currentCoordinate.lng - previousCoordinate.lng) * Math.cos(currentCoordinate.lat * Math.PI / 180),
+      currentCoordinate.lat - previousCoordinate.lat,
+    ) * 180 / Math.PI;
+    return smoothNavigationBearing(previousBearing, movementBearing, 0.2);
+  }
+
+  return previousBearing;
+}
+
 export function stabilizeNavigationCoordinate(
   previous: NavigationCoordinate | null,
   next: NavigationCoordinate,
