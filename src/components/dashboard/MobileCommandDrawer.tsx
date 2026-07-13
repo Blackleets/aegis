@@ -1,7 +1,7 @@
 'use client';
 
 import { AnimatePresence, motion } from 'framer-motion';
-import { BellRing, ChevronRight, LocateFixed, Map, Menu, Navigation, Search, Satellite, SlidersHorizontal, X } from 'lucide-react';
+import { ChevronRight, LocateFixed, Map, Menu, Navigation, Search, Satellite, X } from 'lucide-react';
 import { useState, type ComponentType, type ReactNode } from 'react';
 
 type MobilePanel = 'layers' | 'markets' | 'intel' | 'search' | 'recon';
@@ -48,9 +48,6 @@ export default function MobileCommandDrawer({
   const [menuOpen, setMenuOpen] = useState(false);
   const activeTab = mobileNavTabs.find((tab) => tab.id === mobilePanel) ?? null;
   const isSearchPanel = mobilePanel === 'search';
-  const layersTab = mobileNavTabs.find((tab) => tab.id === 'layers');
-  const intelTab = mobileNavTabs.find((tab) => tab.id === 'intel');
-  const reconTab = mobileNavTabs.find((tab) => tab.id === 'recon');
 
   const openPanel = (panel: MobilePanel) => {
     setMenuOpen(false);
@@ -65,10 +62,10 @@ export default function MobileCommandDrawer({
             <button
               type="button"
               onClick={() => setMenuOpen((open) => !open)}
-              className={`grid h-14 w-14 place-items-center rounded-[20px] border shadow-[0_12px_32px_rgba(0,0,0,0.38)] backdrop-blur-xl transition-all ${menuOpen ? 'border-cyan-200/40 bg-cyan-300 text-[#031019]' : 'border-white/15 bg-[rgba(5,15,25,0.91)] text-white'}`}
+              className={`grid h-12 w-12 place-items-center rounded-2xl border shadow-[0_12px_32px_rgba(0,0,0,0.38)] backdrop-blur-xl transition-all ${menuOpen ? 'border-cyan-200/40 bg-cyan-300 text-[#031019]' : 'border-white/15 bg-[rgba(5,15,25,0.91)] text-white'}`}
               aria-label="Abrir menú AEGIS"
             >
-              {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-6 w-6" />}
+              {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
 
             <AnimatePresence>
@@ -102,59 +99,35 @@ export default function MobileCommandDrawer({
             </AnimatePresence>
           </div>
 
-          <div className="fixed right-4 top-[max(1rem,env(safe-area-inset-top))] z-[391] flex flex-col gap-2.5">
-            <button type="button" onClick={onToggleProjection} className="grid h-14 w-14 place-items-center rounded-full border border-white/15 bg-[rgba(5,15,25,0.91)] text-cyan-100 shadow-[0_12px_30px_rgba(0,0,0,0.36)] backdrop-blur-xl" aria-label="Cambiar proyección">
+          <div className="fixed right-4 top-[max(1rem,env(safe-area-inset-top))] z-[391] flex flex-col gap-2">
+            <button type="button" onClick={onToggleProjection} className="grid h-12 w-12 place-items-center rounded-full border border-white/15 bg-[rgba(5,15,25,0.91)] text-cyan-100 shadow-[0_12px_30px_rgba(0,0,0,0.36)] backdrop-blur-xl" aria-label="Cambiar proyección">
               {isGlobeView ? <Navigation className="h-5 w-5 fill-cyan-200/20" /> : <Map className="h-5 w-5" />}
             </button>
-            <button type="button" onClick={onToggleMapStyle} className="grid h-14 w-14 place-items-center rounded-full border border-white/15 bg-[rgba(5,15,25,0.91)] text-emerald-200 shadow-[0_12px_30px_rgba(0,0,0,0.36)] backdrop-blur-xl" aria-label="Cambiar estilo del mapa">
+            <button type="button" onClick={onToggleMapStyle} className="grid h-12 w-12 place-items-center rounded-full border border-white/15 bg-[rgba(5,15,25,0.91)] text-emerald-200 shadow-[0_12px_30px_rgba(0,0,0,0.36)] backdrop-blur-xl" aria-label="Cambiar estilo del mapa">
               <Satellite className="h-5 w-5" />
             </button>
           </div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 24 }}
+          <motion.button
+            type="button"
+            initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
-            className="fixed inset-x-0 bottom-0 z-[390] rounded-t-[30px] border-t border-white/14 bg-[linear-gradient(180deg,rgba(7,17,27,0.95),rgba(3,10,17,0.98))] px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2.5 shadow-[0_-18px_54px_rgba(0,0,0,0.46)] backdrop-blur-2xl"
+            onClick={() => openPanel('search')}
+            className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-4 right-4 z-[390] flex min-h-[58px] items-center gap-3 rounded-[22px] border border-cyan-200/20 bg-[linear-gradient(135deg,rgba(5,18,29,0.92),rgba(4,12,20,0.88))] px-4 text-left shadow-[0_14px_38px_rgba(0,0,0,0.42),0_0_22px_rgba(34,211,238,0.09)] backdrop-blur-xl"
+            aria-label="Buscar destino"
           >
-            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-white/28" />
-            <button
-              type="button"
-              onClick={() => openPanel('search')}
-              className="flex min-h-[62px] w-full items-center gap-3 rounded-[22px] border border-cyan-200/18 bg-white/[0.065] px-4 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
-              aria-label="Buscar destino"
-            >
-              <Search className="h-6 w-6 shrink-0 text-cyan-200" strokeWidth={2.2} />
-              <span className="min-w-0 flex-1">
-                <span className="block text-[16px] font-medium text-white">¿A dónde vas?</span>
-                <span className="mt-0.5 flex items-center gap-1.5 text-[9px] text-white/42">
-                  <LocateFixed className="h-3 w-3 text-emerald-300" />
-                  Ruta desde tu ubicación
-                </span>
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-cyan-300/12 text-cyan-200">
+              <Search className="h-5 w-5" strokeWidth={2.2} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[15px] font-semibold text-white">¿A dónde vas?</span>
+              <span className="mt-0.5 flex items-center gap-1.5 text-[9px] text-white/42">
+                <LocateFixed className="h-3 w-3 text-emerald-300" />
+                Ruta desde tu ubicación
               </span>
-              <ChevronRight className="h-5 w-5 text-white/35" />
-            </button>
-
-            <div className="mt-3 grid grid-cols-3 gap-2">
-              {layersTab && (
-                <button type="button" onClick={() => openPanel('layers')} className="flex min-h-[46px] items-center justify-center gap-2 rounded-2xl border border-white/9 bg-white/[0.035] px-2 text-white/72">
-                  <layersTab.icon className="h-4 w-4 text-cyan-200" />
-                  <span className="text-[8px] font-mono uppercase tracking-[0.12em]">Capas</span>
-                </button>
-              )}
-              {intelTab && (
-                <button type="button" onClick={() => openPanel('intel')} className="flex min-h-[46px] items-center justify-center gap-2 rounded-2xl border border-amber-300/12 bg-amber-300/[0.045] px-2 text-white/72">
-                  <BellRing className="h-4 w-4 text-amber-200" />
-                  <span className="text-[8px] font-mono uppercase tracking-[0.12em]">Alertas</span>
-                </button>
-              )}
-              {reconTab && (
-                <button type="button" onClick={() => openPanel('recon')} className="flex min-h-[46px] items-center justify-center gap-2 rounded-2xl border border-cyan-300/12 bg-cyan-300/[0.045] px-2 text-white/72">
-                  <SlidersHorizontal className="h-4 w-4 text-cyan-200" />
-                  <span className="text-[8px] font-mono uppercase tracking-[0.12em]">Cortex</span>
-                </button>
-              )}
-            </div>
-          </motion.div>
+            </span>
+            <ChevronRight className="h-5 w-5 text-white/35" />
+          </motion.button>
         </>
       )}
 
