@@ -5,6 +5,7 @@ import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 import { findNewEarthquakes, getEarthquakeSeverity, isRecentEarthquake } from '@/lib/earthquakes';
+import { getNavigationCameraTarget, getVectorCameraPreset, type VectorNavigationMode } from '@/lib/vector-navigation';
 
 type Coordinates = [number, number];
 type EntityProperties = Record<string, unknown>;
@@ -70,6 +71,7 @@ interface AegisMapProps {
   routePath?: Coordinates[];
   navigationActive?: boolean;
   navigationBearing?: number | null;
+  navigationMode?: VectorNavigationMode;
 }
 
 function computeSolarTerminator(): [number, number][] {
@@ -239,7 +241,7 @@ function takeTopEntities<T>(items: T[] | undefined, limit: number, score: (item:
   return [...items].sort((a, b) => score(b) - score(a)).slice(0, limit);
 }
 
-function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightClick, onViewStateChange, flyToLocation, projection = 'globe', mapStyle = 'dark', sweepData, scanTargets = [], currentLocation = null, routeDestination = null, routePath = [], navigationActive = false, navigationBearing = null }: AegisMapProps) {
+function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightClick, onViewStateChange, flyToLocation, projection = 'globe', mapStyle = 'dark', sweepData, scanTargets = [], currentLocation = null, routeDestination = null, routePath = [], navigationActive = false, navigationBearing = null, navigationMode = 'driving' }: AegisMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const popupRef = useRef<maplibregl.Popup | null>(null);
@@ -397,6 +399,45 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       // Sources
       const sources = ['flights','military','jets','private-fl','flight-trails','military-trails','jet-trails','private-trails','satellites','earthquakes','earthquake-pulses','gdelt','gdelt-hotspots','gps-jamming','day-night','cctv','fires','weather','infrastructure','maritime','maritime-choke','maritime-ships','live-news','sigint-news','conflict-zones', 'war-alerts-targets', 'war-alerts-lines', 'balloons', 'radiation', 'ip-sweep-devices', 'ip-sweep-pulse', 'ip-sweep-connections', 'scan-targets', 'sdk-entities', 'sdk-links', 'user-route', 'route-markers'];
       sources.forEach(s => map.addSource(s, { type: 'geojson', data: EMPTY_FC }));
+
+      const firstLabelLayer = map.getStyle().layers?.find((layer) => layer.type === 'symbol')?.id;
+      if (map.getSource('carto') && !map.getLayer('vector-3d-buildings')) {
+        map.addLayer({
+          id: 'vector-3d-buildings',
+          type: 'fill-extrusion',
+          source: 'carto',
+          'source-layer': 'building',
+          minzoom: 14,
+          layout: { visibility: 'none' },
+          paint: {
+            'fill-extrusion-color': [
+              'interpolate', ['linear'], ['zoom'],
+              14, '#101b25',
+              16, '#163447',
+              18, '#1d536c',
+            ],
+            'fill-extrusion-height': [
+              'interpolate', ['linear'], ['zoom'],
+              14, 0,
+              15.2, [
+                'coalesce',
+                ['to-number', ['get', 'render_height']],
+                ['to-number', ['get', 'height']],
+                ['*', ['to-number', ['get', 'levels']], 3],
+                10,
+              ],
+            ],
+            'fill-extrusion-base': [
+              'coalesce',
+              ['to-number', ['get', 'render_min_height']],
+              ['to-number', ['get', 'min_height']],
+              0,
+            ],
+            'fill-extrusion-opacity': 0.84,
+            'fill-extrusion-vertical-gradient': true,
+          },
+        }, firstLabelLayer);
+      }
 
 
       // Warning icon generator (parameterized — eliminates 3x copy-paste)
@@ -2147,6 +2188,8 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
   useEffect(() => {
     if (!mapReady || !mapRef.current || !currentLocation || !navigationActive) return;
     const map = mapRef.current;
+    const isMobileNavigation = window.innerWidth < 768;
+    const cameraPreset = getVectorCameraPreset(navigationMode, isMobileNavigation);
     const now = Date.now();
     const lastCenter = lastNavCameraCenterRef.current;
     const nextBearing = navigationBearing ?? map.getBearing();
@@ -2164,19 +2207,35 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
     lastNavCameraUpdateRef.current = now;
     lastNavCameraCenterRef.current = currentLocation;
     lastNavCameraBearingRef.current = nextBearing;
+    const cameraTarget = getNavigationCameraTarget(currentLocation, nextBearing, cameraPreset.lookAheadMeters);
 
     map.easeTo({
-      center: [currentLocation.lng, currentLocation.lat + (window.innerWidth < 768 ? 0.0009 : 0.0035)],
-      zoom: Math.max(map.getZoom(), window.innerWidth < 768 ? 17.1 : 15.7),
-      pitch: window.innerWidth < 768 ? 72 : 54,
+      center: [cameraTarget.lng, cameraTarget.lat],
+      zoom: Math.max(map.getZoom(), cameraPreset.zoom),
+      pitch: cameraPreset.pitch,
       bearing: nextBearing,
-      padding: window.innerWidth < 768
+      padding: isMobileNavigation
         ? { top: 112, bottom: 86, left: 18, right: 18 }
         : { top: 108, bottom: 156, left: 64, right: 64 },
-      duration: window.innerWidth < 768 ? 560 : 720,
+      duration: cameraPreset.durationMs,
       essential: true,
     });
-  }, [currentLocation, mapReady, navigationActive, navigationBearing]);
+  }, [currentLocation, mapReady, navigationActive, navigationBearing, navigationMode]);
+
+  useEffect(() => {
+    if (!mapReady || !mapRef.current) return;
+    const map = mapRef.current;
+    const buildingsVisible = navigationActive && projection === 'mercator';
+    if (map.getLayer('vector-3d-buildings')) {
+      map.setLayoutProperty('vector-3d-buildings', 'visibility', buildingsVisible ? 'visible' : 'none');
+    }
+
+    if (buildingsVisible) {
+      const isMobileNavigation = window.innerWidth < 768;
+      const cameraPreset = getVectorCameraPreset(navigationMode, isMobileNavigation);
+      map.easeTo({ pitch: cameraPreset.pitch, duration: 650, essential: true });
+    }
+  }, [mapReady, navigationActive, navigationMode, projection]);
 
   useEffect(() => {
 
@@ -2221,13 +2280,16 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
     const targetZoom = flyToLocation.zoom ?? (projection === 'globe' ? 7.2 : 10);
 
     if (navigationActive && currentLocation && window.innerWidth < 768) {
+      const cameraPreset = getVectorCameraPreset(navigationMode, true);
+      const nextBearing = navigationBearing ?? map.getBearing();
+      const cameraTarget = getNavigationCameraTarget(currentLocation, nextBearing, cameraPreset.lookAheadMeters);
       map.easeTo({
-        center: [currentLocation.lng, currentLocation.lat + 0.0009],
-        zoom: Math.max(map.getZoom(), 17.1),
-        pitch: 72,
-        bearing: navigationBearing ?? map.getBearing(),
+        center: [cameraTarget.lng, cameraTarget.lat],
+        zoom: Math.max(map.getZoom(), cameraPreset.zoom),
+        pitch: cameraPreset.pitch,
+        bearing: nextBearing,
         padding: { top: 112, bottom: 86, left: 18, right: 18 },
-        duration: 520,
+        duration: cameraPreset.durationMs,
         essential: true,
       });
       return;
@@ -2253,7 +2315,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       duration: 2400,
       essential: true,
     });
-  }, [currentLocation, flyToLocation, mapReady, navigationActive, navigationBearing, projection]);
+  }, [currentLocation, flyToLocation, mapReady, navigationActive, navigationBearing, navigationMode, projection]);
 
   // Dynamic projection switching (lightweight — no terrain DEM)
   useEffect(() => {
@@ -2267,12 +2329,13 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
           map.easeTo({ center: [0, 31], zoom: Math.min(map.getZoom(), 1.82), pitch: 12, duration: 1200 });
         }
       } else {
-        map.easeTo({ pitch: 0, duration: 800 });
+        const cameraPreset = getVectorCameraPreset(navigationMode, window.innerWidth < 768);
+        map.easeTo({ pitch: navigationActive ? cameraPreset.pitch : 0, duration: 800 });
       }
     } catch (e) {
       console.warn('Projection switch failed:', e);
     }
-  }, [applyAegisGlobeStyling, currentLocation, mapReady, navigationActive, navigationBearing, projection, mapStyle]);
+  }, [applyAegisGlobeStyling, currentLocation, mapReady, navigationActive, navigationBearing, navigationMode, projection, mapStyle]);
 
   // Satellite / globe presentation switching
   useEffect(() => {
