@@ -133,7 +133,7 @@ export function stabilizeNavigationCoordinate(
 
 export function snapNavigationToRoute(
   coordinate: NavigationCoordinate,
-  route: NavigationCoordinate[],
+  route: Array<NavigationCoordinate | [number, number]>,
   gpsAccuracyMeters: number | null,
 ): { coordinate: NavigationCoordinate; distanceMeters: number; snapped: boolean } {
   if (route.length < 2) {
@@ -147,8 +147,10 @@ export function snapNavigationToRoute(
   let bestDistance = Number.POSITIVE_INFINITY;
 
   for (let index = 1; index < route.length; index += 1) {
-    const start = route[index - 1];
-    const end = route[index];
+    const startValue = route[index - 1];
+    const endValue = route[index];
+    const start = Array.isArray(startValue) ? { lng: startValue[0], lat: startValue[1] } : startValue;
+    const end = Array.isArray(endValue) ? { lng: endValue[0], lat: endValue[1] } : endValue;
     const ax = (start.lng - coordinate.lng) * metersPerDegreeLng;
     const ay = (start.lat - coordinate.lat) * metersPerDegreeLat;
     const bx = (end.lng - coordinate.lng) * metersPerDegreeLng;
