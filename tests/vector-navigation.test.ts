@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { getNavigationCameraTarget, getNextSimulationIndex, getVectorCameraPreset, shouldRerouteNavigation, shouldUpdateNavigationCamera, smoothNavigationBearing } from '../src/lib/vector-navigation';
+import { getArrivalThresholdMeters, getNavigationCameraTarget, getNextSimulationIndex, getVectorCameraPreset, shouldRerouteNavigation, shouldUpdateNavigationCamera, smoothNavigationBearing, snapNavigationToRoute, stabilizeNavigationCoordinate } from '../src/lib/vector-navigation';
 
 describe('vector navigation camera', () => {
   it('uses a closer camera for walking than driving', () => {
@@ -29,6 +29,33 @@ describe('vector navigation camera', () => {
     expect(shouldRerouteNavigation({ offRouteDistanceMeters: 120, gpsAccuracyMeters: 12, deviationDurationMs: 8_000, cooldownElapsedMs: 31_000 })).toBe(true);
     expect(shouldRerouteNavigation({ offRouteDistanceMeters: 120, gpsAccuracyMeters: 80, deviationDurationMs: 8_000, cooldownElapsedMs: 31_000 })).toBe(false);
     expect(shouldRerouteNavigation({ offRouteDistanceMeters: 120, gpsAccuracyMeters: 12, deviationDurationMs: 2_000, cooldownElapsedMs: 31_000 })).toBe(false);
+  });
+
+  it('snaps reliable GPS positions to a nearby route without hiding real deviations', () => {
+    const route = [
+      { lat: 40.4168, lng: -3.7040 },
+      { lat: 40.4168, lng: -3.7000 },
+    ];
+    const nearRoute = snapNavigationToRoute({ lat: 40.41695, lng: -3.7020 }, route, 10);
+    const offRoute = snapNavigationToRoute({ lat: 40.4185, lng: -3.7020 }, route, 10);
+
+    expect(nearRoute.snapped).toBe(true);
+    expect(nearRoute.coordinate.lat).toBeCloseTo(40.4168, 5);
+    expect(offRoute.snapped).toBe(false);
+  });
+
+  it('smooths normal GPS noise and rejects a stationary one-sample jump', () => {
+    const previous = { lat: 40.4168, lng: -3.7038 };
+    const smoothed = stabilizeNavigationCoordinate(previous, { lat: 40.4169, lng: -3.7037 }, 18, 20);
+    const rejected = stabilizeNavigationCoordinate(previous, { lat: 40.4268, lng: -3.6938 }, 8, 0);
+
+    expect(smoothed.lat).toBeGreaterThan(previous.lat);
+    expect(smoothed.lat).toBeLessThan(40.4169);
+    expect(rejected).toEqual(previous);
+  });
+
+  it('uses mode, accuracy and speed for arrival detection', () => {
+    expect(getArrivalThresholdMeters('walking', 8, 4)).toBeLessThan(getArrivalThresholdMeters('driving', 25, 60));
   });
 
   it('advances simulation safely and stops at the destination', () => {
