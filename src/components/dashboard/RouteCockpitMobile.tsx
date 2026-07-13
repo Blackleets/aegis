@@ -371,8 +371,17 @@ export default function RouteCockpitMobile({
                   {routeLoading ? <Route className="h-5 w-5 animate-pulse" /> : <Flag className="h-5 w-5" />}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-cyan-200/58">{statusLabel}</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-cyan-200/58">{statusLabel}</p>
+                    {!routeLoading && (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-emerald-300/16 bg-emerald-300/[0.08] px-2 py-1 text-[8px] font-medium text-emerald-200">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                        {gpsAccuracyMeters !== null ? `GPS ±${Math.round(gpsAccuracyMeters)} m` : 'Origen GPS'}
+                      </span>
+                    )}
+                  </div>
                   <h2 className="mt-1 truncate text-[17px] font-bold text-white">{routeLoading ? 'Buscando la mejor ruta' : destinationLabel}</h2>
+                  {!routeLoading && <p className="mt-1 text-[10px] text-white/44">Desde tu ubicación actual · revisa la ruta antes de iniciar</p>}
                   <div className="mt-2 flex items-center gap-2 text-[12px] text-white/62">
                     <span className="font-semibold text-white">{routeEtaLabel}</span>
                     <span>·</span><span>{distanceLabel}</span><span>·</span><span>{durationLabel}</span>
