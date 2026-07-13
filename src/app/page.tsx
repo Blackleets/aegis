@@ -32,7 +32,7 @@ import SplashScreen from '@/components/dashboard/SplashScreen';
 import TopHudOverlays from '@/components/dashboard/TopHudOverlays';
 import { DEFAULT_LOCALE, getDashboardCopy, isLocale, type Locale } from '@/lib/i18n';
 import { type ActiveLayers, type BoundingBox, type Coordinate, type FlyToLocation, type MapView, type RouteOption, type RouteRiskSummary, type RouteSnapshot, type RouteStep, computeBearing, countSignalsNearRoute, distanceMetersBetween, distanceToRoutePath, formatEtaLabel, formatProgressLabel, getClosestStepIndex, getYouTubeWatchUrl, localizeRouteInstruction } from '@/lib/routing-shell';
-import { getArrivalThresholdMeters, getNextSimulationIndex, shouldRerouteNavigation, snapNavigationToRoute, stabilizeNavigationCoordinate } from '@/lib/vector-navigation';
+import { getArrivalThresholdMeters, getNextSimulationIndex, resolveNavigationBearing, shouldAcceptNavigationFix, shouldRerouteNavigation, snapNavigationToRoute, stabilizeNavigationCoordinate } from '@/lib/vector-navigation';
 import { recommendRoute } from '@/lib/route-intelligence';
 
 const AegisMap = dynamic(() => import('@/components/AegisMap'), { ssr: false });
@@ -520,6 +520,8 @@ export default function Dashboard() {
   const geocodeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const geocodeAbortRef = useRef<AbortController | null>(null);
   const lastNavigationLocationRef = useRef<Coordinate | null>(null);
+  const lastNavigationBearingRef = useRef<number | null>(null);
+  const lastAcceptedGpsAtRef = useRef(0);
   const offRouteSinceRef = useRef<number | null>(null);
   const lastRerouteAtRef = useRef(0);
   const simulationIndexRef = useRef(0);
@@ -827,7 +829,10 @@ export default function Dashboard() {
       setNavigationActive(startImmediately);
       setNavigationSimulationActive(false);
       setNavigationArrived(false);
-      setNavigationBearing(route.steps?.[0]?.maneuver.bearingAfter ?? null);
+      const initialBearing = route.steps?.[0]?.maneuver.bearingAfter ?? null;
+      lastNavigationBearingRef.current = initialBearing;
+      lastAcceptedGpsAtRef.current = Date.now();
+      setNavigationBearing(initialBearing);
       setCurrentRouteStepIndex(0);
       lastNavigationLocationRef.current = origin;
       setRouteSnapshot({
@@ -1249,6 +1254,20 @@ export default function Dashboard() {
           : null;
 
         const previous = lastNavigationLocationRef.current;
+        const now = Date.now();
+        const elapsedMs = lastAcceptedGpsAtRef.current > 0 ? now - lastAcceptedGpsAtRef.current : 1_000;
+        if (!shouldAcceptNavigationFix({
+          previous,
+          next: rawLocation,
+          gpsAccuracyMeters: accuracy,
+          speedKmh,
+          elapsedMs,
+        })) {
+          setGpsAccuracyMeters(accuracy);
+          return;
+        }
+        lastAcceptedGpsAtRef.current = now;
+
         const stabilizedLocation = stabilizeNavigationCoordinate(previous, rawLocation, accuracy, speedKmh);
         const routeMatch = snapNavigationToRoute(stabilizedLocation, routeSnapshot.coordinates, accuracy);
         const nextLocation = routeMatch.coordinate;
@@ -1257,8 +1276,18 @@ export default function Dashboard() {
         setGpsAccuracyMeters(accuracy);
         setNavigationSpeedKmh(speedKmh);
 
-        const computedBearing = heading ?? (previous ? computeBearing(previous, nextLocation) : null);
-        if (computedBearing !== null) setNavigationBearing(computedBearing);
+        const computedBearing = resolveNavigationBearing({
+          previousBearing: lastNavigationBearingRef.current,
+          deviceHeading: heading,
+          previousCoordinate: previous,
+          currentCoordinate: nextLocation,
+          gpsAccuracyMeters: accuracy,
+          speedKmh,
+        });
+        if (computedBearing !== null) {
+          lastNavigationBearingRef.current = computedBearing;
+          setNavigationBearing(computedBearing);
+        }
 
         if (routeSnapshot.steps.length > 0) {
           const closestStepIndex = getClosestStepIndex(nextLocation, routeSnapshot.steps);
@@ -1357,6 +1386,8 @@ export default function Dashboard() {
     simulationIndexRef.current = 0;
     offRouteSinceRef.current = null;
     lastNavigationLocationRef.current = null;
+    lastNavigationBearingRef.current = null;
+    lastAcceptedGpsAtRef.current = 0;
     const previousMapState = preNavigationMapStateRef.current;
     if (previousMapState) {
       setMapProjection(previousMapState.projection);
