@@ -401,14 +401,15 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
+    const isCompactViewport = window.innerWidth < 768;
     const map = new maplibregl.Map({
       container: containerRef.current,
       style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
-      center: [0, 20],
-      zoom: initialProjectionRef.current === 'globe' ? 2.05 : 3.2,
-      minZoom: 1.5,
+      center: [0, isCompactViewport ? 12 : 20],
+      zoom: initialProjectionRef.current === 'globe' ? (isCompactViewport ? 1.52 : 2.05) : 3.2,
+      minZoom: isCompactViewport ? 1.3 : 1.5,
       maxZoom: 18,
-      pitch: initialProjectionRef.current === 'globe' ? 14 : 0,
+      pitch: initialProjectionRef.current === 'globe' ? (isCompactViewport ? 0 : 14) : 0,
       attributionControl: false,
     });
 
@@ -2416,7 +2417,8 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       applyAegisGlobeStyling(map, projection, mapStyle);
       if (projection === 'globe') {
         if (!navigationActive && !currentLocation) {
-          map.easeTo({ center: [0, 31], zoom: Math.min(map.getZoom(), 1.82), pitch: 12, duration: 1200 });
+          const isCompactViewport = window.innerWidth < 768;
+          map.easeTo({ center: [0, isCompactViewport ? 12 : 31], zoom: Math.min(map.getZoom(), isCompactViewport ? 1.52 : 1.82), pitch: isCompactViewport ? 0 : 12, duration: 1200 });
         }
       } else if (navigationActive && currentLocation) {
         // Projection changes cancel in-flight MapLibre camera transitions. Re-apply the
