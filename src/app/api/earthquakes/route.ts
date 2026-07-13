@@ -1,6 +1,10 @@
 
 import { NextResponse } from 'next/server';
 
+import type { EarthquakeEvent } from '@/lib/earthquakes';
+
+export const dynamic = 'force-dynamic';
+
 /**
  * AEGIS — Earthquake Data API
  * Fetches real-time seismic events from USGS (last 24h, M2.5+)
@@ -21,6 +25,7 @@ interface UsgsFeature {
     type?: string;
     felt?: number | null;
     alert?: string | null;
+    updated?: number;
   };
 }
 
@@ -42,32 +47,44 @@ export async function GET() {
     const data: UsgsResponse = await res.json();
     const features = data.features || [];
 
-    const earthquakes = features.map((f) => {
+    const earthquakes: EarthquakeEvent[] = features.flatMap((f) => {
       const coords = f.geometry?.coordinates || [0, 0, 0];
       const props = f.properties || {};
-      return {
+      const magnitude = Number(props.mag);
+      const lng = Number(coords[0]);
+      const lat = Number(coords[1]);
+      const depth = Number(coords[2]);
+      const time = Number(props.time);
+
+      if (!f.id || !Number.isFinite(magnitude) || !Number.isFinite(lat) || !Number.isFinite(lng) || !Number.isFinite(time)) {
+        return [];
+      }
+
+      return [{
         id: f.id,
-        lat: coords[1],
-        lng: coords[0],
-        depth: coords[2],
-        magnitude: props.mag,
-        place: props.place,
-        time: props.time,
+        lat,
+        lng,
+        depth: Number.isFinite(depth) ? depth : 0,
+        magnitude,
+        place: props.place || 'Unknown location',
+        time,
+        updated: props.updated,
         url: props.url,
-        tsunami: props.tsunami,
-        type: props.type,
+        tsunami: props.tsunami === 1,
         felt: props.felt,
         alert: props.alert,
-      };
-    });
+      }];
+    }).sort((a, b) => b.time - a.time);
 
     return NextResponse.json({
       earthquakes,
       total: earthquakes.length,
       timestamp: new Date().toISOString(),
+      source: 'USGS',
+      refreshIntervalMs: 20000,
     }, {
       headers: {
-        'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
+        'Cache-Control': 'no-store, max-age=0',
       },
     });
   } catch (error) {

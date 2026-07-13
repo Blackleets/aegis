@@ -4,6 +4,8 @@ import { useEffect, useRef, useState, useCallback, memo } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
+import { findNewEarthquakes, getEarthquakeSeverity, isRecentEarthquake } from '@/lib/earthquakes';
+
 type Coordinates = [number, number];
 type EntityProperties = Record<string, unknown>;
 type MapEntity = EntityProperties & { lat?: number; lng?: number; coords?: Coordinates };
@@ -15,6 +17,15 @@ type GeoJsonFeature = {
   properties: EntityProperties;
 };
 type GeoJsonSourceHandle = { setData: (data: { type: 'FeatureCollection'; features: GeoJsonFeature[] }) => void };
+type EarthquakePulse = {
+  id: string;
+  lat: number;
+  lng: number;
+  magnitude: number;
+  depth: number;
+  tsunami: boolean;
+  startedAt: number;
+};
 
 interface SweepCenter { lat: number; lng: number }
 interface SweepDevice extends EntityProperties { ip?: string; device_type?: string; device_icon?: string; device_color?: string; risk_level?: string; ports?: unknown[]; hostnames?: unknown[]; vulns?: unknown[]; cpes?: unknown[]; tags?: unknown[] }
@@ -244,6 +255,9 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
   const lastNavCameraCenterRef = useRef<{ lat: number; lng: number } | null>(null);
   const lastNavCameraBearingRef = useRef<number | null>(null);
   const globeSpinPauseUntilRef = useRef(0);
+  const seenEarthquakeIdsRef = useRef<Set<string> | null>(null);
+  const earthquakePulsesRef = useRef<EarthquakePulse[]>([]);
+  const earthquakePulseFrameRef = useRef<number | null>(null);
   const isOverviewMode = projection === 'globe' && adaptiveZoom <= GLOBE_OVERVIEW_ZOOM;
 
 
@@ -381,7 +395,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       createDot(map, 'dot-cctv', '#39FF14', 10);
 
       // Sources
-      const sources = ['flights','military','jets','private-fl','flight-trails','military-trails','jet-trails','private-trails','satellites','earthquakes','gdelt','gdelt-hotspots','gps-jamming','day-night','cctv','fires','weather','infrastructure','maritime','maritime-choke','maritime-ships','live-news','sigint-news','conflict-zones', 'war-alerts-targets', 'war-alerts-lines', 'balloons', 'radiation', 'ip-sweep-devices', 'ip-sweep-pulse', 'ip-sweep-connections', 'scan-targets', 'sdk-entities', 'sdk-links', 'user-route', 'route-markers'];
+      const sources = ['flights','military','jets','private-fl','flight-trails','military-trails','jet-trails','private-trails','satellites','earthquakes','earthquake-pulses','gdelt','gdelt-hotspots','gps-jamming','day-night','cctv','fires','weather','infrastructure','maritime','maritime-choke','maritime-ships','live-news','sigint-news','conflict-zones', 'war-alerts-targets', 'war-alerts-lines', 'balloons', 'radiation', 'ip-sweep-devices', 'ip-sweep-pulse', 'ip-sweep-connections', 'scan-targets', 'sdk-entities', 'sdk-links', 'user-route', 'route-markers'];
       sources.forEach(s => map.addSource(s, { type: 'geojson', data: EMPTY_FC }));
 
 
@@ -505,6 +519,21 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
         'circle-radius': ['interpolate',['linear'],['get','magnitude'], 2.5,4, 5,12, 7,24],
         'circle-color': ['interpolate',['linear'],['get','magnitude'], 2.5,'#FFD700', 4,'#FF9500', 6,'#FF1744'],
         'circle-opacity': 0.6, 'circle-blur': 0.3, 'circle-stroke-width': 1, 'circle-stroke-color': '#FFD700', 'circle-stroke-opacity': 0.3,
+      }});
+      map.addLayer({ id: 'eq-pulse-ring', type: 'circle', source: 'earthquake-pulses', paint: {
+        'circle-radius': ['interpolate', ['linear'], ['get', 'progress'], 0, 7, 1, ['interpolate', ['linear'], ['get', 'magnitude'], 2.5, 42, 5, 70, 7, 110]],
+        'circle-color': ['match', ['get', 'severity'], 'critical', '#FF1744', 'high', '#FF6B35', 'moderate', '#FFD166', '#7DE3FF'],
+        'circle-opacity': ['interpolate', ['linear'], ['get', 'progress'], 0, 0.72, 0.65, 0.24, 1, 0],
+        'circle-blur': 0.35,
+        'circle-stroke-width': 2,
+        'circle-stroke-color': ['match', ['get', 'severity'], 'critical', '#FF4D6D', 'high', '#FF9F43', '#FFF3B0'],
+        'circle-stroke-opacity': ['interpolate', ['linear'], ['get', 'progress'], 0, 1, 1, 0],
+      }});
+      map.addLayer({ id: 'eq-pulse-core', type: 'circle', source: 'earthquake-pulses', paint: {
+        'circle-radius': ['interpolate', ['linear'], ['get', 'magnitude'], 2.5, 5, 5, 9, 7, 14],
+        'circle-color': ['match', ['get', 'severity'], 'critical', '#FFFFFF', 'high', '#FFD6C8', '#FFF6CC'],
+        'circle-opacity': ['interpolate', ['linear'], ['get', 'progress'], 0, 1, 0.8, 0.72, 1, 0],
+        'circle-blur': 0.15,
       }});
       map.addLayer({ id: 'eq-label', type: 'symbol', source: 'earthquakes', minzoom: 5, filter: ['>=',['get','magnitude'],4.5], layout: {
         'text-field': ['concat','M',['to-string',['get','magnitude']]], 'text-size': 9, 'text-font': ['Open Sans Regular'], 'text-offset': [0,1.5],
@@ -1422,8 +1451,94 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
 
   useEffect(() => {
     if (!mapReady) return;
-    setGeo('earthquakes', activeLayers.earthquakes && data.earthquakes ? data.earthquakes.map((eq: MapEntity) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [eq.lng, eq.lat] }, properties: { magnitude: eq.magnitude, place: eq.place } })) : []);
+    setGeo('earthquakes', activeLayers.earthquakes && data.earthquakes ? data.earthquakes
+      .filter((eq: MapEntity) => typeof eq.lng === 'number' && typeof eq.lat === 'number')
+      .map((eq: MapEntity) => ({
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [eq.lng, eq.lat] },
+        properties: {
+          id: eq.id,
+          magnitude: eq.magnitude,
+          place: eq.place,
+          depth: eq.depth,
+          time: eq.time,
+          tsunami: eq.tsunami,
+          source: eq.source || 'USGS',
+        },
+      })) : []);
   }, [mapReady, data.earthquakes, activeLayers.earthquakes, setGeo]);
+
+  useEffect(() => {
+    if (!mapReady || !activeLayers.earthquakes || !Array.isArray(data.earthquakes)) return;
+
+    const validEvents = data.earthquakes.filter((event: MapEntity) => (
+      typeof event.id === 'string'
+      && typeof event.lat === 'number'
+      && typeof event.lng === 'number'
+      && typeof event.magnitude === 'number'
+    ));
+
+    if (seenEarthquakeIdsRef.current === null) {
+      seenEarthquakeIdsRef.current = new Set(validEvents.map((event) => String(event.id)));
+      const freshest = [...validEvents]
+        .filter((event) => isRecentEarthquake(Number(event.time)))
+        .sort((a, b) => Number(b.time) - Number(a.time))[0];
+      if (freshest) validEvents.splice(0, validEvents.length, freshest);
+      else validEvents.length = 0;
+    } else {
+      const unseen = findNewEarthquakes(validEvents, seenEarthquakeIdsRef.current);
+      validEvents.splice(0, validEvents.length, ...unseen);
+      unseen.forEach((event) => seenEarthquakeIdsRef.current?.add(String(event.id)));
+    }
+
+    if (validEvents.length === 0) return;
+
+    const startedAt = performance.now();
+    earthquakePulsesRef.current.push(...validEvents.slice(0, 8).map((event) => ({
+      id: String(event.id),
+      lat: Number(event.lat),
+      lng: Number(event.lng),
+      magnitude: Number(event.magnitude),
+      depth: Number(event.depth) || 0,
+      tsunami: event.tsunami === true || event.tsunami === 1,
+      startedAt,
+    })));
+
+    if (earthquakePulseFrameRef.current !== null) return;
+
+    const animatePulses = (now: number) => {
+      const durationMs = 4200;
+      earthquakePulsesRef.current = earthquakePulsesRef.current.filter((pulse) => now - pulse.startedAt < durationMs);
+
+      const features: GeoJsonFeature[] = earthquakePulsesRef.current.map((pulse) => ({
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [pulse.lng, pulse.lat] },
+        properties: {
+          id: pulse.id,
+          magnitude: pulse.magnitude,
+          progress: Math.min(1, (now - pulse.startedAt) / durationMs),
+          severity: getEarthquakeSeverity({ magnitude: pulse.magnitude, depth: pulse.depth, tsunami: pulse.tsunami }),
+        },
+      }));
+      setGeo('earthquake-pulses', features);
+
+      if (earthquakePulsesRef.current.length > 0) {
+        earthquakePulseFrameRef.current = window.requestAnimationFrame(animatePulses);
+      } else {
+        earthquakePulseFrameRef.current = null;
+        setGeo('earthquake-pulses', []);
+      }
+    };
+
+    earthquakePulseFrameRef.current = window.requestAnimationFrame(animatePulses);
+  }, [mapReady, data.earthquakes, activeLayers.earthquakes, setGeo]);
+
+  useEffect(() => () => {
+    if (earthquakePulseFrameRef.current !== null) {
+      window.cancelAnimationFrame(earthquakePulseFrameRef.current);
+      earthquakePulseFrameRef.current = null;
+    }
+  }, []);
 
   useEffect(() => {
     if (!mapReady) return;
@@ -1871,7 +1986,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
   // Visibility
   useEffect(() => {
     if (!mapReady) return;
-    setVis(['eq-circles','eq-label'], activeLayers.earthquakes);
+    setVis(['eq-circles','eq-label','eq-pulse-ring','eq-pulse-core'], activeLayers.earthquakes);
     setVis(['sat-dots','sat-glow'], activeLayers.satellites);
     setVis(['gdelt-dots','gdelt-hotspot-halo','gdelt-hotspot-core','gdelt-hotspot-label'], activeLayers.global_incidents);
     setVis(['jam-fill','jam-label'], activeLayers.gps_jamming);

@@ -851,7 +851,7 @@ export default function Dashboard() {
   // ── PROGRESSIVE DATA LOADING (request-optimized) ──
   useEffect(() => {
     const loadCoreFeeds = async () => {
-      await fetchEndpoint('/api/earthquakes');
+      await fetchEndpoint('/api/earthquakes', undefined, { cache: 'no-store' });
       await fetchEndpoint('/api/news');
     };
 
@@ -883,7 +883,7 @@ export default function Dashboard() {
 
     // Polling — OPTIMIZED intervals to minimize edge requests
     const intervals = [
-      setInterval(() => fetchEndpoint('/api/earthquakes'), 900000),  // 15 min (was 5)
+      setInterval(() => fetchEndpoint('/api/earthquakes', undefined, { cache: 'no-store' }), 20000),
       setInterval(() => fetchEndpoint('/api/news'), 1800000),        // 30 min (was 10)
       setInterval(() => fetchEndpoint('/api/markets', d => ({ markets: d })), 900000), // 15 min (was 5)
       setInterval(() => {
