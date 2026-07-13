@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { getNavigationCameraTarget, getVectorCameraPreset, shouldRerouteNavigation, shouldUpdateNavigationCamera, smoothNavigationBearing } from '../src/lib/vector-navigation';
+import { getNavigationCameraTarget, getNextSimulationIndex, getVectorCameraPreset, shouldRerouteNavigation, shouldUpdateNavigationCamera, smoothNavigationBearing } from '../src/lib/vector-navigation';
 
 describe('vector navigation camera', () => {
   it('uses a closer camera for walking than driving', () => {
@@ -29,6 +29,12 @@ describe('vector navigation camera', () => {
     expect(shouldRerouteNavigation({ offRouteDistanceMeters: 120, gpsAccuracyMeters: 12, deviationDurationMs: 8_000, cooldownElapsedMs: 31_000 })).toBe(true);
     expect(shouldRerouteNavigation({ offRouteDistanceMeters: 120, gpsAccuracyMeters: 80, deviationDurationMs: 8_000, cooldownElapsedMs: 31_000 })).toBe(false);
     expect(shouldRerouteNavigation({ offRouteDistanceMeters: 120, gpsAccuracyMeters: 12, deviationDurationMs: 2_000, cooldownElapsedMs: 31_000 })).toBe(false);
+  });
+
+  it('advances simulation safely and stops at the destination', () => {
+    expect(getNextSimulationIndex(0, 240)).toBeGreaterThan(0);
+    expect(getNextSimulationIndex(239, 240)).toBe(239);
+    expect(getNextSimulationIndex(0, 0)).toBe(0);
   });
 
   it('looks ahead in the current direction instead of always shifting north', () => {
