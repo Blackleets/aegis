@@ -22,6 +22,9 @@ const RSS_FEEDS: Array<{ source: string; url: string }> = [
   { source: 'BBC World', url: 'https://feeds.bbci.co.uk/news/world/rss.xml' },
   { source: 'Al Jazeera', url: 'https://www.aljazeera.com/xml/rss/all.xml' },
   { source: 'GDACS', url: 'https://www.gdacs.org/xml/rss.xml' },
+  { source: 'DW World', url: 'https://rss.dw.com/rdf/rss-en-all' },
+  { source: 'France 24', url: 'https://www.france24.com/en/rss' },
+  { source: 'UN News', url: 'https://news.un.org/feed/subscribe/en/news/all/rss.xml' },
 ];
 
 const RISK_KEYWORDS = [
@@ -31,6 +34,22 @@ const RISK_KEYWORDS = [
 ];
 
 const KEYWORD_COORDS: Record<string, [number, number]> = {
+  argentina: [-38.416, -63.616],
+  australia: [-25.274, 133.775],
+  brazil: [-14.235, -51.925],
+  canada: [56.13, -106.347],
+  colombia: [4.571, -74.297],
+  egypt: [26.821, 30.802],
+  france: [46.228, 2.214],
+  germany: [51.166, 10.452],
+  india: [20.594, 78.963],
+  indonesia: [-0.789, 113.921],
+  mexico: [23.635, -102.553],
+  pakistan: [30.375, 69.345],
+  philippines: [12.88, 121.774],
+  spain: [40.464, -3.749],
+  sudan: [12.863, 30.218],
+  venezuela: [6.424, -66.59],
   ukraine: [49.487, 31.272],
   kyiv: [50.45, 30.523],
   russia: [61.524, 105.318],
@@ -135,7 +154,7 @@ export async function GET() {
           });
           if (!res.ok) return [];
           const xml = await res.text();
-          return parseRSSItems(xml, source).slice(0, 8);
+          return parseRSSItems(xml, source).slice(0, 12);
         } catch {
           return [];
         }
@@ -175,9 +194,10 @@ export async function GET() {
 
     return NextResponse.json(
       {
-        news: newsItems.slice(0, 24),
+        news: newsItems.slice(0, 60),
         total: newsItems.length,
         sources: RSS_FEEDS.map((feed) => feed.source),
+        activeSources: Array.from(new Set(newsItems.map((item) => item.source))),
         timestamp: new Date().toISOString(),
       },
       {

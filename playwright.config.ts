@@ -1,7 +1,7 @@
 import { defineConfig } from '@playwright/test';
 
 const PORT = process.env.PORT ?? '3000';
-const HOST = process.env.HOSTNAME ?? '127.0.0.1';
+const HOST = process.env.PLAYWRIGHT_HOST ?? '127.0.0.1';
 const baseURL = `http://${HOST}:${PORT}`;
 
 export default defineConfig({

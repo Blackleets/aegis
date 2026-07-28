@@ -39,6 +39,7 @@ import { chooseRouteAlertChannel } from '@/lib/route-alert-priority';
 import { vibrateForRouteAlert } from '@/lib/route-alert-haptics';
 import { formatRouteAlertAge, getAlertObservedAt, isRouteAlertFresh } from '@/lib/route-alert-freshness';
 import { DEFAULT_ROUTE_ALERT_PREFERENCES, parseRouteAlertPreferences, type RouteAlertPreferences } from '@/lib/route-alert-preferences';
+import { LIVE_HAZARD_REFRESH_MS, LIVE_TRAFFIC_REFRESH_MS, shouldRefreshNavigationData } from '@/lib/navigation-live-refresh';
 
 const AegisMap = dynamic(() => import('@/components/AegisMap'), { ssr: false });
 const LayerPanel = dynamic(() => import('@/components/LayerPanel'));
@@ -159,7 +160,7 @@ function MobileDrawerHeaderSummary({
             <div className="rounded-full border border-[var(--border-primary)]/40 bg-white/[0.04] px-2 py-1 text-[7px] font-mono tracking-[0.18em] text-[var(--text-secondary)]">
               {backendStatusLabel}
             </div>
-            <button onClick={onClose} className="text-[var(--text-muted)] p-1"><X className="w-4 h-4" /></button>
+            <button type="button" onClick={onClose} className="text-[var(--text-muted)] p-1" aria-label="Cerrar panel"><X className="w-4 h-4" /></button>
           </div>
         </div>
       </div>
@@ -923,7 +924,11 @@ export default function Dashboard() {
   useEffect(() => {
     if (!navigationActive || routeSnapshot?.mode !== 'driving') return;
 
+    let lastRefreshAt = 0;
     const refreshLiveTraffic = () => {
+      const now = Date.now();
+      if (!shouldRefreshNavigationData(lastRefreshAt, now)) return;
+      lastRefreshAt = now;
       const currentLocation = lastNavigationLocationRef.current ?? routeSnapshot.origin;
       const trafficParams = new URLSearchParams({
         fromLat: String(currentLocation.lat),
@@ -939,30 +944,48 @@ export default function Dashboard() {
         .catch(() => setTrafficInsight({ status: 'unavailable', source: 'TomTom Traffic' }));
     };
 
-    const interval = window.setInterval(refreshLiveTraffic, 120_000);
-    return () => window.clearInterval(interval);
+    const refreshWhenVisible = () => {
+      if (!document.hidden) refreshLiveTraffic();
+    };
+
+    refreshLiveTraffic();
+    const interval = window.setInterval(refreshLiveTraffic, LIVE_TRAFFIC_REFRESH_MS);
+    window.addEventListener('online', refreshLiveTraffic);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('online', refreshLiveTraffic);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
   }, [navigationActive, routeSnapshot]);
 
   // ── SHARED FETCH UTILITY (Fixes #107 — single definition, not 3 copies) ──
-  const fetchEndpoint = useCallback(async (url: string, transform?: (d: unknown) => Partial<DashboardData>, options?: RequestInit) => {
-    if (typeof document !== 'undefined' && document.hidden) return;
+  const fetchEndpoint = useCallback(async (url: string, transform?: (d: unknown) => Partial<DashboardData>, options?: RequestInit): Promise<boolean> => {
+    if (typeof document !== 'undefined' && document.hidden) return false;
     try {
-      const res = await fetch(url, options);
+      const res = await fetch(url, { cache: 'no-store', ...options });
       if (res.ok) {
         const json = await res.json() as unknown;
         const nextData = transform ? transform(json) : (json as Partial<DashboardData>);
         setData(prev => ({ ...prev, ...nextData }));
         setBackendStatus('connected');
+        return true;
       }
+      setBackendStatus('error');
     } catch (e) {
       console.warn('[AEGIS] Suppressed error:', e instanceof Error ? e.message : e);
       setBackendStatus('error');
     }
+    return false;
   }, []);
 
   useEffect(() => {
     if (!navigationActive) return;
+    let lastRefreshAt = 0;
     const refreshNavigationHazards = () => {
+      const now = Date.now();
+      if (!shouldRefreshNavigationData(lastRefreshAt, now)) return;
+      lastRefreshAt = now;
       void fetchEndpoint('/api/fires', (payload) => {
         const value = payload as { fires?: DashboardEntity[] };
         return { fires: value.fires || [] };
@@ -973,9 +996,19 @@ export default function Dashboard() {
       }, { cache: 'no-store' });
     };
 
+    const refreshWhenVisible = () => {
+      if (!document.hidden) refreshNavigationHazards();
+    };
+
     refreshNavigationHazards();
-    const interval = window.setInterval(refreshNavigationHazards, 300000);
-    return () => window.clearInterval(interval);
+    const interval = window.setInterval(refreshNavigationHazards, LIVE_HAZARD_REFRESH_MS);
+    window.addEventListener('online', refreshNavigationHazards);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('online', refreshNavigationHazards);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
   }, [fetchEndpoint, navigationActive]);
 
   // ── PROGRESSIVE DATA LOADING (request-optimized) ──
@@ -1031,63 +1064,63 @@ export default function Dashboard() {
   // ── LAYER-AWARE DATA LOADING — only fetch when layer is toggled ON ──
   const layerFetchedRef = useRef<Set<string>>(new Set());
   useEffect(() => {
+    const loadLayerOnce = (
+      key: string,
+      url: string,
+      transform?: (payload: Record<string, unknown>) => Partial<DashboardData>,
+    ) => {
+      if (layerFetchedRef.current.has(key)) return;
+      void fetchEndpoint(
+        url,
+        transform ? (payload) => transform(payload as Record<string, unknown>) : undefined,
+      ).then((loaded) => {
+        if (loaded) layerFetchedRef.current.add(key);
+      });
+    };
 
     // Flights
     if (activeLayers.flights || activeLayers.military || activeLayers.jets || activeLayers.private) {
-      if (!layerFetchedRef.current.has('flights')) {
-        fetchEndpoint('/api/flights');
-        layerFetchedRef.current.add('flights');
-      }
+      loadLayerOnce('flights', '/api/flights');
     }
     // Satellites
-    if (activeLayers.satellites && !layerFetchedRef.current.has('satellites')) {
-      fetchEndpoint('/api/satellites');
-      layerFetchedRef.current.add('satellites');
+    if (activeLayers.satellites) {
+      loadLayerOnce('satellites', '/api/satellites');
     }
     // Fires
-    if (activeLayers.fires && !layerFetchedRef.current.has('fires')) {
-      fetchEndpoint('/api/fires');
-      layerFetchedRef.current.add('fires');
+    if (activeLayers.fires) {
+      loadLayerOnce('fires', '/api/fires');
     }
     // CCTV
-    if (activeLayers.cctv && !layerFetchedRef.current.has('cctv')) {
-      fetchEndpoint('/api/cctv?region=all&v=2');
-      layerFetchedRef.current.add('cctv');
+    if (activeLayers.cctv) {
+      loadLayerOnce('cctv', '/api/cctv?region=all&v=2');
     }
     // Maritime
-    if (activeLayers.maritime && !layerFetchedRef.current.has('maritime')) {
-      fetchEndpoint('/api/maritime', d => ({ maritime_ports: d.ports, maritime_chokepoints: d.chokepoints, maritime_ships: d.ships }));
-      layerFetchedRef.current.add('maritime');
+    if (activeLayers.maritime) {
+      loadLayerOnce('maritime', '/api/maritime', d => ({ maritime_ports: d.ports as DashboardEntity[], maritime_chokepoints: d.chokepoints as DashboardEntity[], maritime_ships: d.ships as DashboardEntity[] }));
     }
     // Balloons
-    if (activeLayers.balloons && !layerFetchedRef.current.has('balloons')) {
-      fetchEndpoint('/api/balloons', d => ({ balloons: d.balloons }));
-      layerFetchedRef.current.add('balloons');
+    if (activeLayers.balloons) {
+      loadLayerOnce('balloons', '/api/balloons', d => ({ balloons: d.balloons as DashboardEntity[] }));
     }
     // Radiation
-    if (activeLayers.radiation && !layerFetchedRef.current.has('radiation')) {
-      fetchEndpoint('/api/radiation', d => ({ radiation: d.stations }));
-      layerFetchedRef.current.add('radiation');
+    if (activeLayers.radiation) {
+      loadLayerOnce('radiation', '/api/radiation', d => ({ radiation: d.stations as DashboardEntity[] }));
     }
     // Live News
-    if (activeLayers.live_news && !layerFetchedRef.current.has('live_news')) {
-      fetchEndpoint('/api/live-news', d => ({ live_feeds: d.feeds }));
-      layerFetchedRef.current.add('live_news');
+    if (activeLayers.live_news) {
+      loadLayerOnce('live_news', '/api/live-news', d => ({ live_feeds: d.feeds as DashboardEntity[] }));
     }
     // Weather
-    if (activeLayers.weather && !layerFetchedRef.current.has('weather')) {
-      fetchEndpoint('/api/weather', d => ({ weather_events: d.events }));
-      layerFetchedRef.current.add('weather');
+    if (activeLayers.weather) {
+      loadLayerOnce('weather', '/api/weather', d => ({ weather_events: d.events as DashboardEntity[] }));
     }
     // Infrastructure
-    if (activeLayers.infrastructure && !layerFetchedRef.current.has('infrastructure')) {
-      fetchEndpoint('/api/infrastructure', d => ({ infrastructure: d.infrastructure }));
-      layerFetchedRef.current.add('infrastructure');
+    if (activeLayers.infrastructure) {
+      loadLayerOnce('infrastructure', '/api/infrastructure', d => ({ infrastructure: d.infrastructure as DashboardEntity[] }));
     }
     // Global Incidents (GDELT)
-    if (activeLayers.global_incidents && !layerFetchedRef.current.has('gdelt')) {
-      fetchEndpoint('/api/gdelt', d => ({ gdelt: d.events }));
-      layerFetchedRef.current.add('gdelt');
+    if (activeLayers.global_incidents) {
+      loadLayerOnce('gdelt', '/api/gdelt', d => ({ gdelt: d.events as DashboardData['gdelt'] }));
     }
 
   }, [activeLayers, fetchEndpoint]);
@@ -1108,10 +1141,26 @@ export default function Dashboard() {
     if (activeLayers.maritime) {
       intervals.push(setInterval(() => fetchEndpoint('/api/maritime', d => ({ maritime_ports: d.ports, maritime_chokepoints: d.chokepoints, maritime_ships: d.ships })), 10000)); // 10s
     }
+    if (activeLayers.fires) {
+      intervals.push(setInterval(() => fetchEndpoint('/api/fires'), 300000)); // NASA FIRMS: 5m
+    }
+    if (activeLayers.weather) {
+      intervals.push(setInterval(() => fetchEndpoint('/api/weather', d => ({ weather_events: d.events })), 120000)); // 2m
+    }
+    if (activeLayers.cctv) {
+      intervals.push(setInterval(() => fetchEndpoint('/api/cctv?region=all&v=2'), 120000)); // 2m
+    }
+    if (activeLayers.global_incidents) {
+      intervals.push(setInterval(() => fetchEndpoint('/api/gdelt', d => ({ gdelt: d.events })), 120000)); // 2m
+    }
+    if (activeLayers.live_news) {
+      intervals.push(setInterval(() => fetchEndpoint('/api/live-news', d => ({ live_feeds: d.feeds })), 300000)); // 5m
+    }
+    if (activeLayers.satellites) {
+      intervals.push(setInterval(() => fetchEndpoint('/api/satellites'), 120000)); // 2m
+    }
     return () => intervals.forEach(clearInterval);
   }, [activeLayers, fetchEndpoint]);
-
-  // CCTV: loaded once on layer toggle via layerFetchedRef (no viewport polling)
 
   // Reactive layer fetch: handled by layerFetchedRef above (no duplicate)
 
