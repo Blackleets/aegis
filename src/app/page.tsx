@@ -160,7 +160,7 @@ function MobileDrawerHeaderSummary({
             <div className="rounded-full border border-[var(--border-primary)]/40 bg-white/[0.04] px-2 py-1 text-[7px] font-mono tracking-[0.18em] text-[var(--text-secondary)]">
               {backendStatusLabel}
             </div>
-            <button onClick={onClose} className="text-[var(--text-muted)] p-1"><X className="w-4 h-4" /></button>
+            <button type="button" onClick={onClose} className="text-[var(--text-muted)] p-1" aria-label="Cerrar panel"><X className="w-4 h-4" /></button>
           </div>
         </div>
       </div>
