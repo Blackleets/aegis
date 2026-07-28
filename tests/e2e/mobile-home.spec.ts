@@ -25,7 +25,7 @@ test('mobile command buttons open and close without blocking one another', async
   await page.getByRole('button', { name: 'Abrir menú AEGIS' }).click();
   await expect(page.getByText('Centro de control')).toBeVisible();
 
-  await page.getByRole('button', { name: /CAPAS/i }).click();
+  await page.getByRole('button', { name: /CAPAS|LAYERS/i }).click();
   await expect(page.getByRole('button', { name: /Cerrar/i }).first()).toBeVisible();
   await page.getByRole('button', { name: /Cerrar/i }).first().click();
 
