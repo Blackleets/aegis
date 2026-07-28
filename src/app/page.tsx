@@ -39,6 +39,7 @@ import { chooseRouteAlertChannel } from '@/lib/route-alert-priority';
 import { vibrateForRouteAlert } from '@/lib/route-alert-haptics';
 import { formatRouteAlertAge, getAlertObservedAt, isRouteAlertFresh } from '@/lib/route-alert-freshness';
 import { DEFAULT_ROUTE_ALERT_PREFERENCES, parseRouteAlertPreferences, type RouteAlertPreferences } from '@/lib/route-alert-preferences';
+import { LIVE_HAZARD_REFRESH_MS, LIVE_TRAFFIC_REFRESH_MS, shouldRefreshNavigationData } from '@/lib/navigation-live-refresh';
 
 const AegisMap = dynamic(() => import('@/components/AegisMap'), { ssr: false });
 const LayerPanel = dynamic(() => import('@/components/LayerPanel'));
@@ -923,7 +924,11 @@ export default function Dashboard() {
   useEffect(() => {
     if (!navigationActive || routeSnapshot?.mode !== 'driving') return;
 
+    let lastRefreshAt = 0;
     const refreshLiveTraffic = () => {
+      const now = Date.now();
+      if (!shouldRefreshNavigationData(lastRefreshAt, now)) return;
+      lastRefreshAt = now;
       const currentLocation = lastNavigationLocationRef.current ?? routeSnapshot.origin;
       const trafficParams = new URLSearchParams({
         fromLat: String(currentLocation.lat),
@@ -939,8 +944,19 @@ export default function Dashboard() {
         .catch(() => setTrafficInsight({ status: 'unavailable', source: 'TomTom Traffic' }));
     };
 
-    const interval = window.setInterval(refreshLiveTraffic, 120_000);
-    return () => window.clearInterval(interval);
+    const refreshWhenVisible = () => {
+      if (!document.hidden) refreshLiveTraffic();
+    };
+
+    refreshLiveTraffic();
+    const interval = window.setInterval(refreshLiveTraffic, LIVE_TRAFFIC_REFRESH_MS);
+    window.addEventListener('online', refreshLiveTraffic);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('online', refreshLiveTraffic);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
   }, [navigationActive, routeSnapshot]);
 
   // ── SHARED FETCH UTILITY (Fixes #107 — single definition, not 3 copies) ──
@@ -965,7 +981,11 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!navigationActive) return;
+    let lastRefreshAt = 0;
     const refreshNavigationHazards = () => {
+      const now = Date.now();
+      if (!shouldRefreshNavigationData(lastRefreshAt, now)) return;
+      lastRefreshAt = now;
       void fetchEndpoint('/api/fires', (payload) => {
         const value = payload as { fires?: DashboardEntity[] };
         return { fires: value.fires || [] };
@@ -976,9 +996,19 @@ export default function Dashboard() {
       }, { cache: 'no-store' });
     };
 
+    const refreshWhenVisible = () => {
+      if (!document.hidden) refreshNavigationHazards();
+    };
+
     refreshNavigationHazards();
-    const interval = window.setInterval(refreshNavigationHazards, 300000);
-    return () => window.clearInterval(interval);
+    const interval = window.setInterval(refreshNavigationHazards, LIVE_HAZARD_REFRESH_MS);
+    window.addEventListener('online', refreshNavigationHazards);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('online', refreshNavigationHazards);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
   }, [fetchEndpoint, navigationActive]);
 
   // ── PROGRESSIVE DATA LOADING (request-optimized) ──
