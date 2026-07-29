@@ -41,6 +41,7 @@ import { formatRouteAlertAge, getAlertObservedAt, isRouteAlertFresh } from '@/li
 import { DEFAULT_ROUTE_ALERT_PREFERENCES, parseRouteAlertPreferences, type RouteAlertPreferences } from '@/lib/route-alert-preferences';
 import { LIVE_HAZARD_REFRESH_MS, LIVE_TRAFFIC_REFRESH_MS, shouldRefreshNavigationData } from '@/lib/navigation-live-refresh';
 import { isAcceptableLocalRiskFix, shouldMonitorLocalRisks } from '@/lib/local-risk-monitoring';
+import { filterCctvByViewMode, type CctvDeliveryMetadata, type CctvViewMode } from '@/lib/cctv-feed';
 
 const AegisMap = dynamic(() => import('@/components/AegisMap'), { ssr: false });
 const LayerPanel = dynamic(() => import('@/components/LayerPanel'));
@@ -504,6 +505,7 @@ export default function Dashboard() {
   const [showSplash, setShowSplash] = useState(true);
   const [locale, setLocale] = useState<Locale>(DEFAULT_LOCALE);
   const [activeCamera, setActiveCamera] = useState<ActiveCamera | null>(null);
+  const [cctvViewMode, setCctvViewMode] = useState<CctvViewMode>('all');
   const [spaceWeather, setSpaceWeather] = useState<SpaceWeather | null>(null);
   const [nasaEventMesh, setNasaEventMesh] = useState<NasaEventMesh | null>(null);
   const [showLayers, setShowLayers] = useState(true);
@@ -1265,6 +1267,18 @@ export default function Dashboard() {
     sdk_entities: sdkEntities,
   }), [data, sdkEntities]);
 
+  const mapData = useMemo<DashboardData>(() => ({
+    ...dataWithSdk,
+    cameras: filterCctvByViewMode(
+      dataWithSdk.cameras as Array<DashboardEntity & CctvDeliveryMetadata> | undefined,
+      cctvViewMode,
+    ),
+  }), [cctvViewMode, dataWithSdk]);
+
+  const handleCctvViewModeChange = useCallback((mode: CctvViewMode) => {
+    setCctvViewMode(mode);
+  }, []);
+
   const totalFlights = useMemo(() => (
     (data.commercial_flights?.length||0)+(data.private_flights?.length||0)+(data.private_jets?.length||0)+(data.military_flights?.length||0)
   ), [data.commercial_flights, data.private_flights, data.private_jets, data.military_flights]);
@@ -1968,7 +1982,7 @@ export default function Dashboard() {
       {/* ── MAP ── */}
       <ErrorBoundary name="Map">
         <AegisMap
-          data={dataWithSdk}
+          data={mapData}
           activeLayers={activeLayers}
           projection={mapProjection}
           mapStyle={mapStyle}
@@ -2240,7 +2254,14 @@ export default function Dashboard() {
         showIntel={showIntel}
         leftLayersContent={(
           <>
-            <LayerPanel data={dataWithSdk} activeLayers={activeLayers} setActiveLayers={setActiveLayers} locale={locale} />
+            <LayerPanel
+              data={dataWithSdk}
+              activeLayers={activeLayers}
+              setActiveLayers={setActiveLayers}
+              locale={locale}
+              cctvViewMode={cctvViewMode}
+              onCctvViewModeChange={handleCctvViewModeChange}
+            />
             <ViewPresets locale={locale} onNavigate={(lat, lng, zoom) => { setFlyToLocation({ lat, lng, ts: Date.now() }); setMapView(v => ({ ...v, zoom })); }} />
           </>
         )}
@@ -2377,7 +2398,16 @@ export default function Dashboard() {
                     infrastructureCount={data.infrastructure?.length || 0}
                   />
                 )}
-                layerPanel={<LayerPanel data={data} activeLayers={activeLayers} setActiveLayers={setActiveLayers} locale={locale} />}
+                layerPanel={(
+                  <LayerPanel
+                    data={data}
+                    activeLayers={activeLayers}
+                    setActiveLayers={setActiveLayers}
+                    locale={locale}
+                    cctvViewMode={cctvViewMode}
+                    onCctvViewModeChange={handleCctvViewModeChange}
+                  />
+                )}
                 presets={<ViewPresets locale={locale} onNavigate={(lat, lng, zoom) => { setFlyToLocation({ lat, lng, ts: Date.now() }); setMapView(v => ({ ...v, zoom })); setMobilePanel(null); }} />}
               />
             )}

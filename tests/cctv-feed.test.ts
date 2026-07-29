@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   buildCctvFrameUrl,
+  countCctvByMode,
+  filterCctvByViewMode,
   getCctvOperationalStatus,
   inferCctvRefreshIntervalSeconds,
   isLikelySnapshotUrl,
@@ -79,5 +81,18 @@ describe('CCTV feed delivery', () => {
     expect(getCctvOperationalStatus({
       mode: 'video', loading: false, error: true, lastFrameAt: null, now,
     })).toBe('offline');
+  });
+
+  it('filters live video without removing near-live coverage from the source set', () => {
+    const cameras = [
+      { id: 'live', stream_url: 'https://example.com/live.m3u8', live_mode: 'video' as const },
+      { id: 'snapshot', feed_url: 'https://example.com/current.jpg', live_mode: 'snapshot' as const },
+      { id: 'external', external_url: 'https://example.com/viewer', live_mode: 'external' as const },
+    ];
+
+    expect(filterCctvByViewMode(cameras, 'live').map((camera) => camera.id)).toEqual(['live']);
+    expect(filterCctvByViewMode(cameras, 'near-live').map((camera) => camera.id)).toEqual(['snapshot']);
+    expect(filterCctvByViewMode(cameras, 'all')).toBe(cameras);
+    expect(countCctvByMode(cameras)).toEqual({ all: 3, live: 1, nearLive: 1, external: 1 });
   });
 });
