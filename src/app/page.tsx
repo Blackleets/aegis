@@ -24,7 +24,7 @@ import DesktopOpsRails from '@/components/dashboard/DesktopOpsRails';
 import LiveFeedOverlay from '@/components/dashboard/LiveFeedOverlay';
 import RegionDossierOverlay, { type RegionDossierData } from '@/components/dashboard/RegionDossierOverlay';
 import IncidentFusionStrip from '@/components/dashboard/IncidentFusionStrip';
-import OperationalCaseCard from '@/components/dashboard/OperationalCaseCard';
+import OperationalCasesPanel from '@/components/dashboard/OperationalCasesPanel';
 import NasaMissionStrip, { type NasaEventItem } from '@/components/dashboard/NasaMissionStrip';
 import MobileCommandDrawer from '@/components/dashboard/MobileCommandDrawer';
 import RouteCockpitDesktop from '@/components/dashboard/RouteCockpitDesktop';
@@ -563,6 +563,7 @@ export default function Dashboard() {
   const notifiedRouteAlertIdsRef = useRef<Set<string>>(new Set());
   const hapticRouteAlertIdsRef = useRef<Set<string>>(new Set());
   const spokenContextPhasesRef = useRef<Set<string>>(new Set());
+  const spokenRouteRecommendationRef = useRef<string | null>(null);
   const arrivalSpokenRef = useRef(false);
   const preNavigationMapStateRef = useRef<{ projection: 'globe' | 'mercator'; style: 'dark' | 'satellite' } | null>(null);
   const lastGeocodedPos = useRef<{ lat: number; lng: number } | null>(null);
@@ -2054,11 +2055,25 @@ export default function Dashboard() {
       const weather = countSignalsNearRoute(data.weather_events, option.coordinates, 35000);
       const fires = countSignalsNearRoute(data.fires, option.coordinates, 25000);
       const jamming = countSignalsNearRoute(data.gps_jamming, option.coordinates, 60000);
+      const nearbyCases = operationalCases.filter((operationalCase) => (
+        distanceToRoutePath(
+          { lat: operationalCase.latitude, lng: operationalCase.longitude },
+          option.coordinates,
+        ) <= 50_000
+      ));
+      const criticalCases = nearbyCases.filter(({ severity }) => severity === 'critical').length;
+      const caseRiskWeight = nearbyCases.reduce(
+        (sum, operationalCase) => sum + (operationalCase.severity === 'critical' ? 5 : 3),
+        0,
+      );
+      const nearbySignals = incidents + earthquakes + weather + fires + jamming;
       return {
         id: option.id,
         label: option.label || 'Ruta alternativa',
         durationSeconds: option.durationSeconds,
-        nearbySignals: incidents + earthquakes + weather + fires + jamming,
+        nearbySignals,
+        criticalCases,
+        riskWeight: nearbySignals + caseRiskWeight,
       };
     });
 
@@ -2066,7 +2081,15 @@ export default function Dashboard() {
       activeRouteId: routeSnapshot.activeRouteId,
       candidates,
     });
-  }, [routeSnapshot, data.news, data.gdelt, data.earthquakes, data.weather_events, data.fires, data.gps_jamming]);
+  }, [operationalCases, routeSnapshot, data.news, data.gdelt, data.earthquakes, data.weather_events, data.fires, data.gps_jamming]);
+
+  useEffect(() => {
+    if (!navigationActive || !routeRecommendation?.shouldSwitch) return;
+    const recommendationKey = `${routeRecommendation.routeId}:${routeRecommendation.reason}`;
+    if (spokenRouteRecommendationRef.current === recommendationKey) return;
+    spokenRouteRecommendationRef.current = recommendationKey;
+    speakNavigationMessage(`AEGIS recomienda una ruta más segura. ${routeRecommendation.reason}.`);
+  }, [navigationActive, routeRecommendation, speakNavigationMessage]);
   const earthNavigationMode = selectedCelestialBody === 'earth' && (navigationActive || routeSnapshot !== null || routeLoading);
   const mobileVectorStatusLabel = routeLoading
     ? 'CALCULANDO'
@@ -2593,17 +2616,14 @@ export default function Dashboard() {
             intelContent={<IntelFeed data={data} onLocate={(lat, lng) => { setFlyToLocation({ lat, lng, ts: Date.now() }); setMobilePanel(null); }} />}
             alertsContent={(
               <>
-                {operationalCases[0] && (
-                  <div className="mb-2">
-                    <OperationalCaseCard
-                      operationalCase={operationalCases[0]}
-                      onLocate={(lat, lng) => {
-                        setFlyToLocation({ lat, lng, zoom: 8, ts: Date.now() });
-                        setMobilePanel(null);
-                      }}
-                    />
-                  </div>
-                )}
+                <OperationalCasesPanel
+                  cases={operationalCases}
+                  currentLocation={userLocation}
+                  onLocate={(lat, lng) => {
+                    setFlyToLocation({ lat, lng, zoom: 8, ts: Date.now() });
+                    setMobilePanel(null);
+                  }}
+                />
                 <RouteAlertPreferencesPanel value={routeAlertPreferences} onChange={setRouteAlertPreferences} />
                 <LiveAlerts data={dataWithSdk} onLocate={(lat, lng) => { setFlyToLocation({ lat, lng, ts: Date.now() }); setMobilePanel(null); }} onWatchFeed={(url, name) => { setLiveFeedUrl(url); setLiveFeedName(name); }} />
               </>
