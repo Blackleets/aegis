@@ -8,6 +8,7 @@ import { findNewEarthquakes, getEarthquakeSeverity, isRecentEarthquake } from '@
 import { scoreCctvDelivery } from '@/lib/cctv-feed';
 import { getLiveMotionFrame } from '@/lib/map-live-motion';
 import { getNavigationCameraTarget, getVectorCameraPreset, shouldUpdateNavigationCamera, smoothNavigationBearing, type VectorNavigationMode } from '@/lib/vector-navigation';
+import { getGpsPulseFrame } from '@/lib/gps-position-visual';
 
 type Coordinates = [number, number];
 type EntityProperties = Record<string, unknown>;
@@ -69,6 +70,7 @@ interface AegisMapProps {
   sweepData?: SweepData | null;
   scanTargets?: ScanTarget[];
   currentLocation?: { lat: number; lng: number } | null;
+  gpsAccuracyMeters?: number | null;
   routeDestination?: { lat: number; lng: number } | null;
   routePath?: Coordinates[];
   navigationActive?: boolean;
@@ -244,7 +246,7 @@ function takeTopEntities<T>(items: T[] | undefined, limit: number, score: (item:
   return [...items].sort((a, b) => score(b) - score(a)).slice(0, limit);
 }
 
-function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightClick, onViewStateChange, flyToLocation, projection = 'globe', mapStyle = 'dark', sweepData, scanTargets = [], currentLocation = null, routeDestination = null, routePath = [], navigationActive = false, navigationBearing = null, navigationMode = 'driving', ambientMotionEnabled = true }: AegisMapProps) {
+function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightClick, onViewStateChange, flyToLocation, projection = 'globe', mapStyle = 'dark', sweepData, scanTargets = [], currentLocation = null, gpsAccuracyMeters = null, routeDestination = null, routePath = [], navigationActive = false, navigationBearing = null, navigationMode = 'driving', ambientMotionEnabled = true }: AegisMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const popupRef = useRef<maplibregl.Popup | null>(null);
@@ -588,6 +590,46 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
         'circle-opacity': 0.24,
         'circle-blur': 0.95,
       }});
+      map.addLayer({
+        id: 'route-position-accuracy',
+        type: 'circle',
+        source: 'route-markers',
+        filter: ['==', ['get', 'role'], 'origin'],
+        paint: {
+          'circle-radius': 14,
+          'circle-color': '#22D3EE',
+          'circle-opacity': 0.08,
+          'circle-stroke-width': 1,
+          'circle-stroke-color': '#67E8F9',
+          'circle-stroke-opacity': 0.24,
+        },
+      });
+      map.addLayer({
+        id: 'route-position-pulse',
+        type: 'circle',
+        source: 'route-markers',
+        filter: ['==', ['get', 'role'], 'origin'],
+        paint: {
+          'circle-radius': 10,
+          'circle-color': '#22D3EE',
+          'circle-opacity': 0.5,
+          'circle-blur': 0.25,
+        },
+      });
+      map.addLayer({
+        id: 'route-position-core',
+        type: 'circle',
+        source: 'route-markers',
+        filter: ['==', ['get', 'role'], 'origin'],
+        paint: {
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 2, 4.5, 10, 7, 16, 9],
+          'circle-color': '#22D3EE',
+          'circle-opacity': 1,
+          'circle-stroke-width': 2.5,
+          'circle-stroke-color': '#ECFEFF',
+          'circle-stroke-opacity': 0.95,
+        },
+      });
       map.addLayer({ id: 'route-markers-rings', type: 'circle', source: 'route-markers', paint: {
         'circle-radius': ['interpolate', ['linear'], ['zoom'], 2, 7, 6, 10, 10, 14, 15, 18],
         'circle-color': 'rgba(2, 7, 18, 0.18)',
@@ -2292,7 +2334,12 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
         markerFeatures.push({
           type: 'Feature',
           geometry: { type: 'Point', coordinates: [currentLocation.lng, currentLocation.lat] },
-          properties: { role: 'origin', label: window.innerWidth < 768 ? '' : 'FROM GPS', bearing: navigationBearing ?? 0 },
+          properties: {
+            role: 'origin',
+            label: window.innerWidth < 768 ? '' : `GPS${gpsAccuracyMeters !== null ? ` ±${Math.round(gpsAccuracyMeters)}m` : ''}`,
+            bearing: navigationBearing ?? 0,
+            accuracy: gpsAccuracyMeters,
+          },
         });
       }
       if (routeDestination) {
@@ -2304,7 +2351,38 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       }
       markerSource.setData({ type: 'FeatureCollection', features: markerFeatures });
     }
-  }, [currentLocation, mapReady, navigationActive, navigationBearing, routeDestination, routePath]);
+  }, [currentLocation, gpsAccuracyMeters, mapReady, navigationActive, navigationBearing, routeDestination, routePath]);
+
+  useEffect(() => {
+    if (!mapReady || !mapRef.current || !currentLocation) return;
+    const map = mapRef.current;
+    const startedAt = performance.now();
+    let animationFrame = 0;
+    let lastPaintAt = 0;
+
+    const animate = (now: number) => {
+      if (now - lastPaintAt >= 40) {
+        lastPaintAt = now;
+        const frame = getGpsPulseFrame(now - startedAt, gpsAccuracyMeters);
+        if (map.getLayer('route-position-pulse')) {
+          map.setPaintProperty('route-position-pulse', 'circle-radius', frame.pulseRadius);
+          map.setPaintProperty('route-position-pulse', 'circle-opacity', frame.pulseOpacity);
+          map.setPaintProperty('route-position-pulse', 'circle-color', frame.color);
+        }
+        if (map.getLayer('route-position-accuracy')) {
+          map.setPaintProperty('route-position-accuracy', 'circle-radius', frame.accuracyRadius);
+          map.setPaintProperty('route-position-accuracy', 'circle-color', frame.color);
+          map.setPaintProperty('route-position-accuracy', 'circle-stroke-color', frame.color);
+        }
+        if (map.getLayer('route-position-core')) {
+          map.setPaintProperty('route-position-core', 'circle-color', frame.color);
+        }
+      }
+      animationFrame = requestAnimationFrame(animate);
+    };
+    animationFrame = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(animationFrame);
+  }, [currentLocation, gpsAccuracyMeters, mapReady]);
 
   useEffect(() => {
     if (!mapReady || !mapRef.current || !currentLocation || !navigationActive) return;

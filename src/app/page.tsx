@@ -2168,6 +2168,7 @@ export default function Dashboard() {
           sweepData={sweepData as { center: { lat: number; lng: number }; devices: unknown[] } | null}
           scanTargets={scanTargets}
           currentLocation={userLocation}
+          gpsAccuracyMeters={gpsAccuracyMeters}
           routeDestination={routeSnapshot?.destination ? { lat: routeSnapshot.destination.lat, lng: routeSnapshot.destination.lng } : null}
           routePath={routeSnapshot?.coordinates ?? []}
           navigationActive={navigationActive}
