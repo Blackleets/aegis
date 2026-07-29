@@ -13,14 +13,16 @@ test('mobile shell loads AEGIS homepage', async ({ page }) => {
 
   await expect(page).toHaveTitle(/AEGIS/i);
   await expect(page.getByRole('region', { name: 'Inicio AEGIS' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Navegar', exact: false })).toBeVisible();
-  await expect(page.getByText('Tu mundo, mientras ocurre.')).toBeVisible();
+  await expect(page.getByRole('button', { name: '¿Adónde vas?', exact: false })).toBeVisible();
+  await expect(page.getByText('Tu mundo, mientras ocurre.')).toHaveCount(0);
+  await expect(page.getByText('Mundo en vivo')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Abrir menú AEGIS' })).toHaveCount(0);
 });
 
 test('daily navigation entry opens the local map and destination search', async ({ page }) => {
   await page.goto('/');
 
-  await page.getByRole('button', { name: 'Navegar', exact: false }).click();
+  await page.getByRole('button', { name: '¿Adónde vas?', exact: false }).click();
   await expect(page.getByText('Destino y ruta')).toBeVisible();
   await page.getByRole('button', { name: 'Cerrar navegación' }).click();
   await expect(page.getByRole('button', { name: 'Cambiar a globo 3D' })).toHaveAttribute('data-view', 'map');
@@ -54,10 +56,10 @@ test('mobile map controls expose and change their real state', async ({ page }) 
   await page.goto('/?nosplash=1');
 
   await expect(page.getByRole('heading', { name: 'AEGIS' }).first()).toBeVisible();
-  const projection = page.getByRole('button', { name: 'Cambiar a mapa 2D' });
-  await expect(projection).toHaveAttribute('data-view', 'globe');
+  const projection = page.getByRole('button', { name: 'Cambiar a globo 3D' });
+  await expect(projection).toHaveAttribute('data-view', 'map');
   await projection.click();
-  await expect(page.getByRole('button', { name: 'Cambiar a globo 3D' })).toHaveAttribute('data-view', 'map');
+  await expect(page.getByRole('button', { name: 'Cambiar a mapa 2D' })).toHaveAttribute('data-view', 'globe');
 
   const satellite = page.getByRole('button', { name: 'Activar vista satélite' });
   await expect(satellite).toHaveAttribute('data-style', 'dark');

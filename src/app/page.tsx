@@ -518,8 +518,8 @@ export default function Dashboard() {
   const [vectorDockOpen, setVectorDockOpen] = useState(false);
   const [mobileModeDockCollapsed, setMobileModeDockCollapsed] = useState(true);
   const [dashboardMode, setDashboardMode] = useState<DashboardMode>('earth');
-  const [mapProjection, setMapProjection] = useState<'globe'|'mercator'>('globe');
-  const [ambientMotionEnabled, setAmbientMotionEnabled] = useState(true);
+  const [mapProjection, setMapProjection] = useState<'globe'|'mercator'>('mercator');
+  const [ambientMotionEnabled, setAmbientMotionEnabled] = useState(false);
   const ambientMotionPreferenceLoadedRef = useRef(false);
   const [routeAlertPreferences, setRouteAlertPreferences] = useState<RouteAlertPreferences>(DEFAULT_ROUTE_ALERT_PREFERENCES);
   const routeAlertPreferencesLoadedRef = useRef(false);
@@ -1985,6 +1985,9 @@ export default function Dashboard() {
     setShowSplash(false);
     setDashboardMode('earth');
     setSelectedCelestialBody('earth');
+    setMapProjection('globe');
+    setMapStyle('dark');
+    setAmbientMotionEnabled(true);
   }, []);
 
   return (
@@ -2344,7 +2347,7 @@ export default function Dashboard() {
       />
 
       {/* ═══ MOBILE UI ═══ */}
-      {isMobile && isEarthOps && (
+      {isMobile && isEarthOps && !showSplash && (
         <>
           {(routeSnapshot || routeLoading) && (
             <RouteCockpitMobile

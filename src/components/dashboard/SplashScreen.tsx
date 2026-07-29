@@ -1,8 +1,7 @@
 'use client';
 
-import Image from 'next/image';
 import { AnimatePresence, motion } from 'framer-motion';
-import { BellRing, Globe2, Navigation, Radio } from 'lucide-react';
+import { BellRing, Globe2, Navigation, Search } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 type SplashScreenProps = {
@@ -34,118 +33,65 @@ export default function SplashScreen({ showSplash, onNavigate, onExplore }: Spla
       {showSplash && !dismissed && (
         <motion.section
           initial={{ opacity: 1 }}
-          exit={{ opacity: 0, scale: 1.015 }}
-          transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-          className="absolute inset-0 z-[999] overflow-hidden"
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+          className="pointer-events-none absolute inset-0 z-[999] overflow-hidden"
           aria-label="Inicio AEGIS"
         >
-          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(3,7,11,0.06)_0%,rgba(3,7,11,0.12)_42%,rgba(3,7,11,0.78)_78%,rgba(3,7,11,0.94)_100%)]" />
-
-          <div className="relative z-10 mx-auto flex h-full w-full max-w-[31rem] flex-col px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(2rem,env(safe-area-inset-top))]">
+          <div className="relative mx-auto flex h-full w-full max-w-[31rem] flex-col justify-between px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))]">
             <motion.div
               initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.45 }}
-              className="flex items-center justify-between"
+              transition={{ duration: 0.4 }}
+              className="flex justify-end"
             >
-              <div className="flex items-center gap-2 text-[10px] font-medium tracking-[0.12em] text-white/54">
-                <span className="h-2 w-2 rounded-full bg-emerald-300 shadow-[0_0_14px_rgba(110,231,183,0.75)]" />
-                ENTORNO EN DIRECTO
-              </div>
               <button
                 type="button"
                 onClick={enterExplorer}
                 disabled={!ready}
-                className="flex min-h-11 items-center gap-2 rounded-full border border-white/10 bg-black/28 px-4 text-[11px] font-semibold text-white/72 backdrop-blur-xl transition hover:border-white/20 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200"
+                className="pointer-events-auto flex min-h-12 items-center gap-2 rounded-full border border-white/12 bg-[#090d0f]/78 px-5 text-sm font-semibold text-white shadow-xl backdrop-blur-xl transition hover:bg-[#111719] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200 disabled:opacity-60"
               >
-                <Globe2 className="h-4 w-4 text-cyan-200" />
+                <Globe2 className="h-5 w-5 text-cyan-200" />
                 Explorar
               </button>
             </motion.div>
 
-            <div className="flex flex-1 flex-col items-center justify-center pb-3 text-center">
-              <motion.div
-                initial={{ opacity: 0, scale: 0.82, y: 12 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                transition={{ delay: 0.08, duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
-                className="relative mb-7"
-              >
-                <div className="absolute inset-[-20px] rounded-full bg-white/[0.035] blur-2xl" />
-                <Image
-                  src="/brand/aegis-symbol.png"
-                  alt="Símbolo AEGIS"
-                  width={116}
-                  height={116}
-                  priority
-                  className="relative h-[82px] w-[82px] object-contain opacity-95 drop-shadow-[0_0_20px_rgba(255,255,255,0.12)] sm:h-[94px] sm:w-[94px]"
-                />
-              </motion.div>
-
-              <motion.p
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2, duration: 0.5 }}
-                className="max-w-[20rem] text-[28px] font-semibold leading-[1.08] tracking-[-0.035em] text-white sm:text-[34px]"
-              >
-                Tu mundo, mientras ocurre.
-              </motion.p>
-              <motion.p
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.32, duration: 0.5 }}
-                className="mt-4 max-w-[21rem] text-[13px] leading-5 text-white/52"
-              >
-                Navega con tráfico, cámaras e incidentes verificados alrededor de tu ruta.
-              </motion.p>
-            </div>
-
             <motion.div
-              initial={{ opacity: 0, y: 18 }}
+              initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.36, duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-              className="space-y-3"
+              transition={{ delay: 0.08, duration: 0.48, ease: [0.22, 1, 0.36, 1] }}
+              className="pointer-events-auto space-y-3"
             >
               <button
                 type="button"
                 onClick={enterNavigation}
                 disabled={!ready}
-                className="group flex min-h-[68px] w-full items-center justify-between rounded-[22px] bg-[#f1f1ed] px-5 text-left text-[#0a0d0c] shadow-[0_18px_50px_rgba(0,0,0,0.28)] transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white active:scale-[0.985]"
+                className="group flex min-h-[76px] w-full items-center justify-between rounded-[24px] bg-[#f5f5f0] px-5 text-left text-[#090c0b] shadow-[0_20px_60px_rgba(0,0,0,0.42)] transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white active:scale-[0.985] disabled:opacity-70"
               >
                 <span className="flex items-center gap-4">
-                    <span className="grid h-11 w-11 place-items-center rounded-full bg-[#0a0d0c] text-white">
-                    <Navigation className="h-5 w-5 fill-current" />
+                  <span className="grid h-12 w-12 place-items-center rounded-full bg-[#0b0e0d] text-white">
+                    <Search className="h-5 w-5" strokeWidth={2.4} />
                   </span>
                   <span>
-                    <span className="block text-[17px] font-bold tracking-[-0.02em]">Navegar</span>
-                    <span className="mt-0.5 block text-[11px] font-medium text-black/52">¿Adónde vas?</span>
+                    <span className="block text-lg font-bold tracking-[-0.025em]">¿Adónde vas?</span>
+                    <span className="mt-0.5 block text-xs font-medium text-black/50">Buscar un destino</span>
                   </span>
                 </span>
-                <span className="text-xl transition-transform group-hover:translate-x-1" aria-hidden="true">→</span>
+                <Navigation className="h-5 w-5 fill-current transition-transform group-hover:translate-x-0.5" />
               </button>
 
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={enterExplorer}
-                  disabled={!ready}
-                  className="flex min-h-[58px] items-center justify-center gap-2 rounded-[19px] border border-white/10 bg-white/[0.055] px-3 text-[12px] font-semibold text-white/72 backdrop-blur-xl transition hover:bg-white/[0.09] hover:text-white"
-                >
-                  <Radio className="h-4 w-4 text-cyan-200" />
-                  Mundo en vivo
-                </button>
-                <button
-                  type="button"
-                  onClick={enterNavigation}
-                  disabled={!ready}
-                  className="flex min-h-[58px] items-center justify-center gap-2 rounded-[19px] border border-white/10 bg-white/[0.055] px-3 text-[12px] font-semibold text-white/72 backdrop-blur-xl transition hover:bg-white/[0.09] hover:text-white"
-                >
-                  <BellRing className="h-4 w-4 text-amber-300" />
-                  Alertas cerca
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={enterNavigation}
+                disabled={!ready}
+                className="flex min-h-12 w-full items-center justify-center gap-2 rounded-[18px] border border-white/12 bg-[#090d0f]/78 px-4 text-sm font-semibold text-white/78 shadow-lg backdrop-blur-xl transition hover:bg-[#111719] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200 disabled:opacity-60"
+              >
+                <BellRing className="h-[18px] w-[18px] text-amber-300" />
+                Alertas cerca de tu ruta
+              </button>
 
-              <p className="pt-2 text-center text-[9px] font-medium uppercase tracking-[0.18em] text-white/30">
-                Inteligencia local · fuentes verificadas
+              <p className="pb-1 text-center text-[10px] font-medium tracking-[0.08em] text-white/46">
+                Tráfico · cámaras · incidentes verificados
               </p>
             </motion.div>
           </div>
