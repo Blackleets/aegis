@@ -12,27 +12,23 @@ test('mobile shell loads AEGIS homepage', async ({ page }) => {
   await page.goto('/');
 
   await expect(page).toHaveTitle(/AEGIS/i);
-  await expect(page.getByRole('region', { name: 'Inicio AEGIS' })).toBeVisible();
-  await expect(page.getByRole('button', { name: '¿Adónde vas?', exact: false })).toBeVisible();
-  await expect(page.getByText('Tu mundo, mientras ocurre.')).toHaveCount(0);
-  await expect(page.getByText('Mundo en vivo')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Abrir menú AEGIS' })).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Introducción AEGIS' })).toBeVisible();
+  await expect(page.getByRole('img', { name: 'AEGIS' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Introducción AEGIS' })).toBeHidden({ timeout: 4_000 });
+  await expect(page.getByRole('button', { name: 'Buscar destino' })).toBeVisible();
 });
 
 test('daily navigation entry opens the local map and destination search', async ({ page }) => {
-  await page.goto('/');
-
-  await page.getByRole('button', { name: '¿Adónde vas?', exact: false }).click();
+  await page.goto('/?nosplash=1');
+  await page.getByRole('button', { name: 'Buscar destino' }).click();
   await expect(page.getByText('Destino y ruta')).toBeVisible();
   await page.getByRole('button', { name: 'Cerrar navegación' }).click();
   await expect(page.getByRole('button', { name: 'Cambiar a globo 3D' })).toHaveAttribute('data-view', 'map');
 });
 
 test('world explorer keeps the globe as the primary global surface', async ({ page }) => {
-  await page.goto('/');
-
-  await page.getByRole('button', { name: 'Explorar', exact: true }).click();
-  await expect(page.getByRole('region', { name: 'Inicio AEGIS' })).toBeHidden();
+  await page.goto('/?nosplash=1');
+  await page.getByRole('button', { name: 'Cambiar a globo 3D' }).click();
   await expect(page.getByRole('button', { name: 'Cambiar a mapa 2D' })).toHaveAttribute('data-view', 'globe', { timeout: 15_000 });
 });
 

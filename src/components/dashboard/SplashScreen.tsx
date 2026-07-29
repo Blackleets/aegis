@@ -1,100 +1,58 @@
 'use client';
 
-import { AnimatePresence, motion } from 'framer-motion';
-import { BellRing, Globe2, Navigation, Search } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import Image from 'next/image';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { useEffect } from 'react';
 
 type SplashScreenProps = {
   showSplash: boolean;
-  onNavigate: () => void;
-  onExplore: () => void;
+  onComplete: () => void;
 };
 
-export default function SplashScreen({ showSplash, onNavigate, onExplore }: SplashScreenProps) {
-  const [dismissed, setDismissed] = useState(false);
-  const [ready, setReady] = useState(false);
+const INTRO_DURATION_MS = 1500;
+
+export default function SplashScreen({ showSplash, onComplete }: SplashScreenProps) {
+  const reduceMotion = useReducedMotion();
 
   useEffect(() => {
-    queueMicrotask(() => setReady(true));
-  }, []);
-
-  const enterNavigation = () => {
-    setDismissed(true);
-    onNavigate();
-  };
-
-  const enterExplorer = () => {
-    setDismissed(true);
-    onExplore();
-  };
+    if (!showSplash) return;
+    const timer = window.setTimeout(onComplete, reduceMotion ? 450 : INTRO_DURATION_MS);
+    return () => window.clearTimeout(timer);
+  }, [onComplete, reduceMotion, showSplash]);
 
   return (
     <AnimatePresence>
-      {showSplash && !dismissed && (
+      {showSplash && (
         <motion.section
           initial={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-          className="pointer-events-none absolute inset-0 z-[999] overflow-hidden"
-          aria-label="Inicio AEGIS"
+          transition={{ duration: reduceMotion ? 0.12 : 0.38, ease: [0.22, 1, 0.36, 1] }}
+          className="absolute inset-0 z-[999] grid place-items-center bg-[#070a0b]"
+          aria-label="Introducción AEGIS"
+          aria-live="polite"
         >
-          <div className="relative mx-auto flex h-full w-full max-w-[31rem] flex-col justify-between px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))]">
+          <motion.div
+            initial={reduceMotion ? false : { opacity: 0, scale: 0.82 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+            className="relative grid place-items-center"
+          >
             <motion.div
-              initial={{ opacity: 0, y: -8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4 }}
-              className="flex justify-end"
-            >
-              <button
-                type="button"
-                onClick={enterExplorer}
-                disabled={!ready}
-                className="pointer-events-auto flex min-h-12 items-center gap-2 rounded-full border border-white/12 bg-[#090d0f]/78 px-5 text-sm font-semibold text-white shadow-xl backdrop-blur-xl transition hover:bg-[#111719] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200 disabled:opacity-60"
-              >
-                <Globe2 className="h-5 w-5 text-cyan-200" />
-                Explorar
-              </button>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.08, duration: 0.48, ease: [0.22, 1, 0.36, 1] }}
-              className="pointer-events-auto space-y-3"
-            >
-              <button
-                type="button"
-                onClick={enterNavigation}
-                disabled={!ready}
-                className="group flex min-h-[76px] w-full items-center justify-between rounded-[24px] bg-[#f5f5f0] px-5 text-left text-[#090c0b] shadow-[0_20px_60px_rgba(0,0,0,0.42)] transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white active:scale-[0.985] disabled:opacity-70"
-              >
-                <span className="flex items-center gap-4">
-                  <span className="grid h-12 w-12 place-items-center rounded-full bg-[#0b0e0d] text-white">
-                    <Search className="h-5 w-5" strokeWidth={2.4} />
-                  </span>
-                  <span>
-                    <span className="block text-lg font-bold tracking-[-0.025em]">¿Adónde vas?</span>
-                    <span className="mt-0.5 block text-xs font-medium text-black/50">Buscar un destino</span>
-                  </span>
-                </span>
-                <Navigation className="h-5 w-5 fill-current transition-transform group-hover:translate-x-0.5" />
-              </button>
-
-              <button
-                type="button"
-                onClick={enterNavigation}
-                disabled={!ready}
-                className="flex min-h-12 w-full items-center justify-center gap-2 rounded-[18px] border border-white/12 bg-[#090d0f]/78 px-4 text-sm font-semibold text-white/78 shadow-lg backdrop-blur-xl transition hover:bg-[#111719] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200 disabled:opacity-60"
-              >
-                <BellRing className="h-[18px] w-[18px] text-amber-300" />
-                Alertas cerca de tu ruta
-              </button>
-
-              <p className="pb-1 text-center text-[10px] font-medium tracking-[0.08em] text-white/46">
-                Tráfico · cámaras · incidentes verificados
-              </p>
-            </motion.div>
-          </div>
+              aria-hidden="true"
+              animate={reduceMotion ? undefined : { scale: [0.88, 1.2], opacity: [0.2, 0] }}
+              transition={{ duration: 1.25, ease: 'easeOut' }}
+              className="absolute h-28 w-28 rounded-full border border-cyan-100/25"
+            />
+            <Image
+              src="/brand/aegis-symbol.png"
+              alt="AEGIS"
+              width={112}
+              height={112}
+              priority
+              className="h-[76px] w-[76px] object-contain drop-shadow-[0_0_26px_rgba(165,243,252,0.16)]"
+            />
+          </motion.div>
+          <span className="sr-only">Abriendo el navegador AEGIS</span>
         </motion.section>
       )}
     </AnimatePresence>
