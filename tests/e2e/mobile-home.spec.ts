@@ -35,10 +35,7 @@ test('world explorer keeps the globe as the primary global surface', async ({ pa
 });
 
 test('mobile command buttons open and close without blocking one another', async ({ page }) => {
-  await page.addInitScript(() => {
-    window.sessionStorage.setItem('aegis-splash-seen', '1');
-  });
-  await page.goto('/');
+  await page.goto('/?nosplash=1');
 
   await page.getByRole('button', { name: 'Abrir menú AEGIS' }).click();
   await expect(page.getByText('Centro de control')).toBeVisible();
@@ -54,10 +51,7 @@ test('mobile command buttons open and close without blocking one another', async
 });
 
 test('mobile map controls expose and change their real state', async ({ page }) => {
-  await page.addInitScript(() => {
-    window.sessionStorage.setItem('aegis-splash-seen', '1');
-  });
-  await page.goto('/');
+  await page.goto('/?nosplash=1');
 
   await expect(page.getByRole('heading', { name: 'AEGIS' }).first()).toBeVisible();
   const projection = page.getByRole('button', { name: 'Cambiar a mapa 2D' });
@@ -77,10 +71,7 @@ test('mobile map controls expose and change their real state', async ({ page }) 
 });
 
 test('mobile command menu closes with Escape and outside tap', async ({ page }) => {
-  await page.addInitScript(() => {
-    window.sessionStorage.setItem('aegis-splash-seen', '1');
-  });
-  await page.goto('/');
+  await page.goto('/?nosplash=1');
 
   await expect(page.getByRole('heading', { name: 'AEGIS' }).first()).toBeVisible();
   await page.getByRole('button', { name: 'Abrir menú AEGIS' }).click();
