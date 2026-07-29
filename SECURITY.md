@@ -16,8 +16,10 @@ The creators and contributors of AEGIS are not responsible for any misuse or dam
 We take the security of our project seriously. If you discover a security vulnerability within the AEGIS codebase itself, please do not disclose it publicly.
 
 **To report a vulnerability:**
-1. Please open an issue in the GitHub repository and label it appropriately, or contact the repository maintainers directly if a private channel is available.
+1. Use a [private GitHub Security Advisory](https://github.com/Blackleets/aegis/security/advisories/new). **Do not open a public issue.**
 2. Provide a detailed description of the vulnerability, including steps to reproduce it and the potential impact.
 3. Our team will acknowledge the receipt of your report and provide an estimated timeline for resolution.
+
+Do not include production credentials, personal data, precise user-location history, or active exploitation against systems you do not own. Use minimal sanitized proof of concept data.
 
 We appreciate your efforts in keeping AEGIS secure for everyone!

@@ -69,6 +69,20 @@ Open:
 http://localhost:3000
 ```
 
+## Contributing
+
+AEGIS welcomes focused contributions from humans and AI coding agents.
+
+Start here:
+
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — workflow, data-truth standard, testing, and review.
+- [`AGENTS.md`](AGENTS.md) — repository-wide instructions for coding agents.
+- [Bug report](https://github.com/Blackleets/aegis/issues/new?template=bug.yml) — reproducible defects.
+- [Improvement proposal](https://github.com/Blackleets/aegis/issues/new?template=improvement.yml) — focused proposals backed by evidence.
+- [`SECURITY.md`](SECURITY.md) — private vulnerability reporting.
+
+Pull requests cannot deploy or modify `main` by themselves. Maintainers merge only focused, reviewed changes that pass tests, lint, build, and data-source verification.
+
 ## Environment
 
 AEGIS runs without most third-party keys.
