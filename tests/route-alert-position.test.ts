@@ -52,4 +52,16 @@ describe('route alert position', () => {
     expect(result).not.toBeNull();
     expect(result?.lateralDistanceMeters).toBeGreaterThan(10_000);
   });
+  it('projects a short route correctly across the antimeridian', () => {
+    const result = resolveRouteAlertPosition({
+      user: { lat: 0, lng: 179.91 },
+      alert: { lat: 0, lng: -179.95 },
+      routeCoordinates: [[179.9, 0], [-179.9, 0]],
+      corridorMeters: 100,
+      maxAheadMeters: 30_000,
+    });
+    expect(result).not.toBeNull();
+    expect(result?.distanceAheadMeters).toBeGreaterThan(15_000);
+    expect(result?.distanceAheadMeters).toBeLessThan(16_000);
+  });
 });
