@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { resolveRouteAlertPosition } from '../src/lib/route-alert-position';
 
+// Madrid route fixture used for directional corridor checks.
 const route: [number, number][] = [
   [-3.7100, 40.4200],
   [-3.7000, 40.4200],
