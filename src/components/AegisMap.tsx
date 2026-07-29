@@ -1120,6 +1120,9 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
         stream_url: p.stream_url,
         stream_type: p.stream_type,
         external_url: p.external_url,
+        refresh_interval_seconds: p.refresh_interval_seconds,
+        captured_at: p.captured_at,
+        live_mode: p.live_mode,
         lat: coords[1],
         lng: coords[0],
       });
@@ -1765,7 +1768,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
     const cameras = isOverviewMode
       ? takeTopEntities(data.cameras, OVERVIEW_ENTITY_LIMITS.cctv, (c: MapEntity) => Number(c.priority ?? c.rank ?? 0))
       : (data.cameras || []);
-    setGeo('cctv', activeLayers.cctv && cameras ? cameras.map((c: MapEntity) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [c.lng, c.lat] }, properties: { id: c.id, name: c.name, city: c.city, country: c.country, source: c.source, feed_url: c.feed_url, stream_url: c.stream_url, stream_type: c.stream_type, external_url: c.external_url } })) : []);
+    setGeo('cctv', activeLayers.cctv && cameras ? cameras.map((c: MapEntity) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [c.lng, c.lat] }, properties: { id: c.id, name: c.name, city: c.city, country: c.country, source: c.source, feed_url: c.feed_url, stream_url: c.stream_url, stream_type: c.stream_type, external_url: c.external_url, refresh_interval_seconds: c.refresh_interval_seconds, captured_at: c.captured_at, live_mode: c.live_mode } })) : []);
   }, [mapReady, data.cameras, activeLayers.cctv, isOverviewMode, setGeo]);
 
   useEffect(() => {
