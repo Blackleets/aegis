@@ -1967,35 +1967,13 @@ export default function Dashboard() {
     { id: 'search', icon: AegisVectorGlyph, label: locale === 'es' ? 'GPS' : 'VECTOR' },
   ]), [copy.status.intel, copy.status.markets, locale]);
 
-  const openDailyNavigation = useCallback(() => {
-    setShowSplash(false);
-    setDashboardMode('earth');
-    setSelectedCelestialBody('earth');
-    setMapProjection('mercator');
-    setMapStyle('dark');
-    setAmbientMotionEnabled(false);
-    if (isMobile) {
-      setMobilePanel('search');
-    } else {
-      setVectorDockOpen(true);
-    }
-  }, [isMobile]);
-
-  const openWorldExplorer = useCallback(() => {
-    setShowSplash(false);
-    setDashboardMode('earth');
-    setSelectedCelestialBody('earth');
-    setMapProjection('globe');
-    setMapStyle('dark');
-    setAmbientMotionEnabled(true);
-  }, []);
+  const dismissIntro = useCallback(() => setShowSplash(false), []);
 
   return (
     <main className="fixed inset-0 w-full h-full bg-[var(--bg-void)] overflow-hidden">
       <SplashScreen
         showSplash={showSplash}
-        onNavigate={openDailyNavigation}
-        onExplore={openWorldExplorer}
+        onComplete={dismissIntro}
       />
 
 
