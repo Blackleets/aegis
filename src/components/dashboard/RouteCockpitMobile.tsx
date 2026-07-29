@@ -38,12 +38,10 @@ import { requestNavigationNotificationPermission } from '@/lib/navigation-notifi
 import { formatRouteAlertAge } from '@/lib/route-alert-freshness';
 import { getRouteAlertGuidance } from '@/lib/route-alert-guidance';
 import {
-  LOCAL_INCIDENT_REPORTS_KEY,
-  addLocalIncidentReport,
-  createLocalIncidentReport,
-  parseLocalIncidentReports,
-  type LocalIncidentKind,
-} from '@/lib/local-incident-reports';
+  createBrowserCommunityIncidentService,
+  getOrCreateCommunityReporterId,
+} from '@/lib/browser-community-incidents';
+import type { CommunityIncidentKind } from '@/lib/community-incidents';
 
 type NearbyEarthquakeAlert = {
   id: string;
@@ -110,14 +108,16 @@ type RouteCockpitMobileProps = {
 };
 
 const LOCAL_REPORT_OPTIONS: Array<{
-  kind: LocalIncidentKind;
+  kind: CommunityIncidentKind;
   label: string;
   Icon: typeof TriangleAlert;
 }> = [
   { kind: 'accident', label: 'Accidente', Icon: TriangleAlert },
-  { kind: 'obstacle', label: 'Obstáculo', Icon: TrafficCone },
-  { kind: 'roadworks', label: 'Obras', Icon: Construction },
-  { kind: 'hazard', label: 'Peligro', Icon: ShieldAlert },
+  { kind: 'camera', label: 'Cámara', Icon: Construction },
+  { kind: 'fire', label: 'Incendio', Icon: ShieldAlert },
+  { kind: 'flood', label: 'Inundación', Icon: ShieldAlert },
+  { kind: 'road_closure', label: 'Cierre', Icon: TrafficCone },
+  { kind: 'road_hazard', label: 'Peligro', Icon: ShieldAlert },
 ];
 
 function getModeMeta(mode: RouteSnapshot['mode']) {
@@ -257,25 +257,27 @@ export default function RouteCockpitMobile({
     onToggleNavigationFollow();
   };
 
-  const saveLocalReport = (kind: LocalIncidentKind) => {
+  const saveLocalReport = async (kind: CommunityIncidentKind) => {
     if (!currentLocation || typeof window === 'undefined') {
       setReportFeedback('Esperando una ubicación GPS válida');
       return;
     }
 
-    const report = createLocalIncidentReport({
-      kind,
-      lat: currentLocation.lat,
-      lng: currentLocation.lng,
-    });
-    const existing = parseLocalIncidentReports(
-      window.localStorage.getItem(LOCAL_INCIDENT_REPORTS_KEY),
-      report.createdAt,
+    const reporterId = getOrCreateCommunityReporterId(
+      window.localStorage,
+      () => window.crypto.randomUUID(),
     );
-    const result = addLocalIncidentReport(existing, report);
-    window.localStorage.setItem(LOCAL_INCIDENT_REPORTS_KEY, JSON.stringify(result.reports));
-    setReportFeedback(result.added ? 'Guardado solo en este dispositivo' : 'Ya guardaste esta incidencia cerca');
-    if (result.added) window.setTimeout(() => setReportComposerOpen(false), 900);
+    const incident = await createBrowserCommunityIncidentService(window.localStorage).report({
+      kind,
+      location: {
+        latitude: currentLocation.lat,
+        longitude: currentLocation.lng,
+      },
+      reporterId,
+      reportedAt: new Date().toISOString(),
+    });
+    setReportFeedback(incident.reportCount > 1 ? 'Incidencia cercana actualizada' : 'Guardado solo en este dispositivo');
+    window.setTimeout(() => setReportComposerOpen(false), 900);
   };
 
   return (
@@ -298,12 +300,12 @@ export default function RouteCockpitMobile({
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <div className="mt-3 grid grid-cols-4 gap-2">
+            <div className="mt-3 grid grid-cols-3 gap-2">
               {LOCAL_REPORT_OPTIONS.map(({ kind, label, Icon }) => (
                 <button
                   key={kind}
                   type="button"
-                  onClick={() => saveLocalReport(kind)}
+                  onClick={() => void saveLocalReport(kind)}
                   className="flex min-h-[4.5rem] flex-col items-center justify-center gap-1.5 rounded-2xl border border-white/10 bg-white/[0.05] px-1 text-[9px] font-semibold text-white/78 transition-colors active:bg-amber-200/15"
                 >
                   <Icon className="h-5 w-5 text-amber-200" />
