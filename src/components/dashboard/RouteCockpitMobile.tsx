@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   ArrowDownLeft,
@@ -28,11 +29,21 @@ import {
   X,
   Sparkles,
   Gauge,
+  TriangleAlert,
+  Construction,
+  TrafficCone,
 } from 'lucide-react';
 import { type RouteRiskSummary, type RouteSnapshot, type RouteStep, formatRouteDistance, formatRouteDuration, formatStepDistance, localizeRouteInstruction } from '@/lib/routing-shell';
 import { requestNavigationNotificationPermission } from '@/lib/navigation-notifications';
 import { formatRouteAlertAge } from '@/lib/route-alert-freshness';
 import { getRouteAlertGuidance } from '@/lib/route-alert-guidance';
+import {
+  LOCAL_INCIDENT_REPORTS_KEY,
+  addLocalIncidentReport,
+  createLocalIncidentReport,
+  parseLocalIncidentReports,
+  type LocalIncidentKind,
+} from '@/lib/local-incident-reports';
 
 type NearbyEarthquakeAlert = {
   id: string;
@@ -95,7 +106,19 @@ type RouteCockpitMobileProps = {
   recommendedRouteId: string | null;
   routeRecommendationLabel: string | null;
   trafficInsight: TrafficInsight | null;
+  currentLocation: { lat: number; lng: number } | null;
 };
+
+const LOCAL_REPORT_OPTIONS: Array<{
+  kind: LocalIncidentKind;
+  label: string;
+  Icon: typeof TriangleAlert;
+}> = [
+  { kind: 'accident', label: 'Accidente', Icon: TriangleAlert },
+  { kind: 'obstacle', label: 'Obstáculo', Icon: TrafficCone },
+  { kind: 'roadworks', label: 'Obras', Icon: Construction },
+  { kind: 'hazard', label: 'Peligro', Icon: ShieldAlert },
+];
 
 function getModeMeta(mode: RouteSnapshot['mode']) {
   if (mode === 'walking') return { label: 'A pie', Icon: Footprints };
@@ -152,7 +175,10 @@ export default function RouteCockpitMobile({
   recommendedRouteId,
   routeRecommendationLabel,
   trafficInsight,
+  currentLocation,
 }: RouteCockpitMobileProps) {
+  const [reportComposerOpen, setReportComposerOpen] = useState(false);
+  const [reportFeedback, setReportFeedback] = useState<string | null>(null);
   const destinationLabel = routeSnapshot?.destination.label ?? 'Preparando ruta';
   const distanceLabel = routeSnapshot ? formatRouteDistance(remainingRouteDistance || routeSnapshot.distanceMeters) : '--';
   const durationLabel = routeSnapshot ? formatRouteDuration(routeSnapshot.durationSeconds) : 'Calculando…';
@@ -231,8 +257,65 @@ export default function RouteCockpitMobile({
     onToggleNavigationFollow();
   };
 
+  const saveLocalReport = (kind: LocalIncidentKind) => {
+    if (!currentLocation || typeof window === 'undefined') {
+      setReportFeedback('Esperando una ubicación GPS válida');
+      return;
+    }
+
+    const report = createLocalIncidentReport({
+      kind,
+      lat: currentLocation.lat,
+      lng: currentLocation.lng,
+    });
+    const existing = parseLocalIncidentReports(
+      window.localStorage.getItem(LOCAL_INCIDENT_REPORTS_KEY),
+      report.createdAt,
+    );
+    const result = addLocalIncidentReport(existing, report);
+    window.localStorage.setItem(LOCAL_INCIDENT_REPORTS_KEY, JSON.stringify(result.reports));
+    setReportFeedback(result.added ? 'Guardado solo en este dispositivo' : 'Ya guardaste esta incidencia cerca');
+    if (result.added) window.setTimeout(() => setReportComposerOpen(false), 900);
+  };
+
   return (
     <>
+      <AnimatePresence>
+        {navigationActive && reportComposerOpen && (
+          <motion.aside
+            initial={{ opacity: 0, y: 12, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.98 }}
+            className="pointer-events-auto fixed bottom-[6.15rem] left-2.5 right-2.5 z-[365] mx-auto max-w-[34rem] overflow-hidden rounded-[1.35rem] border border-amber-200/18 bg-[rgba(13,18,24,0.96)] p-3 shadow-[0_18px_45px_rgba(0,0,0,0.42)] backdrop-blur-xl"
+            aria-label="Reportar incidencia"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-amber-200">¿Qué ocurre aquí?</p>
+                <p className="mt-1 text-[9px] leading-relaxed text-white/48">Se guarda 30 min en tu dispositivo. Aún no se comparte con otros usuarios.</p>
+              </div>
+              <button type="button" onClick={() => setReportComposerOpen(false)} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white/60" aria-label="Cerrar reporte">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="mt-3 grid grid-cols-4 gap-2">
+              {LOCAL_REPORT_OPTIONS.map(({ kind, label, Icon }) => (
+                <button
+                  key={kind}
+                  type="button"
+                  onClick={() => saveLocalReport(kind)}
+                  className="flex min-h-[4.5rem] flex-col items-center justify-center gap-1.5 rounded-2xl border border-white/10 bg-white/[0.05] px-1 text-[9px] font-semibold text-white/78 transition-colors active:bg-amber-200/15"
+                >
+                  <Icon className="h-5 w-5 text-amber-200" />
+                  {label}
+                </button>
+              ))}
+            </div>
+            {reportFeedback && <p className="mt-2 text-center text-[9px] font-medium text-amber-100" aria-live="polite">{reportFeedback}</p>}
+          </motion.aside>
+        )}
+      </AnimatePresence>
+
       <AnimatePresence mode="wait">
         {navigationActive && currentRouteStep && !routeLoading && (
           <motion.section
@@ -371,6 +454,18 @@ export default function RouteCockpitMobile({
                     )}
                   </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setReportFeedback(null);
+                    setReportComposerOpen((open) => !open);
+                  }}
+                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-transform active:scale-95 ${reportComposerOpen ? 'border-amber-200/45 bg-amber-200/18 text-amber-100' : 'border-amber-200/20 bg-amber-200/[0.08] text-amber-200'}`}
+                  aria-label="Reportar incidencia"
+                  aria-expanded={reportComposerOpen}
+                >
+                  <TriangleAlert className="h-[18px] w-[18px]" />
+                </button>
                 <button
                   type="button"
                   onClick={onToggleSimulation}
