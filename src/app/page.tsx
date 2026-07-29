@@ -508,6 +508,7 @@ export default function Dashboard() {
   const [navigationSimulationActive, setNavigationSimulationActive] = useState(false);
   const [navigationArrived, setNavigationArrived] = useState(false);
   const [navigationVoiceEnabled, setNavigationVoiceEnabled] = useState(true);
+  const [navigationCameraFollowing, setNavigationCameraFollowing] = useState(true);
   const [nearbyEarthquakeAlert, setNearbyEarthquakeAlert] = useState<NearbyEarthquakeAlert | null>(null);
   const [nearbyContextAlert, setNearbyContextAlert] = useState<NearbyContextAlert | null>(null);
   const [communityIncidents, setCommunityIncidents] = useState<CommunityIncident[]>([]);
@@ -1573,6 +1574,7 @@ export default function Dashboard() {
     setRouteError(null);
     setTrafficInsight(null);
     setNavigationActive(false);
+    setNavigationCameraFollowing(true);
     setNavigationBearing(null);
     setCurrentRouteStepIndex(0);
     setGpsAccuracyMeters(null);
@@ -1623,8 +1625,20 @@ export default function Dashboard() {
 
   const toggleNavigationFollow = useCallback(() => {
     if (!routeSnapshot) return;
-    setNavigationActive((value) => !value);
+    setNavigationActive((value) => {
+      if (!value) setNavigationCameraFollowing(true);
+      return !value;
+    });
   }, [routeSnapshot]);
+
+  const releaseNavigationCamera = useCallback(() => {
+    setNavigationCameraFollowing(false);
+  }, []);
+
+  const resumeNavigationCamera = useCallback(() => {
+    if (!navigationActive || !userLocation) return;
+    setNavigationCameraFollowing(true);
+  }, [navigationActive, userLocation]);
 
   const toggleNavigationSimulation = useCallback(() => {
     if (!routeSnapshot) return;
@@ -2195,6 +2209,8 @@ export default function Dashboard() {
           routeDestination={routeSnapshot?.destination ? { lat: routeSnapshot.destination.lat, lng: routeSnapshot.destination.lng } : null}
           routePath={routeSnapshot?.coordinates ?? []}
           navigationActive={navigationActive}
+          navigationCameraFollowing={navigationCameraFollowing}
+          onNavigationCameraRelease={releaseNavigationCamera}
           navigationBearing={navigationBearing}
           navigationMode={routeSnapshot?.mode ?? 'driving'}
           ambientMotionEnabled={
@@ -2561,6 +2577,8 @@ export default function Dashboard() {
               routeRecommendationLabel={routeRecommendation?.reason ?? null}
               trafficInsight={trafficInsight}
               currentLocation={userLocation}
+              navigationCameraFollowing={navigationCameraFollowing}
+              onResumeNavigationCamera={resumeNavigationCamera}
             />
           )}
 

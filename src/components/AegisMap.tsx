@@ -74,6 +74,8 @@ interface AegisMapProps {
   routeDestination?: { lat: number; lng: number } | null;
   routePath?: Coordinates[];
   navigationActive?: boolean;
+  navigationCameraFollowing?: boolean;
+  onNavigationCameraRelease?: () => void;
   navigationBearing?: number | null;
   navigationMode?: VectorNavigationMode;
   ambientMotionEnabled?: boolean;
@@ -246,7 +248,7 @@ function takeTopEntities<T>(items: T[] | undefined, limit: number, score: (item:
   return [...items].sort((a, b) => score(b) - score(a)).slice(0, limit);
 }
 
-function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightClick, onViewStateChange, flyToLocation, projection = 'globe', mapStyle = 'dark', sweepData, scanTargets = [], currentLocation = null, gpsAccuracyMeters = null, routeDestination = null, routePath = [], navigationActive = false, navigationBearing = null, navigationMode = 'driving', ambientMotionEnabled = true }: AegisMapProps) {
+function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightClick, onViewStateChange, flyToLocation, projection = 'globe', mapStyle = 'dark', sweepData, scanTargets = [], currentLocation = null, gpsAccuracyMeters = null, routeDestination = null, routePath = [], navigationActive = false, navigationCameraFollowing = true, onNavigationCameraRelease, navigationBearing = null, navigationMode = 'driving', ambientMotionEnabled = true }: AegisMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const popupRef = useRef<maplibregl.Popup | null>(null);
@@ -1104,6 +1106,9 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
     map.on('rotatestart', pauseGlobeSpin);
     map.on('pitchstart', pauseGlobeSpin);
     map.on('zoomstart', pauseGlobeSpin);
+    map.on('dragstart', (event) => {
+      if (event.originalEvent) onNavigationCameraRelease?.();
+    });
 
     // ── POPUP HELPER ──
     const popup = (coords: Coordinates, html: string) => {
@@ -1543,7 +1548,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       mapRef.current = null;
       setMapReady(false);
     };
-  }, [applyAegisGlobeStyling, createDot, createIcon, createNavigationArrow, onEntityClick, onMouseCoords, onRightClick, onViewStateChange]);
+  }, [applyAegisGlobeStyling, createDot, createIcon, createNavigationArrow, onEntityClick, onMouseCoords, onNavigationCameraRelease, onRightClick, onViewStateChange]);
 
   // Day/Night
   useEffect(() => {
@@ -2385,7 +2390,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
   }, [currentLocation, gpsAccuracyMeters, mapReady]);
 
   useEffect(() => {
-    if (!mapReady || !mapRef.current || !currentLocation || !navigationActive) return;
+    if (!mapReady || !mapRef.current || !currentLocation || !navigationActive || !navigationCameraFollowing) return;
     const map = mapRef.current;
     const isMobileNavigation = window.innerWidth < 768;
     const cameraPreset = getVectorCameraPreset(navigationMode, isMobileNavigation);
@@ -2410,7 +2415,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       duration: cameraPreset.durationMs,
       essential: true,
     });
-  }, [currentLocation, mapReady, navigationActive, navigationBearing, navigationMode]);
+  }, [currentLocation, mapReady, navigationActive, navigationBearing, navigationCameraFollowing, navigationMode]);
 
   useEffect(() => {
     if (!mapReady || !mapRef.current) return;
@@ -2532,7 +2537,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
     const map = mapRef.current;
     const targetZoom = flyToLocation.zoom ?? (projection === 'globe' ? 7.2 : 10);
 
-    if (navigationActive && currentLocation && window.innerWidth < 768) {
+    if (navigationActive && navigationCameraFollowing && currentLocation && window.innerWidth < 768) {
       const cameraPreset = getVectorCameraPreset(navigationMode, true);
       const nextBearing = smoothNavigationBearing(lastNavCameraBearingRef.current, navigationBearing ?? map.getBearing());
       const cameraTarget = getNavigationCameraTarget(currentLocation, nextBearing, cameraPreset.lookAheadMeters);
@@ -2568,7 +2573,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       duration: 2400,
       essential: true,
     });
-  }, [currentLocation, flyToLocation, mapReady, navigationActive, navigationBearing, navigationMode, projection]);
+  }, [currentLocation, flyToLocation, mapReady, navigationActive, navigationBearing, navigationCameraFollowing, navigationMode, projection]);
 
   // Dynamic projection switching (lightweight — no terrain DEM)
   useEffect(() => {
@@ -2582,7 +2587,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
           const isCompactViewport = window.innerWidth < 768;
           map.easeTo({ center: [0, isCompactViewport ? 12 : 31], zoom: Math.min(map.getZoom(), isCompactViewport ? 1.52 : 1.82), pitch: isCompactViewport ? 0 : 12, duration: 1200 });
         }
-      } else if (navigationActive && currentLocation) {
+      } else if (navigationActive && navigationCameraFollowing && currentLocation) {
         // Projection changes cancel in-flight MapLibre camera transitions. Re-apply the
         // complete VECTOR camera here, after setProjection, so a pitch-only transition
         // cannot leave navigation stranded at the previous globe zoom.
@@ -2607,7 +2612,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
     } catch (e) {
       console.warn('Projection switch failed:', e);
     }
-  }, [applyAegisGlobeStyling, currentLocation, mapReady, navigationActive, navigationBearing, navigationMode, projection, mapStyle]);
+  }, [applyAegisGlobeStyling, currentLocation, mapReady, navigationActive, navigationBearing, navigationCameraFollowing, navigationMode, projection, mapStyle]);
 
   useEffect(() => {
     if (navigationActive) return;
