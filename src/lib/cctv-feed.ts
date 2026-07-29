@@ -12,6 +12,40 @@ export interface CctvDeliveryMetadata {
   live_mode?: CctvLiveMode;
 }
 
+export type CctvOperationalStatus = 'connecting' | 'live' | 'stale' | 'offline';
+
+export function scoreCctvDelivery(camera: CctvDeliveryMetadata): number {
+  const mode = camera.live_mode
+    || (camera.stream_url ? 'video' : camera.feed_url ? 'snapshot' : 'external');
+  const transportScore = mode === 'video' ? 300 : mode === 'snapshot' ? 200 : 100;
+  const cadence = inferCctvRefreshIntervalSeconds(camera);
+  const cadenceScore = mode === 'snapshot' ? Math.max(0, 60 - cadence) : 0;
+  return transportScore + cadenceScore;
+}
+
+export function getCctvOperationalStatus({
+  mode,
+  loading,
+  error,
+  lastFrameAt,
+  now = Date.now(),
+  refreshIntervalSeconds = 15,
+}: {
+  mode: CctvLiveMode;
+  loading: boolean;
+  error: boolean;
+  lastFrameAt: number | null;
+  now?: number;
+  refreshIntervalSeconds?: number;
+}): CctvOperationalStatus {
+  if (error) return 'offline';
+  if (loading || lastFrameAt === null) return 'connecting';
+  if (mode === 'snapshot' && now - lastFrameAt > Math.max(30, refreshIntervalSeconds * 3) * 1000) {
+    return 'stale';
+  }
+  return 'live';
+}
+
 const IMAGE_PATH = /\.(?:avif|gif|jpe?g|png|webp)(?:$|[?#])/i;
 const SNAPSHOT_ENDPOINT = /(?:axis-cgi\/jpg|camera\/snapshot|snapshot|campic|traffic-images)/i;
 const NON_IMAGE_ENDPOINT = /\/api\/(?:v\d+\/)?(?:get\/)?cameras?(?:$|[?#])/i;

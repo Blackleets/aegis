@@ -5,6 +5,7 @@ import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 import { findNewEarthquakes, getEarthquakeSeverity, isRecentEarthquake } from '@/lib/earthquakes';
+import { scoreCctvDelivery } from '@/lib/cctv-feed';
 import { getLiveMotionFrame } from '@/lib/map-live-motion';
 import { getNavigationCameraTarget, getVectorCameraPreset, shouldUpdateNavigationCamera, smoothNavigationBearing, type VectorNavigationMode } from '@/lib/vector-navigation';
 
@@ -1766,7 +1767,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
   useEffect(() => {
     if (!mapReady) return;
     const cameras = isOverviewMode
-      ? takeTopEntities(data.cameras, OVERVIEW_ENTITY_LIMITS.cctv, (c: MapEntity) => Number(c.priority ?? c.rank ?? 0))
+      ? takeTopEntities(data.cameras, OVERVIEW_ENTITY_LIMITS.cctv, (c: MapEntity) => scoreCctvDelivery(c) + Number(c.priority ?? c.rank ?? 0))
       : (data.cameras || []);
     setGeo('cctv', activeLayers.cctv && cameras ? cameras.map((c: MapEntity) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [c.lng, c.lat] }, properties: { id: c.id, name: c.name, city: c.city, country: c.country, source: c.source, feed_url: c.feed_url, stream_url: c.stream_url, stream_type: c.stream_type, external_url: c.external_url, refresh_interval_seconds: c.refresh_interval_seconds, captured_at: c.captured_at, live_mode: c.live_mode } })) : []);
   }, [mapReady, data.cameras, activeLayers.cctv, isOverviewMode, setGeo]);
