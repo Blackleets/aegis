@@ -14,6 +14,13 @@ describe('route alert preferences', () => {
     });
   });
 
+  it('keeps background local monitoring opt-in for existing users', () => {
+    expect(parseRouteAlertPreferences(JSON.stringify({
+      earthquakes: true,
+      notifications: true,
+    })).localMonitoring).toBe(false);
+  });
+
   it('ignores malformed field values', () => {
     expect(parseRouteAlertPreferences(JSON.stringify({
       wildfires: 'no',
@@ -29,5 +36,13 @@ describe('route alert preferences', () => {
 
     expect(next.trafficCameras).toBe(false);
     expect(DEFAULT_ROUTE_ALERT_PREFERENCES.trafficCameras).toBe(true);
+  });
+
+  it('can enable local monitoring without changing hazard preferences', () => {
+    const next = updateRouteAlertPreference(DEFAULT_ROUTE_ALERT_PREFERENCES, 'localMonitoring', true);
+
+    expect(next.localMonitoring).toBe(true);
+    expect(next.earthquakes).toBe(true);
+    expect(next.wildfires).toBe(true);
   });
 });

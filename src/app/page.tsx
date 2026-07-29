@@ -40,6 +40,7 @@ import { vibrateForRouteAlert } from '@/lib/route-alert-haptics';
 import { formatRouteAlertAge, getAlertObservedAt, isRouteAlertFresh } from '@/lib/route-alert-freshness';
 import { DEFAULT_ROUTE_ALERT_PREFERENCES, parseRouteAlertPreferences, type RouteAlertPreferences } from '@/lib/route-alert-preferences';
 import { LIVE_HAZARD_REFRESH_MS, LIVE_TRAFFIC_REFRESH_MS, shouldRefreshNavigationData } from '@/lib/navigation-live-refresh';
+import { isAcceptableLocalRiskFix, shouldMonitorLocalRisks } from '@/lib/local-risk-monitoring';
 
 const AegisMap = dynamic(() => import('@/components/AegisMap'), { ssr: false });
 const LayerPanel = dynamic(() => import('@/components/LayerPanel'));
@@ -980,7 +981,7 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    if (!navigationActive) return;
+    if (!shouldMonitorLocalRisks(navigationActive, routeAlertPreferences.localMonitoring)) return;
     let lastRefreshAt = 0;
     const refreshNavigationHazards = () => {
       const now = Date.now();
@@ -1009,7 +1010,7 @@ export default function Dashboard() {
       window.removeEventListener('online', refreshNavigationHazards);
       document.removeEventListener('visibilitychange', refreshWhenVisible);
     };
-  }, [fetchEndpoint, navigationActive]);
+  }, [fetchEndpoint, navigationActive, routeAlertPreferences.localMonitoring]);
 
   // ── PROGRESSIVE DATA LOADING (request-optimized) ──
   useEffect(() => {
@@ -1437,6 +1438,37 @@ export default function Dashboard() {
   }, [handleRouteRequest, navigationActive, navigationRerouting, navigationSimulationActive, routeSnapshot]);
 
   useEffect(() => {
+    if (
+      navigationActive
+      || !routeAlertPreferences.localMonitoring
+      || typeof navigator === 'undefined'
+      || !navigator.geolocation
+    ) return;
+
+    const watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        const accuracy = Number.isFinite(position.coords.accuracy) ? position.coords.accuracy : null;
+        if (!isAcceptableLocalRiskFix(accuracy)) return;
+        setUserLocation({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        });
+        setGpsAccuracyMeters(accuracy);
+      },
+      (error) => {
+        console.warn('[AEGIS] Local risk watch failed:', error.message);
+      },
+      {
+        enableHighAccuracy: false,
+        maximumAge: 60_000,
+        timeout: 20_000,
+      },
+    );
+
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, [navigationActive, routeAlertPreferences.localMonitoring]);
+
+  useEffect(() => {
     if (!navigationSimulationActive || !navigationActive || !routeSnapshot || routeSnapshot.coordinates.length < 2) return;
     const timer = window.setInterval(() => {
       const currentIndex = simulationIndexRef.current;
@@ -1545,7 +1577,8 @@ export default function Dashboard() {
     : currentRouteStep?.distanceMeters ?? null;
 
   useEffect(() => {
-    if (!navigationActive || !userLocation || !routeAlertPreferences.earthquakes) {
+    const monitoringRisks = shouldMonitorLocalRisks(navigationActive, routeAlertPreferences.localMonitoring);
+    if (!monitoringRisks || !userLocation || !routeAlertPreferences.earthquakes) {
       queueMicrotask(() => setNearbyEarthquakeAlert(null));
       return;
     }
@@ -1582,10 +1615,11 @@ export default function Dashboard() {
 
       return nearby;
     });
-  }, [data.earthquakes, navigationActive, routeAlertPreferences.earthquakes, userLocation]);
+  }, [data.earthquakes, navigationActive, routeAlertPreferences.earthquakes, routeAlertPreferences.localMonitoring, userLocation]);
 
   useEffect(() => {
-    if (!navigationActive || !userLocation) {
+    const monitoringRisks = shouldMonitorLocalRisks(navigationActive, routeAlertPreferences.localMonitoring);
+    if (!monitoringRisks || !userLocation) {
       queueMicrotask(() => setNearbyContextAlert(null));
       return;
     }
@@ -1597,7 +1631,7 @@ export default function Dashboard() {
       && Math.abs(entity.lat - userLocation.lat) <= latDelta
       && Math.abs(entity.lng - userLocation.lng) <= lngDelta;
 
-    for (const camera of data.cameras || []) {
+    for (const camera of navigationActive ? data.cameras || [] : []) {
       if (!routeAlertPreferences.trafficCameras || !near(camera, 0.006, 0.009)) continue;
       const distanceMeters = Math.round(distanceMetersBetween(userLocation, camera as Coordinate));
       if (distanceMeters > 500) continue;
@@ -1676,7 +1710,7 @@ export default function Dashboard() {
       alertedContextIdsRef.current.add(alert.id);
       return alert;
     });
-  }, [data.cameras, data.fires, data.weather_events, navigationActive, routeAlertPreferences.severeWeather, routeAlertPreferences.trafficCameras, routeAlertPreferences.volcanoes, routeAlertPreferences.wildfires, userLocation]);
+  }, [data.cameras, data.fires, data.weather_events, navigationActive, routeAlertPreferences.localMonitoring, routeAlertPreferences.severeWeather, routeAlertPreferences.trafficCameras, routeAlertPreferences.volcanoes, routeAlertPreferences.wildfires, userLocation]);
 
   const visibleRouteAlertChannel = useMemo(() => chooseRouteAlertChannel(
     nearbyEarthquakeAlert ? {

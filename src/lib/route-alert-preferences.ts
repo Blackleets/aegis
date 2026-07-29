@@ -1,4 +1,5 @@
 export type RouteAlertPreferences = {
+  localMonitoring: boolean;
   earthquakes: boolean;
   wildfires: boolean;
   volcanoes: boolean;
@@ -9,6 +10,7 @@ export type RouteAlertPreferences = {
 };
 
 export const DEFAULT_ROUTE_ALERT_PREFERENCES: RouteAlertPreferences = {
+  localMonitoring: false,
   earthquakes: true,
   wildfires: true,
   volcanoes: true,
