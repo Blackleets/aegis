@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import { AnimatePresence, motion } from 'framer-motion';
 import { BellRing, Globe2, Navigation, Radio } from 'lucide-react';
+import { useState } from 'react';
 
 type SplashScreenProps = {
   showSplash: boolean;
@@ -11,9 +12,21 @@ type SplashScreenProps = {
 };
 
 export default function SplashScreen({ showSplash, onNavigate, onExplore }: SplashScreenProps) {
+  const [dismissed, setDismissed] = useState(false);
+
+  const enterNavigation = () => {
+    setDismissed(true);
+    onNavigate();
+  };
+
+  const enterExplorer = () => {
+    setDismissed(true);
+    onExplore();
+  };
+
   return (
     <AnimatePresence>
-      {showSplash && (
+      {showSplash && !dismissed && (
         <motion.section
           initial={{ opacity: 1 }}
           exit={{ opacity: 0, scale: 1.015 }}
@@ -36,7 +49,7 @@ export default function SplashScreen({ showSplash, onNavigate, onExplore }: Spla
               </div>
               <button
                 type="button"
-                onClick={onExplore}
+                onClick={enterExplorer}
                 className="flex min-h-11 items-center gap-2 rounded-full border border-white/10 bg-black/28 px-4 text-[11px] font-semibold text-white/72 backdrop-blur-xl transition hover:border-white/20 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200"
               >
                 <Globe2 className="h-4 w-4 text-cyan-200" />
@@ -88,7 +101,7 @@ export default function SplashScreen({ showSplash, onNavigate, onExplore }: Spla
             >
               <button
                 type="button"
-                onClick={onNavigate}
+                onClick={enterNavigation}
                 className="group flex min-h-[68px] w-full items-center justify-between rounded-[22px] bg-[#f1f1ed] px-5 text-left text-[#0a0d0c] shadow-[0_18px_50px_rgba(0,0,0,0.28)] transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white active:scale-[0.985]"
               >
                 <span className="flex items-center gap-4">
@@ -106,7 +119,7 @@ export default function SplashScreen({ showSplash, onNavigate, onExplore }: Spla
               <div className="grid grid-cols-2 gap-3">
                 <button
                   type="button"
-                  onClick={onExplore}
+                  onClick={enterExplorer}
                   className="flex min-h-[58px] items-center justify-center gap-2 rounded-[19px] border border-white/10 bg-white/[0.055] px-3 text-[12px] font-semibold text-white/72 backdrop-blur-xl transition hover:bg-white/[0.09] hover:text-white"
                 >
                   <Radio className="h-4 w-4 text-cyan-200" />
@@ -114,7 +127,7 @@ export default function SplashScreen({ showSplash, onNavigate, onExplore }: Spla
                 </button>
                 <button
                   type="button"
-                  onClick={onNavigate}
+                  onClick={enterNavigation}
                   className="flex min-h-[58px] items-center justify-center gap-2 rounded-[19px] border border-white/10 bg-white/[0.055] px-3 text-[12px] font-semibold text-white/72 backdrop-blur-xl transition hover:bg-white/[0.09] hover:text-white"
                 >
                   <BellRing className="h-4 w-4 text-amber-300" />
