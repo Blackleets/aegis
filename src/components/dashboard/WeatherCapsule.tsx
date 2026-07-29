@@ -1,6 +1,7 @@
 'use client';
 
 import { Cloud, CloudFog, CloudLightning, CloudRain, CloudSnow, Moon, Sun } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 import type { LocalWeather } from '@/hooks/useLocalWeather';
 
@@ -34,12 +35,20 @@ function localTime(timezone: string) {
 }
 
 export default function WeatherCapsule({ weather, status, navigationActive }: WeatherCapsuleProps) {
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    if (!expanded) return;
+    const timeout = window.setTimeout(() => setExpanded(false), 6500);
+    return () => window.clearTimeout(timeout);
+  }, [expanded]);
+
   if (navigationActive || status === 'idle' || status === 'unavailable') return null;
 
   if (!weather) {
     return (
-      <div className="pointer-events-none fixed left-1/2 top-[max(1rem,env(safe-area-inset-top))] z-[390] -translate-x-1/2 rounded-full border border-white/10 bg-[rgba(4,13,22,0.76)] px-3 py-2 text-[8px] font-mono uppercase tracking-[0.14em] text-white/55 backdrop-blur-xl">
-        Clima…
+      <div className="pointer-events-none fixed left-4 top-[calc(env(safe-area-inset-top)+4.75rem)] z-[390] grid h-11 w-11 place-items-center rounded-[15px] border border-white/10 bg-[rgba(4,13,22,0.76)] text-[8px] font-mono text-white/55 backdrop-blur-xl">
+        …
       </div>
     );
   }
@@ -51,23 +60,38 @@ export default function WeatherCapsule({ weather, status, navigationActive }: We
     : weather.condition;
 
   return (
-    <div
-      className="pointer-events-none fixed left-1/2 top-[max(0.8rem,env(safe-area-inset-top))] z-[390] flex min-w-[10.5rem] -translate-x-1/2 items-center gap-2 rounded-[18px] border border-white/12 bg-[rgba(4,13,22,0.84)] px-3 py-2 shadow-[0_14px_38px_rgba(0,0,0,0.34)] backdrop-blur-xl"
-      aria-label={`${weather.place}, ${Math.round(weather.temperatureC)} grados, ${weather.condition}`}
-      title={`Datos reales de Open-Meteo · actualizados ${weather.observedAt}`}
-    >
-      <Icon className={`h-6 w-6 shrink-0 ${rainSoon ? 'text-cyan-200' : weather.isDay ? 'text-amber-200' : 'text-indigo-200'}`} />
-      <div>
-        <div className="flex items-baseline gap-1.5 whitespace-nowrap">
-          <span className="text-[15px] font-semibold tabular-nums text-white">{Math.round(weather.temperatureC)}°</span>
-          <span className="max-w-[8.5rem] truncate text-[10px] font-medium text-white/88">{weather.place}</span>
+    <div className="fixed left-4 top-[calc(env(safe-area-inset-top)+4.75rem)] z-[390] flex items-start gap-2">
+      <button
+        type="button"
+        onClick={() => setExpanded((value) => !value)}
+        className={`pointer-events-auto flex h-11 min-w-11 items-center justify-center gap-1.5 rounded-[15px] border px-2.5 shadow-[0_12px_30px_rgba(0,0,0,0.34)] backdrop-blur-xl transition-all active:scale-95 ${
+          expanded ? 'border-cyan-200/28 bg-[rgba(6,27,38,0.94)]' : 'border-white/12 bg-[rgba(4,13,22,0.82)]'
+        }`}
+        aria-label={`${weather.place}, ${Math.round(weather.temperatureC)} grados, ${weather.condition}. ${expanded ? 'Ocultar detalle' : 'Ver detalle'}`}
+        aria-expanded={expanded}
+        title={`Datos reales de Open-Meteo · actualizados ${weather.observedAt}`}
+      >
+        <Icon className={`h-[18px] w-[18px] shrink-0 ${rainSoon ? 'text-cyan-200' : weather.isDay ? 'text-amber-200' : 'text-indigo-200'}`} />
+        <span className="text-[13px] font-semibold tabular-nums text-white">{Math.round(weather.temperatureC)}°</span>
+      </button>
+
+      {expanded && (
+        <div className="pointer-events-auto min-w-[9.5rem] max-w-[calc(100vw-6rem)] rounded-[17px] border border-white/12 bg-[rgba(4,13,22,0.94)] px-3 py-2 shadow-[0_14px_38px_rgba(0,0,0,0.38)] backdrop-blur-xl" role="status">
+          <div className="flex items-baseline gap-1.5 whitespace-nowrap">
+            <span className="max-w-[9rem] truncate text-[11px] font-semibold text-white/92">{weather.place}</span>
+            <span className="text-[9px] tabular-nums text-white/48">{localTime(weather.timezone)}</span>
+          </div>
+          <div className="mt-0.5 flex items-center gap-1.5 whitespace-nowrap text-[9px] text-white/62">
+            <span>{detail}</span>
+            {typeof weather.windKmh === 'number' && (
+              <>
+                <span>·</span>
+                <span>{Math.round(weather.windKmh)} km/h</span>
+              </>
+            )}
+          </div>
         </div>
-        <div className="mt-0.5 flex items-center gap-1.5 whitespace-nowrap text-[8px] text-white/58">
-          <span>{detail}</span>
-          <span>·</span>
-          <span className="tabular-nums">{localTime(weather.timezone)}</span>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
