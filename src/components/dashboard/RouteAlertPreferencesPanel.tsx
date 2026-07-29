@@ -1,7 +1,8 @@
 'use client';
 
-import { BellRing, Camera, CloudLightning, Flame, Mountain, Smartphone, Vibrate } from 'lucide-react';
+import { BellRing, Camera, CloudLightning, Flame, LocateFixed, Mountain, Smartphone, Vibrate } from 'lucide-react';
 import { type RouteAlertPreferences, updateRouteAlertPreference } from '@/lib/route-alert-preferences';
+import { requestNavigationNotificationPermission } from '@/lib/navigation-notifications';
 
 type PreferenceKey = keyof RouteAlertPreferences;
 
@@ -16,6 +17,7 @@ const OPTIONS: Array<{
   detail: string;
   icon: typeof BellRing;
 }> = [
+  { key: 'localMonitoring', label: 'Vigilancia local', detail: 'Riesgos cercanos incluso sin ruta', icon: LocateFixed },
   { key: 'earthquakes', label: 'Terremotos', detail: 'Eventos USGS cercanos', icon: BellRing },
   { key: 'wildfires', label: 'Incendios', detail: 'Focos térmicos NASA FIRMS', icon: Flame },
   { key: 'volcanoes', label: 'Volcanes', detail: 'Actividad NASA EONET', icon: Mountain },
@@ -26,11 +28,18 @@ const OPTIONS: Array<{
 ];
 
 export default function RouteAlertPreferencesPanel({ value, onChange }: RouteAlertPreferencesPanelProps) {
+  const togglePreference = (key: PreferenceKey, enabled: boolean) => {
+    if (key === 'localMonitoring' && enabled && value.notifications) {
+      void requestNavigationNotificationPermission();
+    }
+    onChange(updateRouteAlertPreference(value, key, enabled));
+  };
+
   return (
     <section className="mb-3 overflow-hidden rounded-[22px] border border-white/10 bg-white/[0.025]">
       <div className="border-b border-white/8 px-4 py-3">
         <div className="text-[8px] font-mono uppercase tracking-[0.22em] text-cyan-200">Preferencias del conductor</div>
-        <p className="mt-1 text-[10px] leading-relaxed text-white/45">Elige qué avisos pueden interrumpir la navegación. Se guarda solo en este dispositivo.</p>
+        <p className="mt-1 text-[10px] leading-relaxed text-white/45">Activa riesgos cercanos con o sin ruta. La preferencia se guarda solo en este dispositivo.</p>
       </div>
       <div className="grid grid-cols-1 gap-px bg-white/6 sm:grid-cols-2">
         {OPTIONS.map(({ key, label, detail, icon: Icon }) => {
@@ -39,7 +48,7 @@ export default function RouteAlertPreferencesPanel({ value, onChange }: RouteAle
             <button
               key={key}
               type="button"
-              onClick={() => onChange(updateRouteAlertPreference(value, key, !enabled))}
+              onClick={() => togglePreference(key, !enabled)}
               className="flex min-h-[62px] items-center gap-3 bg-[rgba(4,13,22,0.96)] px-4 text-left transition-colors active:bg-white/[0.08]"
               aria-pressed={enabled}
             >
