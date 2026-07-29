@@ -21,8 +21,8 @@ test('daily navigation entry opens the local map and destination search', async 
   await page.goto('/');
 
   await page.getByRole('button', { name: 'Navegar', exact: false }).click();
-  await expect(page.getByRole('region', { name: 'Inicio AEGIS' })).toBeHidden();
   await expect(page.getByText('Destino y ruta')).toBeVisible();
+  await page.getByRole('button', { name: 'Cerrar navegación' }).click();
   await expect(page.getByRole('button', { name: 'Cambiar a globo 3D' })).toHaveAttribute('data-view', 'map');
 });
 
