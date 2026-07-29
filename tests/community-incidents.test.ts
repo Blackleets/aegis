@@ -47,6 +47,61 @@ describe("CommunityIncidentService", () => {
     expect(duplicate.reporterIds).toEqual(["driver-a", "driver-b"]);
   });
 
+  it("treats a retry from the same reporter as idempotent", async () => {
+    const service = createService();
+    const input = {
+      kind: "accident" as const,
+      location: { latitude: 40.4168, longitude: -3.7038 },
+      reporterId: "driver-a",
+      reportedAt: at,
+    };
+    const first = await service.report(input);
+    const retry = await service.report(input);
+
+    expect(retry.id).toBe(first.id);
+    expect(retry.reportCount).toBe(1);
+    await expect(service.active(at)).resolves.toHaveLength(1);
+  });
+
+  it("serializes concurrent mutations without losing reports", async () => {
+    const service = createService();
+    await Promise.all([
+      service.report({
+        kind: "fire",
+        location: { latitude: 40.4168, longitude: -3.7038 },
+        reporterId: "driver-a",
+        reportedAt: at,
+      }),
+      service.report({
+        kind: "flood",
+        location: { latitude: 40.4268, longitude: -3.7038 },
+        reporterId: "driver-b",
+        reportedAt: at,
+      }),
+    ]);
+
+    await expect(service.active(at)).resolves.toHaveLength(2);
+  });
+
+  it("does not shorten expiry when delayed reports arrive", async () => {
+    const service = createService();
+    await service.report({
+      kind: "accident",
+      location: { latitude: 40.4168, longitude: -3.7038 },
+      reporterId: "driver-a",
+      reportedAt: at,
+    });
+    const merged = await service.report({
+      kind: "accident",
+      location: { latitude: 40.4169, longitude: -3.7038 },
+      reporterId: "driver-b",
+      reportedAt: "2026-07-29T17:30:00.000Z",
+    });
+
+    expect(merged.lastReportedAt).toBe(at);
+    expect(merged.expiresAt).toBe("2026-07-29T19:00:00.000Z");
+  });
+
   it("does not merge different hazards or distant reports", async () => {
     const service = createService();
     const first = await service.report({
@@ -111,6 +166,45 @@ describe("CommunityIncidentService", () => {
     await expect(
       service.vote(incident.id, "driver-a", "confirm", at),
     ).rejects.toThrow("reporters cannot vote on their own incident");
+  });
+
+  it("removes a prior vote when that user becomes a reporter", async () => {
+    const service = createService();
+    const incident = await service.report({
+      kind: "camera",
+      location: { latitude: 40.4168, longitude: -3.7038 },
+      reporterId: "driver-a",
+      reportedAt: at,
+    });
+    await service.vote(incident.id, "driver-b", "confirm", at);
+    const merged = await service.report({
+      kind: "camera",
+      location: { latitude: 40.4169, longitude: -3.7038 },
+      reporterId: "driver-b",
+      reportedAt: "2026-07-29T18:02:00.000Z",
+    });
+
+    expect(merged.confirmations).toBe(0);
+    expect(merged.votesByReporter).not.toHaveProperty("driver-b");
+    expect(merged.reporterIds).toContain("driver-b");
+  });
+
+  it("never increases confidence after a rejection", async () => {
+    const service = createService();
+    const incident = await service.report({
+      kind: "road_hazard",
+      location: { latitude: 40.4168, longitude: -3.7038 },
+      reporterId: "driver-a",
+      reportedAt: at,
+    });
+    const rejected = await service.vote(
+      incident.id,
+      "driver-b",
+      "reject",
+      at,
+    );
+
+    expect(rejected.confidence).toBeLessThan(incident.confidence);
   });
 
   it("marks sufficiently rejected incidents as disputed", async () => {
