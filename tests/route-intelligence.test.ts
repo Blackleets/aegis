@@ -57,4 +57,18 @@ describe('route intelligence', () => {
     expect(result?.routeId).toBe('active');
     expect(result?.shouldSwitch).toBe(false);
   });
+
+  it('accepts a short detour that avoids a corroborated critical case', () => {
+    const result = recommendRoute({
+      activeRouteId: 'active',
+      candidates: [
+        { id: 'active', label: 'Actual', durationSeconds: 1200, nearbySignals: 1, criticalCases: 1, riskWeight: 6 },
+        { id: 'alt', label: 'Segura', durationSeconds: 1320, nearbySignals: 1, criticalCases: 0, riskWeight: 1 },
+      ],
+    });
+
+    expect(result?.routeId).toBe('alt');
+    expect(result?.shouldSwitch).toBe(true);
+    expect(result?.reason).toContain('1 caso crítico');
+  });
 });
