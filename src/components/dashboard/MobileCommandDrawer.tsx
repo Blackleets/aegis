@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronRight, LocateFixed, Map, Menu, Navigation, RotateCw, Search, Satellite, X } from 'lucide-react';
-import { useState, type ComponentType, type ReactNode } from 'react';
+import { useEffect, useState, type ComponentType, type ReactNode } from 'react';
 import { useRealtimePresence } from '@/hooks/useRealtimePresence';
 
 type MobilePanel = 'layers' | 'markets' | 'intel' | 'alerts' | 'search' | 'recon';
@@ -62,16 +62,37 @@ export default function MobileCommandDrawer({
     onTogglePanel(panel);
   };
 
+  useEffect(() => {
+    if (!menuOpen) return;
+
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMenuOpen(false);
+    };
+
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [menuOpen]);
+
   return (
     <>
       {!mobilePanel && (
         <>
+          {menuOpen && (
+            <button
+              type="button"
+              className="fixed inset-0 z-[391] cursor-default bg-black/20"
+              onClick={() => setMenuOpen(false)}
+              aria-label="Cerrar menú AEGIS"
+            />
+          )}
           <div className="fixed left-4 top-[max(1rem,env(safe-area-inset-top))] z-[392]">
             <button
               type="button"
               onClick={() => setMenuOpen((open) => !open)}
               className={`grid h-11 w-11 place-items-center rounded-[15px] border shadow-[0_12px_32px_rgba(0,0,0,0.38)] backdrop-blur-xl transition-all ${menuOpen ? 'border-cyan-200/40 bg-cyan-300 text-[#031019]' : 'border-white/15 bg-[rgba(5,15,25,0.91)] text-white'}`}
-              aria-label="Abrir menú AEGIS"
+              aria-label={menuOpen ? 'Cerrar menú AEGIS' : 'Abrir menú AEGIS'}
+              aria-expanded={menuOpen}
+              aria-controls="aegis-mobile-command-menu"
             >
               {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
@@ -79,6 +100,7 @@ export default function MobileCommandDrawer({
             <AnimatePresence>
               {menuOpen && (
                 <motion.div
+                  id="aegis-mobile-command-menu"
                   initial={{ opacity: 0, y: -8, scale: 0.96 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -6, scale: 0.97 }}
@@ -116,10 +138,26 @@ export default function MobileCommandDrawer({
           </div>
 
           <div className="fixed right-4 top-[max(1rem,env(safe-area-inset-top))] z-[391] flex items-center gap-1.5 rounded-[18px] border border-white/10 bg-[rgba(4,13,22,0.72)] p-1 shadow-[0_10px_28px_rgba(0,0,0,0.28)] backdrop-blur-xl">
-            <button type="button" onClick={onToggleProjection} className="grid h-10 w-10 place-items-center rounded-[14px] border border-transparent bg-transparent text-cyan-100 shadow-[0_12px_30px_rgba(0,0,0,0.36)] backdrop-blur-xl" aria-label="Cambiar proyección">
+            <button
+              type="button"
+              onClick={onToggleProjection}
+              className="grid h-10 w-10 place-items-center rounded-[14px] border border-transparent bg-transparent text-cyan-100 shadow-[0_12px_30px_rgba(0,0,0,0.36)] backdrop-blur-xl"
+              aria-label={isGlobeView ? 'Cambiar a mapa 2D' : 'Cambiar a globo 3D'}
+              aria-pressed={!isGlobeView}
+              data-view={isGlobeView ? 'globe' : 'map'}
+              title={isGlobeView ? 'Globo 3D activo' : 'Mapa 2D activo'}
+            >
               {isGlobeView ? <Navigation className="h-5 w-5 fill-cyan-200/20" /> : <Map className="h-5 w-5" />}
             </button>
-            <button type="button" onClick={onToggleMapStyle} className="grid h-10 w-10 place-items-center rounded-[14px] border border-transparent bg-transparent text-emerald-200 shadow-[0_12px_30px_rgba(0,0,0,0.36)] backdrop-blur-xl" aria-label="Cambiar estilo del mapa">
+            <button
+              type="button"
+              onClick={onToggleMapStyle}
+              className="grid h-10 w-10 place-items-center rounded-[14px] border border-transparent bg-transparent text-emerald-200 shadow-[0_12px_30px_rgba(0,0,0,0.36)] backdrop-blur-xl"
+              aria-label={isSatelliteView ? 'Cambiar a mapa nocturno' : 'Activar vista satélite'}
+              aria-pressed={isSatelliteView}
+              data-style={isSatelliteView ? 'satellite' : 'dark'}
+              title={isSatelliteView ? 'Vista satélite activa' : 'Mapa nocturno activo'}
+            >
               <Satellite className="h-5 w-5" />
             </button>
             <button
