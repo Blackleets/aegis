@@ -46,6 +46,7 @@ export default function MobileCommandDrawer({
   reconContent,
   headerSummary,
   isGlobeView,
+  isSatelliteView,
   onToggleProjection,
   onToggleMapStyle,
   ambientMotionEnabled,
