@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ExternalLink, RefreshCw, MapPin, Camera, Maximize2, Play, Shield, Clock3, Radio } from 'lucide-react';
 import Hls from 'hls.js';
-import { buildCctvFrameUrl, inferCctvRefreshIntervalSeconds } from '@/lib/cctv-feed';
+import { buildCctvFrameUrl, getCctvOperationalStatus, inferCctvRefreshIntervalSeconds } from '@/lib/cctv-feed';
 
 interface CameraFeed {
   name: string;
@@ -211,6 +211,21 @@ function CameraViewerContent({
   const nextRefreshSeconds = liveMode === 'snapshot' && lastFrameAt
     ? Math.max(0, refreshIntervalSeconds - (frameAgeSeconds ?? 0))
     : null;
+  const operationalStatus = getCctvOperationalStatus({
+    mode: liveMode,
+    loading,
+    error,
+    lastFrameAt,
+    now: nowTs,
+    refreshIntervalSeconds,
+  });
+  const operationalTone = operationalStatus === 'live'
+    ? 'text-[#39FF14] border-[#39FF14]/30 bg-[#39FF14]/10'
+    : operationalStatus === 'connecting'
+      ? 'text-sky-300 border-sky-300/30 bg-sky-300/10'
+      : operationalStatus === 'stale'
+        ? 'text-amber-300 border-amber-300/30 bg-amber-300/10'
+        : 'text-red-400 border-red-400/30 bg-red-400/10';
   const showSafeModeGate = !externalOnly && highLoad && !streamArmed && !error;
 
   return (
@@ -267,6 +282,10 @@ function CameraViewerContent({
               <span>{liveMode === 'snapshot' ? 'Near-live cadence' : liveMode === 'video' ? 'Inline live transport' : 'Source-hosted live feed'}</span>
             </div>
             <div className="flex items-center gap-2 flex-wrap text-[7px] md:text-[8px] font-mono">
+              <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 tracking-[0.16em] ${operationalTone}`}>
+                <span className={`h-1.5 w-1.5 rounded-full ${operationalStatus === 'live' ? 'bg-[#39FF14] animate-aegis-pulse' : operationalStatus === 'offline' ? 'bg-red-400' : operationalStatus === 'stale' ? 'bg-amber-300' : 'bg-sky-300 animate-pulse'}`} />
+                {operationalStatus.toUpperCase()}
+              </span>
               {liveMode === 'snapshot' && (
                 <>
                   <span className="inline-flex items-center gap-1 rounded-full border border-[#39FF14]/20 bg-[#39FF14]/8 px-2 py-1 text-[#39FF14] tracking-[0.16em]">
