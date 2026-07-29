@@ -24,6 +24,7 @@ import DesktopOpsRails from '@/components/dashboard/DesktopOpsRails';
 import LiveFeedOverlay from '@/components/dashboard/LiveFeedOverlay';
 import RegionDossierOverlay, { type RegionDossierData } from '@/components/dashboard/RegionDossierOverlay';
 import IncidentFusionStrip from '@/components/dashboard/IncidentFusionStrip';
+import OperationalCaseCard from '@/components/dashboard/OperationalCaseCard';
 import NasaMissionStrip, { type NasaEventItem } from '@/components/dashboard/NasaMissionStrip';
 import MobileCommandDrawer from '@/components/dashboard/MobileCommandDrawer';
 import RouteCockpitDesktop from '@/components/dashboard/RouteCockpitDesktop';
@@ -2452,6 +2453,7 @@ export default function Dashboard() {
             gdeltCount={data.gdelt?.length || 0}
             operationalModeLabel={operationalModeLabel}
             topOperationalCase={operationalCases[0] ?? null}
+            onLocateOperationalCase={(lat, lng) => setFlyToLocation({ lat, lng, zoom: 8, ts: Date.now() })}
             variant="rail"
           />
         )}
@@ -2590,6 +2592,17 @@ export default function Dashboard() {
             intelContent={<IntelFeed data={data} onLocate={(lat, lng) => { setFlyToLocation({ lat, lng, ts: Date.now() }); setMobilePanel(null); }} />}
             alertsContent={(
               <>
+                {operationalCases[0] && (
+                  <div className="mb-2">
+                    <OperationalCaseCard
+                      operationalCase={operationalCases[0]}
+                      onLocate={(lat, lng) => {
+                        setFlyToLocation({ lat, lng, zoom: 8, ts: Date.now() });
+                        setMobilePanel(null);
+                      }}
+                    />
+                  </div>
+                )}
                 <RouteAlertPreferencesPanel value={routeAlertPreferences} onChange={setRouteAlertPreferences} />
                 <LiveAlerts data={dataWithSdk} onLocate={(lat, lng) => { setFlyToLocation({ lat, lng, ts: Date.now() }); setMobilePanel(null); }} onWatchFeed={(url, name) => { setLiveFeedUrl(url); setLiveFeedName(name); }} />
               </>
