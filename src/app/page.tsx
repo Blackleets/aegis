@@ -2410,6 +2410,7 @@ export default function Dashboard() {
               recommendedRouteId={routeRecommendation?.routeId ?? null}
               routeRecommendationLabel={routeRecommendation?.reason ?? null}
               trafficInsight={trafficInsight}
+              currentLocation={userLocation}
             />
           )}
 

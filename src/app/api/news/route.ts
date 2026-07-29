@@ -7,9 +7,11 @@ interface FeedItem {
   link: string;
   pubDate: string;
   source: string;
+  country: string | null;
+  coordsHint: [number, number] | null;
 }
 
-interface NewsItem extends FeedItem {
+interface NewsItem extends Omit<FeedItem, 'coordsHint'> {
   id: string;
   published: string;
   risk_score: number;
@@ -18,23 +20,53 @@ interface NewsItem extends FeedItem {
   machine_assessment: string | null;
 }
 
-const RSS_FEEDS: Array<{ source: string; url: string }> = [
+const RSS_FEEDS: Array<{
+  source: string;
+  url: string;
+  country?: string;
+  coordsHint?: [number, number];
+}> = [
   { source: 'BBC World', url: 'https://feeds.bbci.co.uk/news/world/rss.xml' },
   { source: 'Al Jazeera', url: 'https://www.aljazeera.com/xml/rss/all.xml' },
   { source: 'GDACS', url: 'https://www.gdacs.org/xml/rss.xml' },
   { source: 'DW World', url: 'https://rss.dw.com/rdf/rss-en-all' },
   { source: 'France 24', url: 'https://www.france24.com/en/rss' },
   { source: 'UN News', url: 'https://news.un.org/feed/subscribe/en/news/all/rss.xml' },
+  {
+    source: 'Argentina News',
+    url: 'https://news.google.com/rss?hl=es-419&gl=AR&ceid=AR:es-419',
+    country: 'AR',
+    coordsHint: [-34.6037, -58.3816],
+  },
+  {
+    source: 'Bolivia News',
+    url: 'https://news.google.com/rss?hl=es-419&gl=BO&ceid=BO:es-419',
+    country: 'BO',
+    coordsHint: [-16.4897, -68.1193],
+  },
+  {
+    source: 'Opinión Bolivia',
+    url: 'https://www.opinion.com.bo/rss/',
+    country: 'BO',
+    coordsHint: [-17.3895, -66.1568],
+  },
 ];
 
 const RISK_KEYWORDS = [
   'war', 'missile', 'strike', 'attack', 'crisis', 'tension', 'military', 'conflict', 'defense', 'clash',
   'nuclear', 'invasion', 'bomb', 'drone', 'weapon', 'sanctions', 'ceasefire', 'escalation', 'killed',
   'destroyed', 'operation', 'casualty', 'frontline', 'threat', 'earthquake', 'tsunami', 'eruption', 'flood',
+  'guerra', 'misil', 'ataque', 'crisis', 'conflicto', 'militar', 'bomba', 'dron', 'sanciones', 'amenaza',
+  'terremoto', 'sismo', 'tsunami', 'erupción', 'inundación', 'incendio', 'evacuación', 'bloqueo',
 ];
 
 const KEYWORD_COORDS: Record<string, [number, number]> = {
   argentina: [-38.416, -63.616],
+  bolivia: [-16.29, -63.589],
+  'buenos aires': [-34.604, -58.382],
+  'la paz': [-16.49, -68.119],
+  'santa cruz': [-17.784, -63.181],
+  cochabamba: [-17.389, -66.157],
   australia: [-25.274, 133.775],
   brazil: [-14.235, -51.925],
   canada: [56.13, -106.347],
@@ -113,7 +145,12 @@ function getTagValue(block: string, tag: string): string {
   return match ? stripHtml(match[1]) : '';
 }
 
-function parseRSSItems(xml: string, sourceName: string): FeedItem[] {
+function parseRSSItems(
+  xml: string,
+  sourceName: string,
+  country: string | null = null,
+  coordsHint: [number, number] | null = null,
+): FeedItem[] {
   const items: FeedItem[] = [];
   const itemRegex = /<item>([\s\S]*?)<\/item>/gi;
   let match: RegExpExecArray | null;
@@ -133,6 +170,8 @@ function parseRSSItems(xml: string, sourceName: string): FeedItem[] {
       link,
       pubDate,
       source: sourceName,
+      country,
+      coordsHint,
     });
   }
 
@@ -142,7 +181,7 @@ function parseRSSItems(xml: string, sourceName: string): FeedItem[] {
 export async function GET() {
   try {
     const feedResults = await Promise.allSettled(
-      RSS_FEEDS.map(async ({ source, url }): Promise<FeedItem[]> => {
+      RSS_FEEDS.map(async ({ source, url, country = null, coordsHint = null }): Promise<FeedItem[]> => {
         try {
           const res = await fetch(url, {
             signal: AbortSignal.timeout(8000),
@@ -154,7 +193,7 @@ export async function GET() {
           });
           if (!res.ok) return [];
           const xml = await res.text();
-          return parseRSSItems(xml, source).slice(0, 12);
+          return parseRSSItems(xml, source, country, coordsHint).slice(0, 12);
         } catch {
           return [];
         }
@@ -177,15 +216,21 @@ export async function GET() {
     const newsItems: NewsItem[] = deduped.map((article) => {
       const summaryText = `${article.title} ${article.description}`.trim();
       const riskScore = scoreRisk(summaryText);
-      const coords = findCoords(summaryText);
+      const detectedCoords = findCoords(summaryText);
+      const coords = detectedCoords ?? article.coordsHint;
 
       return {
-        ...article,
+        title: article.title,
+        description: article.description,
+        link: article.link,
+        pubDate: article.pubDate,
+        source: article.source,
+        country: article.country,
         id: createHash('md5').update((article.link || '') + (article.pubDate || '') + article.title).digest('hex'),
         published: article.pubDate,
         risk_score: riskScore,
         coords: coords ? [coords[0], coords[1]] : null,
-        coords_default: !coords,
+        coords_default: !detectedCoords && Boolean(coords),
         machine_assessment: riskScore >= 8 ? 'AI analysis indicates elevated priority based on real RSS coverage and keyword clustering.' : null,
       };
     });

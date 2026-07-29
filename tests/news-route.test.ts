@@ -35,9 +35,9 @@ describe('global news route', () => {
     };
 
     expect(response.status).toBe(200);
-    expect(payload.sources).toHaveLength(6);
-    expect(payload.activeSources).toHaveLength(6);
-    expect(payload.news).toHaveLength(6);
+    expect(payload.sources).toHaveLength(9);
+    expect(payload.activeSources).toHaveLength(9);
+    expect(payload.news).toHaveLength(9);
   });
 
   it('keeps healthy sources live when another provider fails', async () => {
@@ -58,8 +58,33 @@ describe('global news route', () => {
     };
 
     expect(response.status).toBe(200);
-    expect(payload.activeSources).toHaveLength(5);
-    expect(payload.news).toHaveLength(5);
+    expect(payload.activeSources).toHaveLength(8);
+    expect(payload.news).toHaveLength(8);
     expect(payload.news[0].coords).toEqual([40.464, -3.749]);
+  });
+
+  it('keeps Argentina and Bolivia visible even when a local headline omits the country name', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      const title = url.includes('gl=AR')
+        ? 'Cortes y demoras en el transporte de la capital'
+        : url.includes('gl=BO') || url.includes('opinion.com.bo')
+          ? 'Bloqueo afecta una ruta nacional'
+          : 'Global report';
+      return new Response(rss([{
+        title,
+        link: `https://example.com/${encodeURIComponent(url)}`,
+      }]), { status: 200 });
+    }));
+
+    const response = await GET();
+    const payload = await response.json() as {
+      news: Array<{ source: string; country: string | null; coords: [number, number] | null }>;
+    };
+
+    const argentina = payload.news.find((item) => item.source === 'Argentina News');
+    const bolivia = payload.news.find((item) => item.source === 'Bolivia News');
+    expect(argentina).toMatchObject({ country: 'AR', coords: [-34.6037, -58.3816] });
+    expect(bolivia).toMatchObject({ country: 'BO', coords: [-16.4897, -68.1193] });
   });
 });
