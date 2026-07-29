@@ -38,6 +38,7 @@ import { requestNavigationNotificationPermission } from '@/lib/navigation-notifi
 import { formatRouteAlertAge } from '@/lib/route-alert-freshness';
 import { getRouteAlertGuidance } from '@/lib/route-alert-guidance';
 import {
+  COMMUNITY_INCIDENTS_CHANGED_EVENT,
   createBrowserCommunityIncidentService,
   getOrCreateCommunityReporterId,
 } from '@/lib/browser-community-incidents';
@@ -276,6 +277,7 @@ export default function RouteCockpitMobile({
       reporterId,
       reportedAt: new Date().toISOString(),
     });
+    window.dispatchEvent(new Event(COMMUNITY_INCIDENTS_CHANGED_EVENT));
     setReportFeedback(incident.reportCount > 1 ? 'Incidencia cercana actualizada' : 'Guardado solo en este dispositivo');
     window.setTimeout(() => setReportComposerOpen(false), 900);
   };

@@ -44,6 +44,12 @@ import { DEFAULT_ROUTE_ALERT_PREFERENCES, parseRouteAlertPreferences, type Route
 import { LIVE_HAZARD_REFRESH_MS, LIVE_TRAFFIC_REFRESH_MS, shouldRefreshNavigationData } from '@/lib/navigation-live-refresh';
 import { isAcceptableLocalRiskFix, shouldMonitorLocalRisks } from '@/lib/local-risk-monitoring';
 import { filterCctvByViewMode, type CctvDeliveryMetadata, type CctvViewMode } from '@/lib/cctv-feed';
+import {
+  COMMUNITY_INCIDENTS_CHANGED_EVENT,
+  COMMUNITY_INCIDENTS_STORAGE_KEY,
+  createBrowserCommunityIncidentService,
+} from '@/lib/browser-community-incidents';
+import type { CommunityIncident, CommunityIncidentKind } from '@/lib/community-incidents';
 
 const AegisMap = dynamic(() => import('@/components/AegisMap'), { ssr: false });
 const LayerPanel = dynamic(() => import('@/components/LayerPanel'));
@@ -335,7 +341,7 @@ interface NearbyEarthquakeAlert {
 
 interface NearbyContextAlert {
   id: string;
-  kind: 'traffic-camera' | 'wildfire' | 'volcano' | 'severe-weather';
+  kind: 'traffic-camera' | 'wildfire' | 'volcano' | 'severe-weather' | `community-${CommunityIncidentKind}`;
   title: string;
   detail: string;
   distanceMeters: number;
@@ -498,6 +504,7 @@ export default function Dashboard() {
   const [navigationVoiceEnabled, setNavigationVoiceEnabled] = useState(true);
   const [nearbyEarthquakeAlert, setNearbyEarthquakeAlert] = useState<NearbyEarthquakeAlert | null>(null);
   const [nearbyContextAlert, setNearbyContextAlert] = useState<NearbyContextAlert | null>(null);
+  const [communityIncidents, setCommunityIncidents] = useState<CommunityIncident[]>([]);
   const [usageMetrics, setUsageMetrics] = useState<UsageMetrics | null>(null);
   const mouseCoordsRef = useRef<Coordinate | null>(null);
   const coordsDisplayRef = useRef<HTMLDivElement>(null);
@@ -1587,6 +1594,33 @@ export default function Dashboard() {
     : currentRouteStep?.distanceMeters ?? null;
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    let cancelled = false;
+    const refreshCommunityIncidents = async () => {
+      try {
+        const incidents = await createBrowserCommunityIncidentService(window.localStorage)
+          .active(new Date().toISOString());
+        if (!cancelled) setCommunityIncidents(incidents.filter(({ status }) => status === 'active'));
+      } catch {
+        if (!cancelled) setCommunityIncidents([]);
+      }
+    };
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === COMMUNITY_INCIDENTS_STORAGE_KEY) void refreshCommunityIncidents();
+    };
+    const handleIncidentChange = () => void refreshCommunityIncidents();
+
+    void refreshCommunityIncidents();
+    window.addEventListener('storage', handleStorage);
+    window.addEventListener(COMMUNITY_INCIDENTS_CHANGED_EVENT, handleIncidentChange);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener(COMMUNITY_INCIDENTS_CHANGED_EVENT, handleIncidentChange);
+    };
+  }, []);
+
+  useEffect(() => {
     const monitoringRisks = shouldMonitorLocalRisks(navigationActive, routeAlertPreferences.localMonitoring);
     if (!monitoringRisks || !userLocation || !routeAlertPreferences.earthquakes) {
       queueMicrotask(() => setNearbyEarthquakeAlert(null));
@@ -1688,6 +1722,41 @@ export default function Dashboard() {
       });
     }
 
+    const communityMeta: Record<CommunityIncidentKind, {
+      title: string;
+      detail: string;
+      severity: NearbyContextAlert['severity'];
+      priority: number;
+    }> = {
+      accident: { title: 'Accidente reportado', detail: 'Reduce la velocidad y mantén distancia', severity: 'critical', priority: 5 },
+      camera: { title: 'Cámara reportada', detail: 'Punto señalado por la comunidad local', severity: 'info', priority: 1 },
+      fire: { title: 'Incendio reportado', detail: 'Posible humo o intervención de emergencia', severity: 'critical', priority: 5 },
+      flood: { title: 'Inundación reportada', detail: 'La vía podría no ser transitable', severity: 'critical', priority: 5 },
+      road_closure: { title: 'Cierre de vía reportado', detail: 'Prepárate para una posible ruta alternativa', severity: 'critical', priority: 6 },
+      road_hazard: { title: 'Peligro en la vía', detail: 'Circula con precaución', severity: 'warning', priority: 4 },
+    };
+
+    for (const incident of navigationActive ? communityIncidents : []) {
+      const entity = {
+        lat: incident.location.latitude,
+        lng: incident.location.longitude,
+      };
+      const distanceMeters = alertDistance(entity, 120, 3_000);
+      if (distanceMeters === null) continue;
+      const meta = communityMeta[incident.kind];
+      candidates.push({
+        id: incident.id,
+        kind: `community-${incident.kind}`,
+        title: meta.title,
+        detail: `${meta.detail} · confianza ${Math.round(incident.confidence * 100)}%`,
+        distanceMeters,
+        source: 'Comunidad local',
+        severity: meta.severity,
+        observedAt: Date.parse(incident.lastReportedAt),
+        priority: meta.priority,
+      });
+    }
+
     for (const event of data.fires || []) {
       if (!near(event, 0.55, 0.75)) continue;
       const isVolcano = event.type === 'volcano';
@@ -1749,7 +1818,7 @@ export default function Dashboard() {
       alertedContextIdsRef.current.add(alert.id);
       return alert;
     });
-  }, [data.cameras, data.fires, data.weather_events, navigationActive, routeAlertPreferences.localMonitoring, routeAlertPreferences.severeWeather, routeAlertPreferences.trafficCameras, routeAlertPreferences.volcanoes, routeAlertPreferences.wildfires, routeSnapshot, userLocation]);
+  }, [communityIncidents, data.cameras, data.fires, data.weather_events, navigationActive, routeAlertPreferences.localMonitoring, routeAlertPreferences.severeWeather, routeAlertPreferences.trafficCameras, routeAlertPreferences.volcanoes, routeAlertPreferences.wildfires, routeSnapshot, userLocation]);
 
   const visibleRouteAlertChannel = useMemo(() => chooseRouteAlertChannel(
     nearbyEarthquakeAlert ? {

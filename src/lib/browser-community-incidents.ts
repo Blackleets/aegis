@@ -6,6 +6,7 @@ import {
 
 export const COMMUNITY_INCIDENTS_STORAGE_KEY = 'aegis-community-incidents-v1';
 export const COMMUNITY_REPORTER_STORAGE_KEY = 'aegis-community-reporter-v1';
+export const COMMUNITY_INCIDENTS_CHANGED_EVENT = 'aegis:community-incidents-changed';
 
 export class BrowserCommunityIncidentRepository implements CommunityIncidentRepository {
   private mutationQueue: Promise<void> = Promise.resolve();
