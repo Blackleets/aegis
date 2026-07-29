@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { Activity, AlertTriangle, Database, RadioTower } from 'lucide-react';
 import { assessOperationalFusion, type OperationalPressure } from '@/lib/operational-fusion';
 import type { OperationalCase } from '@/lib/operational-cases';
+import OperationalCaseCard from '@/components/dashboard/OperationalCaseCard';
 
 type BackendStatus = 'connecting' | 'connected' | 'error';
 
@@ -18,6 +19,7 @@ type IncidentFusionStripProps = {
   gdeltCount: number;
   operationalModeLabel: string;
   topOperationalCase?: OperationalCase | null;
+  onLocateOperationalCase?: (latitude: number, longitude: number) => void;
   variant?: 'overlay' | 'rail';
 };
 
@@ -44,6 +46,7 @@ function IncidentFusionStrip({
   gdeltCount,
   operationalModeLabel,
   topOperationalCase = null,
+  onLocateOperationalCase = () => undefined,
   variant = 'overlay',
 }: IncidentFusionStripProps) {
   const assessment = assessOperationalFusion({
@@ -122,15 +125,8 @@ function IncidentFusionStrip({
           </p>
         </div>
         {topOperationalCase && (
-          <div className="mt-2 rounded-xl border border-amber-200/15 bg-amber-200/[0.045] px-2.5 py-2">
-            <div className="flex items-center justify-between gap-2 text-[7px] font-mono uppercase tracking-[0.16em] text-amber-100/65">
-              <span>Operational case · {topOperationalCase.id}</span>
-              <span>{topOperationalCase.confidence} confidence</span>
-            </div>
-            <p className="mt-1 truncate text-[10px] font-semibold text-amber-50">{topOperationalCase.title}</p>
-            <p className="mt-1 truncate text-[8px] text-white/48">
-              {topOperationalCase.signals.length} linked signals · {topOperationalCase.sourceCount} independent sources
-            </p>
+          <div className="mt-2">
+            <OperationalCaseCard operationalCase={topOperationalCase} onLocate={onLocateOperationalCase} compact />
           </div>
         )}
       </div>
