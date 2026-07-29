@@ -37,7 +37,8 @@ import { getArrivalThresholdMeters, getNextSimulationIndex, resolveNavigationBea
 import { recommendRoute } from '@/lib/route-intelligence';
 import { chooseRouteAlertChannel } from '@/lib/route-alert-priority';
 import { vibrateForRouteAlert } from '@/lib/route-alert-haptics';
-import { buildRouteAlertVoiceMessage, getRouteAlertGuidance } from '@/lib/route-alert-guidance';
+import { buildRouteAlertVoiceMessage, getRouteAlertGuidance, shouldAnnounceRouteAlertPhase } from '@/lib/route-alert-guidance';
+import { resolveRouteAlertPosition } from '@/lib/route-alert-position';
 import { formatRouteAlertAge, getAlertObservedAt, isRouteAlertFresh } from '@/lib/route-alert-freshness';
 import { DEFAULT_ROUTE_ALERT_PREFERENCES, parseRouteAlertPreferences, type RouteAlertPreferences } from '@/lib/route-alert-preferences';
 import { LIVE_HAZARD_REFRESH_MS, LIVE_TRAFFIC_REFRESH_MS, shouldRefreshNavigationData } from '@/lib/navigation-live-refresh';
@@ -543,12 +544,12 @@ export default function Dashboard() {
   const simulationIndexRef = useRef(0);
   const lastSpokenStepRef = useRef<number | null>(null);
   const lastNearSpokenStepRef = useRef<number | null>(null);
-  const lastSpokenEarthquakeRef = useRef<string | null>(null);
+  const spokenEarthquakePhasesRef = useRef<Set<string>>(new Set());
   const alertedEarthquakeIdsRef = useRef<Set<string>>(new Set());
   const alertedContextIdsRef = useRef<Set<string>>(new Set());
   const notifiedRouteAlertIdsRef = useRef<Set<string>>(new Set());
   const hapticRouteAlertIdsRef = useRef<Set<string>>(new Set());
-  const lastSpokenContextRef = useRef<string | null>(null);
+  const spokenContextPhasesRef = useRef<Set<string>>(new Set());
   const arrivalSpokenRef = useRef(false);
   const preNavigationMapStateRef = useRef<{ projection: 'globe' | 'mercator'; style: 'dark' | 'satellite' } | null>(null);
   const lastGeocodedPos = useRef<{ lat: number; lng: number } | null>(null);
@@ -1598,8 +1599,19 @@ export default function Dashboard() {
         if (typeof earthquake.lat !== 'number' || typeof earthquake.lng !== 'number' || typeof earthquake.magnitude !== 'number' || typeof earthquake.time !== 'number') return [];
         const ageMs = now - earthquake.time;
         if (ageMs < -300000 || ageMs > 86400000) return [];
-        const distanceMeters = Math.round(distanceMetersBetween(userLocation, earthquake));
-        if (distanceMeters > 25000) return [];
+        const directDistanceMeters = Math.round(distanceMetersBetween(userLocation, earthquake));
+        const routePosition = navigationActive && routeSnapshot
+          ? resolveRouteAlertPosition({
+              user: userLocation,
+              alert: earthquake,
+              routeCoordinates: routeSnapshot.coordinates,
+              corridorMeters: 25_000,
+              maxAheadMeters: 25_000,
+            })
+          : null;
+        if (navigationActive && routeSnapshot && !routePosition) return [];
+        const distanceMeters = routePosition?.distanceAheadMeters ?? directDistanceMeters;
+        if (distanceMeters > 25_000) return [];
         return [{
           id: earthquake.id || `${earthquake.time}-${earthquake.lat}-${earthquake.lng}`,
           magnitude: earthquake.magnitude,
@@ -1624,7 +1636,7 @@ export default function Dashboard() {
 
       return nearby;
     });
-  }, [data.earthquakes, navigationActive, routeAlertPreferences.earthquakes, routeAlertPreferences.localMonitoring, userLocation]);
+  }, [data.earthquakes, navigationActive, routeAlertPreferences.earthquakes, routeAlertPreferences.localMonitoring, routeSnapshot, userLocation]);
 
   useEffect(() => {
     const monitoringRisks = shouldMonitorLocalRisks(navigationActive, routeAlertPreferences.localMonitoring);
@@ -1635,6 +1647,20 @@ export default function Dashboard() {
 
     const candidates: Array<NearbyContextAlert & { priority: number }> = [];
     const now = Date.now();
+    const alertDistance = (entity: DashboardEntity, corridorMeters: number, maxAheadMeters: number) => {
+      if (typeof entity.lat !== 'number' || typeof entity.lng !== 'number') return null;
+      if (navigationActive && routeSnapshot) {
+        return resolveRouteAlertPosition({
+          user: userLocation,
+          alert: entity as Coordinate,
+          routeCoordinates: routeSnapshot.coordinates,
+          corridorMeters,
+          maxAheadMeters,
+        })?.distanceAheadMeters ?? null;
+      }
+      const distanceMeters = Math.round(distanceMetersBetween(userLocation, entity as Coordinate));
+      return distanceMeters <= maxAheadMeters ? distanceMeters : null;
+    };
     const near = (entity: DashboardEntity, latDelta: number, lngDelta: number) =>
       typeof entity.lat === 'number' && typeof entity.lng === 'number'
       && Math.abs(entity.lat - userLocation.lat) <= latDelta
@@ -1642,8 +1668,8 @@ export default function Dashboard() {
 
     for (const camera of navigationActive ? data.cameras || [] : []) {
       if (!routeAlertPreferences.trafficCameras || !near(camera, 0.006, 0.009)) continue;
-      const distanceMeters = Math.round(distanceMetersBetween(userLocation, camera as Coordinate));
-      if (distanceMeters > 500) continue;
+      const distanceMeters = alertDistance(camera, 100, 500);
+      if (distanceMeters === null) continue;
       const id = `camera-${String(camera.id || `${camera.lat}-${camera.lng}`)}`;
       candidates.push({
         id,
@@ -1660,11 +1686,11 @@ export default function Dashboard() {
 
     for (const event of data.fires || []) {
       if (!near(event, 0.55, 0.75)) continue;
-      const distanceMeters = Math.round(distanceMetersBetween(userLocation, event as Coordinate));
       const isVolcano = event.type === 'volcano';
       if (isVolcano ? !routeAlertPreferences.volcanoes : !routeAlertPreferences.wildfires) continue;
-      const limit = isVolcano ? 50000 : 20000;
-      if (distanceMeters > limit) continue;
+      const limit = isVolcano ? 50_000 : 20_000;
+      const distanceMeters = alertDistance(event, limit, limit);
+      if (distanceMeters === null) continue;
       const id = `${isVolcano ? 'volcano' : 'fire'}-${String(event.date || '')}-${event.lat}-${event.lng}`;
       const observedAt = getAlertObservedAt(event);
       if (!isRouteAlertFresh(isVolcano ? 'volcano' : 'wildfire', observedAt, now)) continue;
@@ -1685,9 +1711,9 @@ export default function Dashboard() {
       if (!routeAlertPreferences.severeWeather || !near(event, 0.75, 1)) continue;
       const severity = String(event.severity || 'low');
       if (severity !== 'high' && severity !== 'medium') continue;
-      const distanceMeters = Math.round(distanceMetersBetween(userLocation, event as Coordinate));
-      const limit = severity === 'high' ? 60000 : 25000;
-      if (distanceMeters > limit) continue;
+      const limit = severity === 'high' ? 60_000 : 25_000;
+      const distanceMeters = alertDistance(event, limit, limit);
+      if (distanceMeters === null) continue;
       const observedAt = getAlertObservedAt(event);
       if (!isRouteAlertFresh('severe-weather', observedAt, now)) continue;
       candidates.push({
@@ -1719,7 +1745,7 @@ export default function Dashboard() {
       alertedContextIdsRef.current.add(alert.id);
       return alert;
     });
-  }, [data.cameras, data.fires, data.weather_events, navigationActive, routeAlertPreferences.localMonitoring, routeAlertPreferences.severeWeather, routeAlertPreferences.trafficCameras, routeAlertPreferences.volcanoes, routeAlertPreferences.wildfires, userLocation]);
+  }, [data.cameras, data.fires, data.weather_events, navigationActive, routeAlertPreferences.localMonitoring, routeAlertPreferences.severeWeather, routeAlertPreferences.trafficCameras, routeAlertPreferences.volcanoes, routeAlertPreferences.wildfires, routeSnapshot, userLocation]);
 
   const visibleRouteAlertChannel = useMemo(() => chooseRouteAlertChannel(
     nearbyEarthquakeAlert ? {
@@ -1799,9 +1825,11 @@ export default function Dashboard() {
       speedKmh: navigationSpeedKmh,
       severity: visibleNearbyEarthquakeAlert.magnitude >= 5 ? 'critical' : 'warning',
     });
-    const spokenKey = `${visibleNearbyEarthquakeAlert.id}:${guidance.phase}`;
-    if (!guidance.shouldSpeak || lastSpokenEarthquakeRef.current === spokenKey) return;
-    lastSpokenEarthquakeRef.current = spokenKey;
+    if (!guidance.shouldSpeak || !shouldAnnounceRouteAlertPhase(
+      spokenEarthquakePhasesRef.current,
+      visibleNearbyEarthquakeAlert.id,
+      guidance.phase,
+    )) return;
     speakNavigationMessage(buildRouteAlertVoiceMessage({
       title: `terremoto de magnitud ${visibleNearbyEarthquakeAlert.magnitude}`,
       distanceMeters: visibleNearbyEarthquakeAlert.distanceMeters,
@@ -1816,9 +1844,11 @@ export default function Dashboard() {
       speedKmh: navigationSpeedKmh,
       severity: visibleNearbyContextAlert.severity,
     });
-    const spokenKey = `${visibleNearbyContextAlert.id}:${guidance.phase}`;
-    if (!guidance.shouldSpeak || lastSpokenContextRef.current === spokenKey) return;
-    lastSpokenContextRef.current = spokenKey;
+    if (!guidance.shouldSpeak || !shouldAnnounceRouteAlertPhase(
+      spokenContextPhasesRef.current,
+      visibleNearbyContextAlert.id,
+      guidance.phase,
+    )) return;
     speakNavigationMessage(buildRouteAlertVoiceMessage({
       title: visibleNearbyContextAlert.title,
       distanceMeters: visibleNearbyContextAlert.distanceMeters,
