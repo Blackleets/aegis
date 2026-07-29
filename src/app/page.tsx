@@ -1659,6 +1659,7 @@ export default function Dashboard() {
         });
         if (!routePosition) return null;
         const directDistanceMeters = Math.round(distanceMetersBetween(userLocation, entity as Coordinate));
+        if (directDistanceMeters > maxAheadMeters) return null;
         return corridorMeters <= 100 ? routePosition.distanceAheadMeters : directDistanceMeters;
       }
       const distanceMeters = Math.round(distanceMetersBetween(userLocation, entity as Coordinate));
