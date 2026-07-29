@@ -586,12 +586,6 @@ export default function Dashboard() {
     window.localStorage.setItem('aegis:route-alert-preferences', JSON.stringify(routeAlertPreferences));
   }, [routeAlertPreferences]);
 
-  // Splash screen
-  useEffect(() => {
-    const splashTimer = setTimeout(() => setShowSplash(false), 2500);
-    return () => clearTimeout(splashTimer);
-  }, []);
-
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const urlState = getInitialUrlState();
@@ -1973,9 +1967,33 @@ export default function Dashboard() {
     { id: 'search', icon: AegisVectorGlyph, label: locale === 'es' ? 'GPS' : 'VECTOR' },
   ]), [copy.status.intel, copy.status.markets, locale]);
 
+  const openDailyNavigation = useCallback(() => {
+    setShowSplash(false);
+    setDashboardMode('earth');
+    setSelectedCelestialBody('earth');
+    setMapProjection('mercator');
+    setMapStyle('dark');
+    setAmbientMotionEnabled(false);
+    if (isMobile) {
+      setMobilePanel('search');
+    } else {
+      setVectorDockOpen(true);
+    }
+  }, [isMobile]);
+
+  const openWorldExplorer = useCallback(() => {
+    setShowSplash(false);
+    setDashboardMode('earth');
+    setSelectedCelestialBody('earth');
+  }, []);
+
   return (
     <main className="fixed inset-0 w-full h-full bg-[var(--bg-void)] overflow-hidden">
-      <SplashScreen showSplash={showSplash} />
+      <SplashScreen
+        showSplash={showSplash}
+        onNavigate={openDailyNavigation}
+        onExplore={openWorldExplorer}
+      />
 
 
 

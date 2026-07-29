@@ -1,152 +1,155 @@
 'use client';
 
+import Image from 'next/image';
 import { AnimatePresence, motion } from 'framer-motion';
+import { BellRing, Globe2, Navigation, Radio } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 type SplashScreenProps = {
   showSplash: boolean;
+  onNavigate: () => void;
+  onExplore: () => void;
 };
 
-export default function SplashScreen({ showSplash }: SplashScreenProps) {
+export default function SplashScreen({ showSplash, onNavigate, onExplore }: SplashScreenProps) {
+  const [dismissed, setDismissed] = useState(false);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    queueMicrotask(() => setReady(true));
+  }, []);
+
+  const enterNavigation = () => {
+    setDismissed(true);
+    onNavigate();
+  };
+
+  const enterExplorer = () => {
+    setDismissed(true);
+    onExplore();
+  };
+
   return (
     <AnimatePresence>
-      {showSplash && (
-        <motion.div
+      {showSplash && !dismissed && (
+        <motion.section
           initial={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.8, ease: 'easeInOut' }}
-          className="absolute inset-0 z-[999] flex flex-col items-center justify-center overflow-hidden"
-          style={{ background: 'radial-gradient(ellipse at center, #0a0a14 0%, var(--bg-void) 70%)' }}
+          exit={{ opacity: 0, scale: 1.015 }}
+          transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+          className="absolute inset-0 z-[999] overflow-hidden"
+          aria-label="Inicio AEGIS"
         >
-          <div className="absolute inset-0 pointer-events-none z-[1]" style={{
-            backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(212,175,55,0.015) 2px, rgba(212,175,55,0.015) 4px)',
-            animation: 'splashScanDrift 8s linear infinite',
-          }} />
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(3,7,11,0.06)_0%,rgba(3,7,11,0.12)_42%,rgba(3,7,11,0.78)_78%,rgba(3,7,11,0.94)_100%)]" />
 
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 0.6 }} transition={{ delay: 0.8, duration: 0.5 }} className="absolute top-6 left-6 z-[2] font-mono text-[10px] tracking-[0.3em] text-[var(--gold-primary)]">
-            V4.2
-          </motion.div>
-
-          <div className="relative w-[18rem] max-w-[82vw] mb-7 flex flex-col items-center z-[2]">
+          <div className="relative z-10 mx-auto flex h-full w-full max-w-[31rem] flex-col px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(2rem,env(safe-area-inset-top))]">
             <motion.div
-              initial={{ opacity: 0, y: 22, scale: 0.96 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ duration: 0.75, ease: 'easeOut' }}
-              className="w-full rounded-[24px] border border-[rgba(34,211,238,0.16)] bg-[linear-gradient(180deg,rgba(6,14,24,0.96)_0%,rgba(7,11,18,0.92)_100%)] p-3 shadow-[0_20px_60px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.03)]"
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.45 }}
+              className="flex items-center justify-between"
             >
-              <div className="mb-3 flex items-center justify-between text-[9px] font-mono tracking-[0.28em] text-[var(--text-muted)]">
-                <span>AEGIS</span>
-                <span className="text-[var(--cyan-primary)]">WORLD MODEL</span>
+              <div className="flex items-center gap-2 text-[10px] font-medium tracking-[0.12em] text-white/54">
+                <span className="h-2 w-2 rounded-full bg-emerald-300 shadow-[0_0_14px_rgba(110,231,183,0.75)]" />
+                ENTORNO EN DIRECTO
+              </div>
+              <button
+                type="button"
+                onClick={enterExplorer}
+                disabled={!ready}
+                className="flex min-h-11 items-center gap-2 rounded-full border border-white/10 bg-black/28 px-4 text-[11px] font-semibold text-white/72 backdrop-blur-xl transition hover:border-white/20 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200"
+              >
+                <Globe2 className="h-4 w-4 text-cyan-200" />
+                Explorar
+              </button>
+            </motion.div>
+
+            <div className="flex flex-1 flex-col items-center justify-center pb-3 text-center">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.82, y: 12 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                transition={{ delay: 0.08, duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
+                className="relative mb-7"
+              >
+                <div className="absolute inset-[-20px] rounded-full bg-white/[0.035] blur-2xl" />
+                <Image
+                  src="/brand/aegis-symbol.png"
+                  alt="Símbolo AEGIS"
+                  width={116}
+                  height={116}
+                  priority
+                  className="relative h-[82px] w-[82px] object-contain opacity-95 drop-shadow-[0_0_20px_rgba(255,255,255,0.12)] sm:h-[94px] sm:w-[94px]"
+                />
+              </motion.div>
+
+              <motion.p
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2, duration: 0.5 }}
+                className="max-w-[20rem] text-[28px] font-semibold leading-[1.08] tracking-[-0.035em] text-white sm:text-[34px]"
+              >
+                Tu mundo, mientras ocurre.
+              </motion.p>
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.32, duration: 0.5 }}
+                className="mt-4 max-w-[21rem] text-[13px] leading-5 text-white/52"
+              >
+                Navega con tráfico, cámaras e incidentes verificados alrededor de tu ruta.
+              </motion.p>
+            </div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.36, duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+              className="space-y-3"
+            >
+              <button
+                type="button"
+                onClick={enterNavigation}
+                disabled={!ready}
+                className="group flex min-h-[68px] w-full items-center justify-between rounded-[22px] bg-[#f1f1ed] px-5 text-left text-[#0a0d0c] shadow-[0_18px_50px_rgba(0,0,0,0.28)] transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white active:scale-[0.985]"
+              >
+                <span className="flex items-center gap-4">
+                    <span className="grid h-11 w-11 place-items-center rounded-full bg-[#0a0d0c] text-white">
+                    <Navigation className="h-5 w-5 fill-current" />
+                  </span>
+                  <span>
+                    <span className="block text-[17px] font-bold tracking-[-0.02em]">Navegar</span>
+                    <span className="mt-0.5 block text-[11px] font-medium text-black/52">¿Adónde vas?</span>
+                  </span>
+                </span>
+                <span className="text-xl transition-transform group-hover:translate-x-1" aria-hidden="true">→</span>
+              </button>
+
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={enterExplorer}
+                  disabled={!ready}
+                  className="flex min-h-[58px] items-center justify-center gap-2 rounded-[19px] border border-white/10 bg-white/[0.055] px-3 text-[12px] font-semibold text-white/72 backdrop-blur-xl transition hover:bg-white/[0.09] hover:text-white"
+                >
+                  <Radio className="h-4 w-4 text-cyan-200" />
+                  Mundo en vivo
+                </button>
+                <button
+                  type="button"
+                  onClick={enterNavigation}
+                  disabled={!ready}
+                  className="flex min-h-[58px] items-center justify-center gap-2 rounded-[19px] border border-white/10 bg-white/[0.055] px-3 text-[12px] font-semibold text-white/72 backdrop-blur-xl transition hover:bg-white/[0.09] hover:text-white"
+                >
+                  <BellRing className="h-4 w-4 text-amber-300" />
+                  Alertas cerca
+                </button>
               </div>
 
-              <div className="relative h-[92px] overflow-hidden rounded-[16px] border border-[rgba(34,211,238,0.12)] bg-[linear-gradient(180deg,rgba(8,16,28,0.96)_0%,rgba(5,10,18,0.84)_100%)]">
-                <div className="absolute inset-0 opacity-40" style={{ backgroundImage: 'linear-gradient(rgba(34,211,238,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(34,211,238,0.07) 1px, transparent 1px)', backgroundSize: '26px 26px' }} />
-                <div className="absolute left-0 right-0 top-1/2 h-[1px] -translate-y-1/2 bg-gradient-to-r from-transparent via-[rgba(34,211,238,0.38)] to-transparent" />
-                <div className="absolute bottom-0 left-[18%] top-0 w-[1px] bg-gradient-to-b from-transparent via-[rgba(212,175,55,0.2)] to-transparent" />
-                <div className="absolute bottom-0 right-[22%] top-0 w-[1px] bg-gradient-to-b from-transparent via-[rgba(34,211,238,0.16)] to-transparent" />
-
-                <motion.div initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.35, duration: 0.6 }} className="absolute left-3 top-3 rounded-full border border-[rgba(212,175,55,0.26)] bg-[rgba(212,175,55,0.08)] px-2 py-[3px] text-[8px] font-mono tracking-[0.2em] text-[var(--gold-primary)]">
-                  GRID LOCK
-                </motion.div>
-
-                <motion.div initial={{ opacity: 0, scaleX: 0 }} animate={{ opacity: 1, scaleX: 1 }} transition={{ delay: 0.45, duration: 0.8, ease: 'easeOut' }} className="absolute left-4 right-4 top-1/2 h-[2px] origin-left rounded-full bg-gradient-to-r from-[rgba(34,211,238,0.12)] via-[rgba(191,219,254,0.92)] to-[rgba(212,175,55,0.4)] shadow-[0_0_16px_rgba(34,211,238,0.24)]" />
-
-                {[
-                  { left: '22%', top: '50%', delay: 0.8, color: 'rgba(34,211,238,0.95)' },
-                  { left: '46%', top: '50%', delay: 1.0, color: 'rgba(191,219,254,0.95)' },
-                  { left: '71%', top: '50%', delay: 1.2, color: 'rgba(212,175,55,0.95)' },
-                ].map((node, i) => (
-                  <motion.div
-                    key={i}
-                    initial={{ opacity: 0, scale: 0.7 }}
-                    animate={{ opacity: [0.55, 1, 0.55], scale: [0.9, 1.08, 0.9] }}
-                    transition={{ delay: node.delay, duration: 1.7, repeat: Infinity, ease: 'easeInOut' }}
-                    className="absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full"
-                    style={{ left: node.left, top: node.top, background: node.color, boxShadow: `0 0 14px ${node.color}` }}
-                  />
-                ))}
-
-                <motion.div initial={{ opacity: 0, x: 22 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.6, duration: 0.55 }} className="absolute right-3 top-3 text-right text-[8px] font-mono tracking-[0.22em] text-[var(--text-secondary)]">
-                  <div>SYNC 3/3</div>
-                  <div className="mt-1 text-[var(--cyan-primary)]">VERIFIED FEEDS</div>
-                </motion.div>
-
-                <div className="absolute bottom-3 left-3 text-[8px] font-mono tracking-[0.22em] text-[rgba(212,175,55,0.72)]">COMMAND SURFACE</div>
-                <div className="absolute right-3 bottom-3 text-[8px] font-mono tracking-[0.22em] text-[rgba(34,211,238,0.72)]">LIVE MODEL</div>
-              </div>
+              <p className="pt-2 text-center text-[9px] font-medium uppercase tracking-[0.18em] text-white/30">
+                Inteligencia local · fuentes verificadas
+              </p>
             </motion.div>
           </div>
-
-          <div className="flex flex-col items-center mb-7 z-[2] px-4 text-center">
-            <motion.h1 initial={{ opacity: 0, y: 16, filter: 'blur(6px)' }} animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }} transition={{ delay: 0.55, duration: 0.65, ease: 'easeOut' }} className="text-[2.15rem] md:text-[3.2rem] font-bold tracking-[0.36em] md:tracking-[0.42em] font-mono text-[var(--text-heading)]" style={{ textShadow: '0 0 26px rgba(212,175,55,0.14)' }}>
-              AEGIS
-            </motion.h1>
-            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 0.92 }} transition={{ delay: 0.95, duration: 0.5 }} className="mt-2 text-[10px] md:text-[11px] font-mono tracking-[0.44em] text-[var(--gold-primary)]">
-              LIVE WORLD MODEL
-            </motion.p>
-            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 0.72 }} transition={{ delay: 1.1, duration: 0.5 }} className="mt-2 max-w-[24rem] text-[8px] md:text-[9px] font-mono uppercase tracking-[0.22em] text-[var(--text-secondary)]">
-              VERIFIED GLOBAL INTELLIGENCE • COMMAND SURFACE ONLINE
-            </motion.p>
-          </div>
-
-          <div className="w-64 md:w-80 z-[2]">
-            <div className="mb-2 flex items-center justify-between text-[8px] font-mono tracking-[0.22em] text-[var(--text-muted)]">
-              <span>BOOTSTRAP</span>
-              <span className="text-[var(--gold-primary)]">V4.2</span>
-            </div>
-            <div className="relative w-full h-[3px] rounded-full overflow-hidden" style={{ background: 'rgba(148,163,184,0.12)' }}>
-              <motion.div
-                initial={{ width: '0%' }}
-                animate={{ width: ['0%', '22%', '48%', '74%', '100%'] }}
-                transition={{ duration: 2.2, delay: 0.45, times: [0, 0.22, 0.5, 0.78, 1], ease: 'easeInOut' }}
-                className="absolute inset-y-0 left-0 rounded-full"
-                style={{ background: 'linear-gradient(90deg, rgba(34,211,238,0.88), rgba(191,219,254,0.95), rgba(212,175,55,0.9))', boxShadow: '0 0 12px rgba(34,211,238,0.32)' }}
-              />
-            </div>
-
-            <div className="mt-3 h-4 flex items-center justify-center">
-              {[
-                { text: 'LOCKING WORLD GRID...', delay: 0.5 },
-                { text: 'SYNCING VERIFIED FEEDS...', delay: 1.1 },
-                { text: 'ALIGNING COMMAND SURFACE...', delay: 1.7 },
-                { text: 'AEGIS READY', delay: 2.2 },
-              ].map((stage, i) => (
-                <motion.span
-                  key={i}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: [0, 1, 1, 0] }}
-                  transition={{ delay: stage.delay, duration: 0.62, times: [0, 0.1, 0.72, 1] }}
-                  className="absolute text-[9px] font-mono tracking-[0.24em]"
-                  style={{ color: i === 3 ? 'var(--cyan-primary)' : 'var(--text-muted)' }}
-                >
-                  {stage.text}
-                </motion.span>
-              ))}
-            </div>
-          </div>
-
-          <div className="absolute inset-0 pointer-events-none z-[0]" style={{ opacity: 0.03 }}>
-            <div className="absolute inset-0" style={{
-              backgroundImage: 'linear-gradient(rgba(212,175,55,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(212,175,55,0.5) 1px, transparent 1px)',
-              backgroundSize: '60px 60px',
-            }} />
-          </div>
-
-          {[
-            { t: '10px', l: '10px', bw: '2px 0 0 2px' },
-            { t: '10px', r: '10px', bw: '2px 2px 0 0' },
-            { b: '10px', l: '10px', bw: '0 0 2px 2px' },
-            { b: '10px', r: '10px', bw: '0 2px 2px 0' },
-          ].map((pos, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 0.3 }}
-              transition={{ delay: 0.8 + i * 0.1, duration: 0.5 }}
-              className="absolute w-8 h-8 z-[2]"
-              style={{ top: pos.t, bottom: pos.b, left: pos.l, right: pos.r, borderWidth: pos.bw, borderStyle: 'solid', borderColor: 'var(--gold-primary)' }}
-            />
-          ))}
-        </motion.div>
+        </motion.section>
       )}
     </AnimatePresence>
   );

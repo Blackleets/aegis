@@ -9,20 +9,33 @@ test.use({
 test.describe.configure({ mode: 'serial' });
 
 test('mobile shell loads AEGIS homepage', async ({ page }) => {
-  await page.addInitScript(() => {
-    window.sessionStorage.setItem('aegis-splash-seen', '1');
-  });
   await page.goto('/');
 
   await expect(page).toHaveTitle(/AEGIS/i);
-  await expect(page.getByRole('heading', { name: 'AEGIS' }).first()).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Inicio AEGIS' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Navegar', exact: false })).toBeVisible();
+  await expect(page.getByText('Tu mundo, mientras ocurre.')).toBeVisible();
+});
+
+test('daily navigation entry opens the local map and destination search', async ({ page }) => {
+  await page.goto('/');
+
+  await page.getByRole('button', { name: 'Navegar', exact: false }).click();
+  await expect(page.getByText('Destino y ruta')).toBeVisible();
+  await page.getByRole('button', { name: 'Cerrar navegación' }).click();
+  await expect(page.getByRole('button', { name: 'Cambiar a globo 3D' })).toHaveAttribute('data-view', 'map');
+});
+
+test('world explorer keeps the globe as the primary global surface', async ({ page }) => {
+  await page.goto('/');
+
+  await page.getByRole('button', { name: 'Explorar', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Inicio AEGIS' })).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Cambiar a mapa 2D' })).toHaveAttribute('data-view', 'globe', { timeout: 15_000 });
 });
 
 test('mobile command buttons open and close without blocking one another', async ({ page }) => {
-  await page.addInitScript(() => {
-    window.sessionStorage.setItem('aegis-splash-seen', '1');
-  });
-  await page.goto('/');
+  await page.goto('/?nosplash=1');
 
   await page.getByRole('button', { name: 'Abrir menú AEGIS' }).click();
   await expect(page.getByText('Centro de control')).toBeVisible();
@@ -38,10 +51,7 @@ test('mobile command buttons open and close without blocking one another', async
 });
 
 test('mobile map controls expose and change their real state', async ({ page }) => {
-  await page.addInitScript(() => {
-    window.sessionStorage.setItem('aegis-splash-seen', '1');
-  });
-  await page.goto('/');
+  await page.goto('/?nosplash=1');
 
   await expect(page.getByRole('heading', { name: 'AEGIS' }).first()).toBeVisible();
   const projection = page.getByRole('button', { name: 'Cambiar a mapa 2D' });
@@ -61,10 +71,7 @@ test('mobile map controls expose and change their real state', async ({ page }) 
 });
 
 test('mobile command menu closes with Escape and outside tap', async ({ page }) => {
-  await page.addInitScript(() => {
-    window.sessionStorage.setItem('aegis-splash-seen', '1');
-  });
-  await page.goto('/');
+  await page.goto('/?nosplash=1');
 
   await expect(page.getByRole('heading', { name: 'AEGIS' }).first()).toBeVisible();
   await page.getByRole('button', { name: 'Abrir menú AEGIS' }).click();
