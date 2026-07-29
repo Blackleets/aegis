@@ -40,7 +40,9 @@ export interface CommunityIncident {
 
 export interface CommunityIncidentRepository {
   list(): Promise<CommunityIncident[]>;
-  replace(incidents: CommunityIncident[]): Promise<void>;
+  mutate<T>(
+    mutation: (incidents: CommunityIncident[]) => T | Promise<T>,
+  ): Promise<T>;
 }
 
 export interface CommunityIncidentPolicy {
@@ -66,6 +68,7 @@ export class InMemoryCommunityIncidentRepository
   implements CommunityIncidentRepository
 {
   private incidents: CommunityIncident[];
+  private mutationQueue: Promise<void> = Promise.resolve();
 
   constructor(initialIncidents: CommunityIncident[] = []) {
     this.incidents = cloneIncidents(initialIncidents);
@@ -75,8 +78,23 @@ export class InMemoryCommunityIncidentRepository
     return cloneIncidents(this.incidents);
   }
 
-  async replace(incidents: CommunityIncident[]): Promise<void> {
-    this.incidents = cloneIncidents(incidents);
+  async mutate<T>(
+    mutation: (incidents: CommunityIncident[]) => T | Promise<T>,
+  ): Promise<T> {
+    const previous = this.mutationQueue;
+    let release: () => void = () => undefined;
+    this.mutationQueue = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await previous;
+    try {
+      const draft = cloneIncidents(this.incidents);
+      const result = await mutation(draft);
+      this.incidents = cloneIncidents(draft);
+      return result;
+    } finally {
+      release();
+    }
   }
 }
 
@@ -90,35 +108,40 @@ export class CommunityIncidentService {
   async report(input: CommunityIncidentReport): Promise<CommunityIncident> {
     validateReport(input);
     const now = parseTimestamp(input.reportedAt, "reportedAt");
-    const incidents = await this.repository.list();
-    expireIncidents(incidents, now);
+    return this.repository.mutate((incidents) => {
+      expireIncidents(incidents, now);
+      const duplicate = incidents
+        .filter(
+          (incident) =>
+            incident.status !== "expired" && incident.kind === input.kind,
+        )
+        .map((incident) => ({
+          incident,
+          distance: distanceMeters(incident.location, input.location),
+        }))
+        .filter(({ distance }) => distance <= this.policy.dedupeRadiusMeters)
+        .sort((left, right) => left.distance - right.distance)[0]?.incident;
 
-    const duplicate = incidents
-      .filter(
-        (incident) =>
-          incident.status !== "expired" &&
-          incident.kind === input.kind &&
-          !incident.reporterIds.includes(input.reporterId),
-      )
-      .map((incident) => ({
-        incident,
-        distance: distanceMeters(incident.location, input.location),
-      }))
-      .filter(({ distance }) => distance <= this.policy.dedupeRadiusMeters)
-      .sort((left, right) => left.distance - right.distance)[0]?.incident;
+      if (duplicate?.reporterIds.includes(input.reporterId)) {
+        return cloneIncident(duplicate);
+      }
+      if (duplicate) {
+        removeVote(duplicate, input.reporterId);
+        duplicate.reportCount += 1;
+        duplicate.reporterIds.push(input.reporterId);
+        const latestReportTime = Math.max(
+          Date.parse(duplicate.lastReportedAt),
+          now,
+        );
+        duplicate.lastReportedAt = new Date(latestReportTime).toISOString();
+        duplicate.expiresAt = new Date(
+          latestReportTime + this.policy.ttlMsByKind[input.kind],
+        ).toISOString();
+        updateAssessment(duplicate);
+        return cloneIncident(duplicate);
+      }
 
-    let result: CommunityIncident;
-    if (duplicate) {
-      duplicate.reportCount += 1;
-      duplicate.reporterIds.push(input.reporterId);
-      duplicate.lastReportedAt = input.reportedAt;
-      duplicate.expiresAt = new Date(
-        now + this.policy.ttlMsByKind[input.kind],
-      ).toISOString();
-      updateAssessment(duplicate);
-      result = duplicate;
-    } else {
-      result = {
+      const result: CommunityIncident = {
         id: createIncidentId(input),
         kind: input.kind,
         location: { ...input.location },
@@ -136,10 +159,8 @@ export class CommunityIncidentService {
         votesByReporter: {},
       };
       incidents.push(result);
-    }
-
-    await this.repository.replace(incidents);
-    return cloneIncident(result);
+      return cloneIncident(result);
+    });
   }
 
   async vote(
@@ -152,41 +173,39 @@ export class CommunityIncidentService {
       throw new Error("incidentId and reporterId are required");
     }
     const now = parseTimestamp(votedAt, "votedAt");
-    const incidents = await this.repository.list();
-    expireIncidents(incidents, now);
-    const incident = incidents.find(({ id }) => id === incidentId);
-    if (!incident) throw new Error("incident not found");
-    if (incident.status === "expired") throw new Error("incident has expired");
-    if (incident.reporterIds.includes(reporterId)) {
-      throw new Error("reporters cannot vote on their own incident");
-    }
+    return this.repository.mutate((incidents) => {
+      expireIncidents(incidents, now);
+      const incident = incidents.find(({ id }) => id === incidentId);
+      if (!incident) throw new Error("incident not found");
+      if (incident.status === "expired") throw new Error("incident has expired");
+      if (incident.reporterIds.includes(reporterId)) {
+        throw new Error("reporters cannot vote on their own incident");
+      }
 
-    const previousVote = incident.votesByReporter[reporterId];
-    if (previousVote === vote) return cloneIncident(incident);
-    if (previousVote === "confirm") incident.confirmations -= 1;
-    if (previousVote === "reject") incident.rejections -= 1;
-    if (vote === "confirm") incident.confirmations += 1;
-    if (vote === "reject") incident.rejections += 1;
-    incident.votesByReporter[reporterId] = vote;
-    updateAssessment(incident);
-
-    await this.repository.replace(incidents);
-    return cloneIncident(incident);
+      const previousVote = incident.votesByReporter[reporterId];
+      if (previousVote === vote) return cloneIncident(incident);
+      removeVote(incident, reporterId);
+      if (vote === "confirm") incident.confirmations += 1;
+      if (vote === "reject") incident.rejections += 1;
+      incident.votesByReporter[reporterId] = vote;
+      updateAssessment(incident);
+      return cloneIncident(incident);
+    });
   }
 
   async active(at: string): Promise<CommunityIncident[]> {
     const now = parseTimestamp(at, "at");
-    const incidents = await this.repository.list();
-    const changed = expireIncidents(incidents, now);
-    if (changed) await this.repository.replace(incidents);
-    return incidents
-      .filter(({ status }) => status !== "expired")
-      .sort(
-        (left, right) =>
-          right.confidence - left.confidence ||
-          Date.parse(right.lastReportedAt) - Date.parse(left.lastReportedAt),
-      )
-      .map(cloneIncident);
+    return this.repository.mutate((incidents) => {
+      expireIncidents(incidents, now);
+      return incidents
+        .filter(({ status }) => status !== "expired")
+        .sort(
+          (left, right) =>
+            right.confidence - left.confidence ||
+            Date.parse(right.lastReportedAt) - Date.parse(left.lastReportedAt),
+        )
+        .map(cloneIncident);
+    });
   }
 }
 
@@ -218,12 +237,32 @@ function parseTimestamp(value: string, field: string): number {
 
 function updateAssessment(incident: CommunityIncident): void {
   const support = incident.reportCount + incident.confirmations;
-  const total = support + incident.rejections + 2;
-  incident.confidence = round(Math.min(0.99, (support + 1) / total));
+  incident.confidence = round(
+    Math.max(
+      0.05,
+      Math.min(
+        0.99,
+        0.45 +
+          (incident.reportCount - 1) * 0.12 +
+          incident.confirmations * 0.08 -
+          incident.rejections * 0.18,
+      ),
+    ),
+  );
   incident.status =
     incident.rejections >= 2 && incident.rejections > support
       ? "disputed"
       : "active";
+}
+
+function removeVote(
+  incident: CommunityIncident,
+  reporterId: string,
+): void {
+  const previousVote = incident.votesByReporter[reporterId];
+  if (previousVote === "confirm") incident.confirmations -= 1;
+  if (previousVote === "reject") incident.rejections -= 1;
+  delete incident.votesByReporter[reporterId];
 }
 
 function expireIncidents(
