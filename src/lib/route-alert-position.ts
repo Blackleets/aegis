@@ -12,10 +12,14 @@ type ProjectedPoint = {
 
 const EARTH_RADIUS_METERS = 6_371_000;
 
+function shortestLongitudeDelta(degrees: number) {
+  return ((degrees + 540) % 360) - 180;
+}
+
 function toLocalMeters(point: Coordinate, origin: Coordinate) {
   const latitudeRadians = origin.lat * Math.PI / 180;
   return {
-    x: (point.lng - origin.lng) * Math.PI / 180 * EARTH_RADIUS_METERS * Math.cos(latitudeRadians),
+    x: shortestLongitudeDelta(point.lng - origin.lng) * Math.PI / 180 * EARTH_RADIUS_METERS * Math.cos(latitudeRadians),
     y: (point.lat - origin.lat) * Math.PI / 180 * EARTH_RADIUS_METERS,
   };
 }
