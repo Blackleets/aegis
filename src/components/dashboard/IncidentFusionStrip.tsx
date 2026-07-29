@@ -3,6 +3,7 @@
 import { memo } from 'react';
 import { motion } from 'framer-motion';
 import { Activity, AlertTriangle, Database, RadioTower } from 'lucide-react';
+import { assessOperationalFusion, type OperationalPressure } from '@/lib/operational-fusion';
 
 type BackendStatus = 'connecting' | 'connected' | 'error';
 
@@ -18,13 +19,8 @@ type IncidentFusionStripProps = {
   variant?: 'overlay' | 'rail';
 };
 
-function pressureLabel(score: number, backendStatus: BackendStatus) {
-  if (backendStatus === 'error') return 'DEGRADED';
-  if (backendStatus === 'connecting') return 'SYNCING';
-  if (score >= 8) return 'CRITICAL';
-  if (score >= 4) return 'ELEVATED';
-  if (score >= 1) return 'WATCH';
-  return 'STEADY';
+function pressureLabel(pressure: OperationalPressure) {
+  return pressure.toUpperCase();
 }
 
 function pressureColor(label: string) {
@@ -34,15 +30,6 @@ function pressureColor(label: string) {
   if (label === 'DEGRADED') return 'var(--alert-red)';
   if (label === 'SYNCING') return 'var(--cyan-primary)';
   return 'var(--alert-green)';
-}
-
-function primarySignal({ activeIntelAlerts, maritimePressure, gdeltCount, earthquakeCount, newsCount }: Pick<IncidentFusionStripProps, 'activeIntelAlerts' | 'maritimePressure' | 'gdeltCount' | 'earthquakeCount' | 'newsCount'>) {
-  if (activeIntelAlerts > 0 && maritimePressure > 0) return 'INTEL + MARITIME';
-  if (maritimePressure > 0) return 'MARITIME PRESSURE';
-  if (activeIntelAlerts > 0) return earthquakeCount > 0 ? 'QUAKE + NEWS' : 'HIGH-RISK NEWS';
-  if (gdeltCount > newsCount) return 'GLOBAL INCIDENTS';
-  if (newsCount > 0) return 'NEWS WATCH';
-  return 'BASELINE MESH';
 }
 
 function IncidentFusionStrip({
@@ -56,10 +43,16 @@ function IncidentFusionStrip({
   operationalModeLabel,
   variant = 'overlay',
 }: IncidentFusionStripProps) {
-  const pressureScore = activeIntelAlerts + maritimePressure + Math.min(Math.floor(gdeltCount / 10), 3);
-  const label = pressureLabel(pressureScore, backendStatus);
+  const assessment = assessOperationalFusion({
+    backendStatus,
+    activeIntelAlerts,
+    maritimePressure,
+    newsCount,
+    earthquakeCount,
+    gdeltCount,
+  });
+  const label = pressureLabel(assessment.pressure);
   const color = pressureColor(label);
-  const signal = primarySignal({ activeIntelAlerts, maritimePressure, gdeltCount, earthquakeCount, newsCount });
   const sourceMix = [
     newsCount > 0 ? 'NEWS' : null,
     earthquakeCount > 0 ? 'SEISMIC' : null,
@@ -88,12 +81,12 @@ function IncidentFusionStrip({
               <div className="text-[7px] font-mono tracking-[0.34em] text-[var(--text-secondary)]">AEGIS INCIDENT FUSION</div>
             </div>
             <div className="mt-1 truncate text-[11px] font-semibold tracking-[0.18em] text-[var(--text-primary)]">
-              {signal} · {operationalModeLabel}
+              {assessment.primarySignal} · {operationalModeLabel}
             </div>
           </div>
 
           <div className="shrink-0 rounded-full border border-white/10 bg-black/20 px-3 py-1 text-[7px] font-mono tracking-[0.22em]" style={{ color }}>
-            PRESSURE · {label}
+            PRESSURE {assessment.score.toFixed(1)} · {label}
           </div>
         </div>
 
@@ -114,6 +107,16 @@ function IncidentFusionStrip({
             <div className="text-[7px] font-mono tracking-[0.18em] text-[var(--text-muted)]">EVENT MESH</div>
             <div className="mt-1 text-[11px] font-bold tabular-nums text-[var(--text-primary)]">{(newsCount + earthquakeCount + gdeltCount).toLocaleString()}</div>
           </div>
+        </div>
+        <div className="mt-2.5 rounded-xl border border-white/8 bg-black/15 px-2.5 py-2">
+          <div className="flex items-center justify-between gap-2 text-[7px] font-mono uppercase tracking-[0.16em] text-[var(--text-muted)]">
+            <span>Recommended action</span>
+            <span style={{ color }}>Confidence {assessment.confidence} · {assessment.corroboratingSources} sources</span>
+          </div>
+          <p className="mt-1 text-[9px] leading-relaxed text-[var(--text-secondary)]">{assessment.action}</p>
+          <p className="mt-1 truncate text-[7px] font-mono tracking-[0.08em] text-[var(--cyan-primary)]">
+            EVIDENCE · {assessment.evidence.join(' · ') || 'No active evidence'}
+          </p>
         </div>
       </div>
     </motion.div>
