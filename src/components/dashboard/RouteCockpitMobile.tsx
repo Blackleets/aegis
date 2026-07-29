@@ -106,6 +106,8 @@ type RouteCockpitMobileProps = {
   routeRecommendationLabel: string | null;
   trafficInsight: TrafficInsight | null;
   currentLocation: { lat: number; lng: number } | null;
+  navigationCameraFollowing: boolean;
+  onResumeNavigationCamera: () => void;
 };
 
 const LOCAL_REPORT_OPTIONS: Array<{
@@ -177,6 +179,8 @@ export default function RouteCockpitMobile({
   routeRecommendationLabel,
   trafficInsight,
   currentLocation,
+  navigationCameraFollowing,
+  onResumeNavigationCamera,
 }: RouteCockpitMobileProps) {
   const [reportComposerOpen, setReportComposerOpen] = useState(false);
   const [reportFeedback, setReportFeedback] = useState<string | null>(null);
@@ -470,14 +474,30 @@ export default function RouteCockpitMobile({
                 >
                   <TriangleAlert className="h-[18px] w-[18px]" />
                 </button>
-                <button
-                  type="button"
-                  onClick={onToggleSimulation}
-                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-transform active:scale-95 ${navigationSimulationActive ? 'border-violet-300/40 bg-violet-300/18 text-violet-100' : 'border-white/12 bg-white/[0.06] text-white/72'}`}
-                  aria-label={navigationSimulationActive ? 'Detener simulación GPS' : 'Probar ruta con simulación GPS'}
-                >
-                  <FlaskConical className="h-[18px] w-[18px]" />
-                </button>
+                {navigationSimulationActive ? (
+                  <button
+                    type="button"
+                    onClick={onToggleSimulation}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-violet-300/40 bg-violet-300/18 text-violet-100 transition-transform active:scale-95"
+                    aria-label="Detener simulación GPS"
+                  >
+                    <FlaskConical className="h-[18px] w-[18px]" />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={onResumeNavigationCamera}
+                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-transform active:scale-95 ${
+                      navigationCameraFollowing
+                        ? 'border-cyan-200/22 bg-cyan-300/12 text-cyan-100'
+                        : 'border-amber-200/35 bg-amber-200/12 text-amber-100'
+                    }`}
+                    aria-label={navigationCameraFollowing ? 'Seguimiento GPS activo' : 'Volver a seguir mi posición'}
+                    aria-pressed={navigationCameraFollowing}
+                  >
+                    <Navigation2 className={`h-[18px] w-[18px] ${navigationCameraFollowing ? 'fill-cyan-200/20' : ''}`} />
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={handleNavigationFollow}
