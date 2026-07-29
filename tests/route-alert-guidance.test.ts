@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildRouteAlertVoiceMessage, getRouteAlertGuidance } from '../src/lib/route-alert-guidance';
+import { buildRouteAlertVoiceMessage, getRouteAlertGuidance, shouldAnnounceRouteAlertPhase } from '../src/lib/route-alert-guidance';
 
 describe('route alert guidance', () => {
   it('warns earlier when driving faster', () => {
@@ -40,5 +40,14 @@ describe('route alert guidance', () => {
       distanceMeters: 180,
       guidance,
     })).toBe('Atención. Incendio en la ruta a 180 metros.');
+  });
+
+  it('announces each proximity phase at most once even after a regression', () => {
+    const announced = new Set<string>();
+
+    expect(shouldAnnounceRouteAlertPhase(announced, 'camera-1', 'near')).toBe(true);
+    expect(shouldAnnounceRouteAlertPhase(announced, 'camera-1', 'now')).toBe(true);
+    expect(shouldAnnounceRouteAlertPhase(announced, 'camera-1', 'near')).toBe(false);
+    expect(shouldAnnounceRouteAlertPhase(announced, 'camera-1', 'now')).toBe(false);
   });
 });

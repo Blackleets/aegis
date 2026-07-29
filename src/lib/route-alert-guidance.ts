@@ -75,3 +75,14 @@ export function buildRouteAlertVoiceMessage({
   if (guidance.phase === 'near') return `Atención. ${title} a ${roundedDistance}.`;
   return `Aviso AEGIS. ${title} más adelante, a ${roundedDistance}.`;
 }
+
+export function shouldAnnounceRouteAlertPhase(
+  announcedPhases: Set<string>,
+  alertId: string,
+  phase: RouteAlertPhase,
+) {
+  const key = `${alertId}:${phase}`;
+  if (announcedPhases.has(key)) return false;
+  announcedPhases.add(key);
+  return true;
+}
