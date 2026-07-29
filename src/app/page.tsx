@@ -32,6 +32,9 @@ import RouteCockpitMobile from '@/components/dashboard/RouteCockpitMobile';
 import RouteAlertPreferencesPanel from '@/components/dashboard/RouteAlertPreferencesPanel';
 import SplashScreen from '@/components/dashboard/SplashScreen';
 import TopHudOverlays from '@/components/dashboard/TopHudOverlays';
+import WeatherCapsule from '@/components/dashboard/WeatherCapsule';
+import { useLocalWeather } from '@/hooks/useLocalWeather';
+import { useRealtimePresence } from '@/hooks/useRealtimePresence';
 import { DEFAULT_LOCALE, getDashboardCopy, isLocale, type Locale } from '@/lib/i18n';
 import { type ActiveLayers, type BoundingBox, type Coordinate, type FlyToLocation, type MapView, type RouteOption, type RouteRiskSummary, type RouteSnapshot, type RouteStep, computeBearing, countSignalsNearRoute, distanceMetersBetween, distanceToRoutePath, formatEtaLabel, formatProgressLabel, getClosestStepIndex, getYouTubeWatchUrl, localizeRouteInstruction } from '@/lib/routing-shell';
 import { getArrivalThresholdMeters, getNextSimulationIndex, resolveNavigationBearing, shouldAcceptNavigationFix, shouldRerouteNavigation, snapNavigationToRoute, stabilizeNavigationCoordinate } from '@/lib/vector-navigation';
@@ -97,6 +100,18 @@ type MobileSearchPanelProps = {
 type MobileReconPanelProps = {
   osintPanel: ReactNode;
 };
+
+function weatherEmoji(icon: 'sun' | 'moon' | 'cloud' | 'fog' | 'rain' | 'snow' | 'storm') {
+  return {
+    sun: '☀️',
+    moon: '🌙',
+    cloud: '☁️',
+    fog: '🌫️',
+    rain: '🌧️',
+    snow: '❄️',
+    storm: '⛈️',
+  }[icon];
+}
 
 function AegisLayersGlyph({ className }: MobileNavGlyphProps) {
   return (
@@ -380,12 +395,6 @@ interface TrafficInsight {
   checkedAt?: string;
 }
 
-interface UsageMetrics {
-  onlineUsers: number;
-  totalUsers: number;
-  updatedAt?: string;
-}
-
 type RegionDossier = RegionDossierData;
 
 interface SpaceWeather {
@@ -512,7 +521,6 @@ export default function Dashboard() {
   const [nearbyEarthquakeAlert, setNearbyEarthquakeAlert] = useState<NearbyEarthquakeAlert | null>(null);
   const [nearbyContextAlert, setNearbyContextAlert] = useState<NearbyContextAlert | null>(null);
   const [communityIncidents, setCommunityIncidents] = useState<CommunityIncident[]>([]);
-  const [usageMetrics, setUsageMetrics] = useState<UsageMetrics | null>(null);
   const mouseCoordsRef = useRef<Coordinate | null>(null);
   const coordsDisplayRef = useRef<HTMLDivElement>(null);
   const [locationLabel, setLocationLabel] = useState('');
@@ -546,6 +554,8 @@ export default function Dashboard() {
   const [scanTargets, setScanTargets] = useState<ScanTarget[]>([]);
 
   const isMobile = useIsMobile();
+  const { onlineCount, status: presenceStatus } = useRealtimePresence();
+  const { weather: localWeather, status: localWeatherStatus } = useLocalWeather(userLocation);
   const geocodeCache = useRef<Map<string, string>>(new Map());
   const geocodeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const geocodeAbortRef = useRef<AbortController | null>(null);
@@ -644,60 +654,6 @@ export default function Dashboard() {
       window.history.replaceState(null, '', url);
     }, 1500);
   }, [mapView, activeLayers, dashboardMode, selectedCelestialBody]);
-
-  // Presence + cumulative usage counter
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const sessionKey = 'aegis-session-id';
-    let sessionId = window.sessionStorage.getItem(sessionKey);
-
-    if (!sessionId) {
-      sessionId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-      window.sessionStorage.setItem(sessionKey, sessionId);
-    }
-
-    let cancelled = false;
-
-    const syncUsage = async () => {
-      try {
-        const res = await fetch('/api/usage', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          cache: 'no-store',
-          body: JSON.stringify({ sessionId }),
-        });
-
-        if (!res.ok) return;
-        const metrics = await res.json() as UsageMetrics;
-        if (!cancelled) setUsageMetrics(metrics);
-      } catch (e) {
-        console.warn('[AEGIS] Suppressed error:', e instanceof Error ? e.message : e);
-      }
-    };
-
-    void syncUsage();
-
-    const interval = window.setInterval(() => {
-      void syncUsage();
-    }, 30000);
-
-    const handleVisibility = () => {
-      if (!document.hidden) {
-        void syncUsage();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibility);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(interval);
-      document.removeEventListener('visibilitychange', handleVisibility);
-    };
-  }, []);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -2431,18 +2387,26 @@ export default function Dashboard() {
         systemLabel={copy.status.sys}
         feedsLabel={copy.status.feeds}
         liveLabel={copy.status.live}
-        visitsLabel={copy.status.visits}
         alertsLabel={copy.status.alerts}
         backendStatus={backendStatus}
         backendStatusLabel={backendStatusLabel}
         backendStatusAccentClass={backendStatusAccentClass}
         activeLayerCount={activeLayerCount}
         activeIntelAlerts={activeIntelAlerts}
-        usageMetrics={usageMetrics}
+        onlineCount={onlineCount}
+        presenceStatus={presenceStatus}
         spaceWeather={spaceWeather}
         zuluClock={<ZuluClock />}
         uptimeClock={<UptimeClock />}
       />
+
+      {isEarthOps && !showSplash && isMobile && (
+        <WeatherCapsule
+          weather={localWeather}
+          status={localWeatherStatus}
+          navigationActive={navigationActive}
+        />
+      )}
 
 
 
@@ -2579,6 +2543,7 @@ export default function Dashboard() {
               currentLocation={userLocation}
               navigationCameraFollowing={navigationCameraFollowing}
               onResumeNavigationCamera={resumeNavigationCamera}
+              weatherSummary={localWeather ? `${weatherEmoji(localWeather.icon)} ${Math.round(localWeather.temperatureC)}°` : null}
             />
           )}
 
@@ -2592,6 +2557,8 @@ export default function Dashboard() {
             onToggleMapStyle={() => setMapStyle((style) => style === 'dark' ? 'satellite' : 'dark')}
             ambientMotionEnabled={ambientMotionEnabled}
             onToggleAmbientMotion={() => setAmbientMotionEnabled((enabled) => !enabled)}
+            onlineCount={onlineCount}
+            presenceStatus={presenceStatus}
             headerSummary={(
               <MobileDrawerHeaderSummary
                 commandPanelLabel={copy.status.mobileCommandPanel}

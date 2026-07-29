@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import ErrorBoundary from '@/components/ErrorBoundary';
 
@@ -152,6 +153,7 @@ export default function RootLayout({
         <ErrorBoundary name="AEGIS Core">
           {children}
         </ErrorBoundary>
+        <Analytics />
       </body>
     </html>
   );
