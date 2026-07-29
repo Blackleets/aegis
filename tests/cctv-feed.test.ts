@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   buildCctvFrameUrl,
+  getCctvOperationalStatus,
   inferCctvRefreshIntervalSeconds,
   isLikelySnapshotUrl,
   normalizeCctvDelivery,
+  scoreCctvDelivery,
 } from '../src/lib/cctv-feed';
 
 describe('CCTV feed delivery', () => {
@@ -56,5 +58,26 @@ describe('CCTV feed delivery', () => {
   it('honours safe provider cadence limits', () => {
     expect(inferCctvRefreshIntervalSeconds({ source: 'Alberta 511' })).toBe(60);
     expect(inferCctvRefreshIntervalSeconds({ refresh_interval_seconds: 1 })).toBe(5);
+  });
+
+  it('prioritizes true video over snapshots and external viewers', () => {
+    expect(scoreCctvDelivery({ stream_url: 'https://example.com/live.m3u8', live_mode: 'video' }))
+      .toBeGreaterThan(scoreCctvDelivery({ feed_url: 'https://example.com/current.jpg', live_mode: 'snapshot' }));
+    expect(scoreCctvDelivery({ feed_url: 'https://example.com/current.jpg', live_mode: 'snapshot' }))
+      .toBeGreaterThan(scoreCctvDelivery({ external_url: 'https://example.com/viewer', live_mode: 'external' }));
+  });
+
+  it('reports live, stale and offline states from playback evidence', () => {
+    const now = Date.parse('2026-07-29T14:00:00.000Z');
+    expect(getCctvOperationalStatus({
+      mode: 'video', loading: false, error: false, lastFrameAt: now - 1_000, now,
+    })).toBe('live');
+    expect(getCctvOperationalStatus({
+      mode: 'snapshot', loading: false, error: false, lastFrameAt: now - 61_000, now,
+      refreshIntervalSeconds: 15,
+    })).toBe('stale');
+    expect(getCctvOperationalStatus({
+      mode: 'video', loading: false, error: true, lastFrameAt: null, now,
+    })).toBe('offline');
   });
 });
