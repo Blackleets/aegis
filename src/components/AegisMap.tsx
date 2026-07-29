@@ -5,6 +5,7 @@ import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 import { findNewEarthquakes, getEarthquakeSeverity, isRecentEarthquake } from '@/lib/earthquakes';
+import { getLiveMotionFrame } from '@/lib/map-live-motion';
 import { getNavigationCameraTarget, getVectorCameraPreset, shouldUpdateNavigationCamera, smoothNavigationBearing, type VectorNavigationMode } from '@/lib/vector-navigation';
 
 type Coordinates = [number, number];
@@ -2410,6 +2411,38 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
     frame = window.requestAnimationFrame(spin);
     return () => window.cancelAnimationFrame(frame);
   }, [adaptiveZoom, ambientMotionEnabled, mapReady, navigationActive, projection]);
+
+  useEffect(() => {
+    if (!mapReady || !mapRef.current || navigationActive || !ambientMotionEnabled) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    const map = mapRef.current;
+    const startedAt = performance.now();
+    let animationFrame = 0;
+    let lastRenderAt = 0;
+
+    const setOpacity = (layerId: string, property: string, value: number) => {
+      if (map.getLayer(layerId)) map.setPaintProperty(layerId, property, value);
+    };
+
+    const animateOperationalLayers = (now: number) => {
+      animationFrame = window.requestAnimationFrame(animateOperationalLayers);
+      if (document.hidden || now - lastRenderAt < 66) return;
+      lastRenderAt = now;
+
+      const motion = getLiveMotionFrame(now - startedAt);
+      setOpacity('fires-heat', 'circle-opacity', motion.fireOpacity);
+      setOpacity('gdelt-hotspot-halo', 'circle-opacity', motion.hotspotOpacity);
+      setOpacity('sat-glow', 'circle-opacity', motion.satelliteGlowOpacity);
+      setOpacity('ship-dots', 'circle-opacity', motion.shipOpacity);
+      ['trail-commercial', 'trail-private', 'trail-jets', 'trail-military'].forEach((layerId) => {
+        setOpacity(layerId, 'line-opacity', motion.trailOpacity);
+      });
+    };
+
+    animationFrame = window.requestAnimationFrame(animateOperationalLayers);
+    return () => window.cancelAnimationFrame(animationFrame);
+  }, [ambientMotionEnabled, mapReady, navigationActive]);
 
   // Fly-to
   useEffect(() => {
