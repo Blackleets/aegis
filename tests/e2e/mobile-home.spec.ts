@@ -34,3 +34,41 @@ test('mobile command buttons open and close without blocking one another', async
   await page.getByRole('button', { name: 'Cerrar navegación' }).click();
   await expect(page.getByRole('button', { name: 'Buscar destino' })).toBeVisible();
 });
+
+test('mobile map controls expose and change their real state', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.sessionStorage.setItem('aegis-splash-seen', '1');
+  });
+  await page.goto('/');
+
+  const projection = page.getByRole('button', { name: 'Cambiar a mapa 2D' });
+  await expect(projection).toHaveAttribute('data-view', 'globe');
+  await projection.click();
+  await expect(page.getByRole('button', { name: 'Cambiar a globo 3D' })).toHaveAttribute('data-view', 'map');
+
+  const satellite = page.getByRole('button', { name: 'Activar vista satélite' });
+  await expect(satellite).toHaveAttribute('data-style', 'dark');
+  await satellite.click();
+  await expect(page.getByRole('button', { name: 'Cambiar a mapa nocturno' })).toHaveAttribute('data-style', 'satellite');
+
+  const motion = page.getByRole('button', { name: /rotación ambiental/i });
+  const initialMotionState = await motion.getAttribute('aria-pressed');
+  await motion.click();
+  await expect(motion).toHaveAttribute('aria-pressed', initialMotionState === 'true' ? 'false' : 'true');
+});
+
+test('mobile command menu closes with Escape and outside tap', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.sessionStorage.setItem('aegis-splash-seen', '1');
+  });
+  await page.goto('/');
+
+  await page.getByRole('button', { name: 'Abrir menú AEGIS' }).click();
+  await expect(page.getByRole('button', { name: 'Cerrar menú AEGIS' }).first()).toHaveAttribute('aria-expanded', 'true');
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('button', { name: 'Abrir menú AEGIS' })).toHaveAttribute('aria-expanded', 'false');
+
+  await page.getByRole('button', { name: 'Abrir menú AEGIS' }).click();
+  await page.getByRole('button', { name: 'Cerrar menú AEGIS' }).first().click({ position: { x: 380, y: 800 } });
+  await expect(page.getByRole('button', { name: 'Abrir menú AEGIS' })).toBeVisible();
+});
