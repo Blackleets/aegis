@@ -56,10 +56,10 @@ test('mobile map controls expose and change their real state', async ({ page }) 
   await page.goto('/?nosplash=1');
 
   await expect(page.getByRole('heading', { name: 'AEGIS' }).first()).toBeVisible();
-  const projection = page.getByRole('button', { name: 'Cambiar a mapa 2D' });
-  await expect(projection).toHaveAttribute('data-view', 'globe');
+  const projection = page.getByRole('button', { name: 'Cambiar a globo 3D' });
+  await expect(projection).toHaveAttribute('data-view', 'map');
   await projection.click();
-  await expect(page.getByRole('button', { name: 'Cambiar a globo 3D' })).toHaveAttribute('data-view', 'map');
+  await expect(page.getByRole('button', { name: 'Cambiar a mapa 2D' })).toHaveAttribute('data-view', 'globe');
 
   const satellite = page.getByRole('button', { name: 'Activar vista satélite' });
   await expect(satellite).toHaveAttribute('data-style', 'dark');
