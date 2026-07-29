@@ -44,6 +44,7 @@ import { DEFAULT_ROUTE_ALERT_PREFERENCES, parseRouteAlertPreferences, type Route
 import { LIVE_HAZARD_REFRESH_MS, LIVE_TRAFFIC_REFRESH_MS, shouldRefreshNavigationData } from '@/lib/navigation-live-refresh';
 import { isAcceptableLocalRiskFix, shouldMonitorLocalRisks } from '@/lib/local-risk-monitoring';
 import { filterCctvByViewMode, type CctvDeliveryMetadata, type CctvViewMode } from '@/lib/cctv-feed';
+import { buildOperationalCases, type OperationalSignal, type OperationalSignalSeverity } from '@/lib/operational-cases';
 import {
   COMMUNITY_INCIDENTS_CHANGED_EVENT,
   COMMUNITY_INCIDENTS_STORAGE_KEY,
@@ -303,6 +304,10 @@ interface DashboardNews {
   coords?: [number, number];
   title?: string;
   source?: string;
+  id?: string;
+  published?: string;
+  risk_score?: number;
+  coords_default?: boolean;
   [key: string]: unknown;
 }
 
@@ -1341,6 +1346,55 @@ export default function Dashboard() {
     const riskyChokepoints = (data.maritime_chokepoints || []).filter((point) => point.risk === 'CRITICAL' || point.risk === 'HIGH').length;
     return congestedPorts + riskyChokepoints;
   }, [data.maritime_ports, data.maritime_chokepoints]);
+
+  const operationalCases = useMemo(() => {
+    const signals: OperationalSignal[] = [];
+    const severityFromScore = (score: number): OperationalSignalSeverity => (
+      score >= 8 ? 'critical' : score >= 5 ? 'warning' : 'info'
+    );
+    for (const item of data.news || []) {
+      if (!item.coords || item.coords_default || !item.title || !item.source) continue;
+      const observedAt = Date.parse(item.published || '');
+      if (!Number.isFinite(observedAt)) continue;
+      signals.push({
+        id: item.id || `${item.source}-${item.title}-${observedAt}`,
+        kind: 'news',
+        title: item.title,
+        source: item.source,
+        latitude: item.coords[0],
+        longitude: item.coords[1],
+        observedAt,
+        severity: severityFromScore(typeof item.risk_score === 'number' ? item.risk_score : 1),
+      });
+    }
+    for (const item of data.earthquakes || []) {
+      if (typeof item.lat !== 'number' || typeof item.lng !== 'number' || typeof item.time !== 'number') continue;
+      const magnitude = typeof item.magnitude === 'number' ? item.magnitude : 0;
+      signals.push({
+        id: item.id || `quake-${item.time}-${item.lat}-${item.lng}`,
+        kind: 'earthquake',
+        title: `Terremoto M${magnitude.toFixed(1)} · ${item.place || 'ubicación sin nombre'}`,
+        source: 'USGS',
+        latitude: item.lat,
+        longitude: item.lng,
+        observedAt: item.time,
+        severity: magnitude >= 5 ? 'critical' : magnitude >= 4 ? 'warning' : 'info',
+      });
+    }
+    for (const incident of communityIncidents) {
+      signals.push({
+        id: incident.id,
+        kind: `community-${incident.kind}`,
+        title: `Reporte comunitario · ${incident.kind.replaceAll('_', ' ')}`,
+        source: 'Comunidad local',
+        latitude: incident.location.latitude,
+        longitude: incident.location.longitude,
+        observedAt: Date.parse(incident.lastReportedAt),
+        severity: ['accident', 'fire', 'flood', 'road_closure'].includes(incident.kind) ? 'critical' : 'warning',
+      });
+    }
+    return buildOperationalCases(signals);
+  }, [communityIncidents, data.earthquakes, data.news]);
 
   useEffect(() => {
     if (!navigationActive || navigationSimulationActive || !routeSnapshot || typeof navigator === 'undefined' || !navigator.geolocation) return;
@@ -2397,6 +2451,7 @@ export default function Dashboard() {
             earthquakeCount={data.earthquakes?.length || 0}
             gdeltCount={data.gdelt?.length || 0}
             operationalModeLabel={operationalModeLabel}
+            topOperationalCase={operationalCases[0] ?? null}
             variant="rail"
           />
         )}

@@ -4,6 +4,7 @@ import { memo } from 'react';
 import { motion } from 'framer-motion';
 import { Activity, AlertTriangle, Database, RadioTower } from 'lucide-react';
 import { assessOperationalFusion, type OperationalPressure } from '@/lib/operational-fusion';
+import type { OperationalCase } from '@/lib/operational-cases';
 
 type BackendStatus = 'connecting' | 'connected' | 'error';
 
@@ -16,6 +17,7 @@ type IncidentFusionStripProps = {
   earthquakeCount: number;
   gdeltCount: number;
   operationalModeLabel: string;
+  topOperationalCase?: OperationalCase | null;
   variant?: 'overlay' | 'rail';
 };
 
@@ -41,6 +43,7 @@ function IncidentFusionStrip({
   earthquakeCount,
   gdeltCount,
   operationalModeLabel,
+  topOperationalCase = null,
   variant = 'overlay',
 }: IncidentFusionStripProps) {
   const assessment = assessOperationalFusion({
@@ -118,6 +121,18 @@ function IncidentFusionStrip({
             EVIDENCE · {assessment.evidence.join(' · ') || 'No active evidence'}
           </p>
         </div>
+        {topOperationalCase && (
+          <div className="mt-2 rounded-xl border border-amber-200/15 bg-amber-200/[0.045] px-2.5 py-2">
+            <div className="flex items-center justify-between gap-2 text-[7px] font-mono uppercase tracking-[0.16em] text-amber-100/65">
+              <span>Operational case · {topOperationalCase.id}</span>
+              <span>{topOperationalCase.confidence} confidence</span>
+            </div>
+            <p className="mt-1 truncate text-[10px] font-semibold text-amber-50">{topOperationalCase.title}</p>
+            <p className="mt-1 truncate text-[8px] text-white/48">
+              {topOperationalCase.signals.length} linked signals · {topOperationalCase.sourceCount} independent sources
+            </p>
+          </div>
+        )}
       </div>
     </motion.div>
   );
