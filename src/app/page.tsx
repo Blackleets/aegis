@@ -37,6 +37,7 @@ import { getArrivalThresholdMeters, getNextSimulationIndex, resolveNavigationBea
 import { recommendRoute } from '@/lib/route-intelligence';
 import { chooseRouteAlertChannel } from '@/lib/route-alert-priority';
 import { vibrateForRouteAlert } from '@/lib/route-alert-haptics';
+import { buildRouteAlertVoiceMessage, getRouteAlertGuidance } from '@/lib/route-alert-guidance';
 import { formatRouteAlertAge, getAlertObservedAt, isRouteAlertFresh } from '@/lib/route-alert-freshness';
 import { DEFAULT_ROUTE_ALERT_PREFERENCES, parseRouteAlertPreferences, type RouteAlertPreferences } from '@/lib/route-alert-preferences';
 import { LIVE_HAZARD_REFRESH_MS, LIVE_TRAFFIC_REFRESH_MS, shouldRefreshNavigationData } from '@/lib/navigation-live-refresh';
@@ -1792,22 +1793,38 @@ export default function Dashboard() {
   }, [navigationVoiceEnabled]);
 
   useEffect(() => {
-    if (!visibleNearbyEarthquakeAlert || lastSpokenEarthquakeRef.current === visibleNearbyEarthquakeAlert.id) return;
-    lastSpokenEarthquakeRef.current = visibleNearbyEarthquakeAlert.id;
-    const distance = visibleNearbyEarthquakeAlert.distanceMeters < 1000
-      ? `${visibleNearbyEarthquakeAlert.distanceMeters} metros`
-      : `${(visibleNearbyEarthquakeAlert.distanceMeters / 1000).toFixed(1)} kilómetros`;
-    speakNavigationMessage(`Aviso AEGIS. Terremoto de magnitud ${visibleNearbyEarthquakeAlert.magnitude}, registrado a ${distance}. Fuente U S G S.`);
-  }, [visibleNearbyEarthquakeAlert, speakNavigationMessage]);
+    if (!visibleNearbyEarthquakeAlert) return;
+    const guidance = getRouteAlertGuidance({
+      distanceMeters: visibleNearbyEarthquakeAlert.distanceMeters,
+      speedKmh: navigationSpeedKmh,
+      severity: visibleNearbyEarthquakeAlert.magnitude >= 5 ? 'critical' : 'warning',
+    });
+    const spokenKey = `${visibleNearbyEarthquakeAlert.id}:${guidance.phase}`;
+    if (!guidance.shouldSpeak || lastSpokenEarthquakeRef.current === spokenKey) return;
+    lastSpokenEarthquakeRef.current = spokenKey;
+    speakNavigationMessage(buildRouteAlertVoiceMessage({
+      title: `terremoto de magnitud ${visibleNearbyEarthquakeAlert.magnitude}`,
+      distanceMeters: visibleNearbyEarthquakeAlert.distanceMeters,
+      guidance,
+    }));
+  }, [navigationSpeedKmh, visibleNearbyEarthquakeAlert, speakNavigationMessage]);
 
   useEffect(() => {
-    if (!visibleNearbyContextAlert || lastSpokenContextRef.current === visibleNearbyContextAlert.id) return;
-    lastSpokenContextRef.current = visibleNearbyContextAlert.id;
-    const distance = visibleNearbyContextAlert.distanceMeters < 1000
-      ? `${visibleNearbyContextAlert.distanceMeters} metros`
-      : `${(visibleNearbyContextAlert.distanceMeters / 1000).toFixed(1)} kilómetros`;
-    speakNavigationMessage(`Aviso AEGIS. ${visibleNearbyContextAlert.title}, a ${distance}. Fuente ${visibleNearbyContextAlert.source}.`);
-  }, [visibleNearbyContextAlert, speakNavigationMessage]);
+    if (!visibleNearbyContextAlert) return;
+    const guidance = getRouteAlertGuidance({
+      distanceMeters: visibleNearbyContextAlert.distanceMeters,
+      speedKmh: navigationSpeedKmh,
+      severity: visibleNearbyContextAlert.severity,
+    });
+    const spokenKey = `${visibleNearbyContextAlert.id}:${guidance.phase}`;
+    if (!guidance.shouldSpeak || lastSpokenContextRef.current === spokenKey) return;
+    lastSpokenContextRef.current = spokenKey;
+    speakNavigationMessage(buildRouteAlertVoiceMessage({
+      title: visibleNearbyContextAlert.title,
+      distanceMeters: visibleNearbyContextAlert.distanceMeters,
+      guidance,
+    }));
+  }, [navigationSpeedKmh, visibleNearbyContextAlert, speakNavigationMessage]);
 
   useEffect(() => {
     if (!navigationActive || !currentRouteStep || lastSpokenStepRef.current === currentRouteStep.index) return;

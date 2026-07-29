@@ -32,6 +32,7 @@ import {
 import { type RouteRiskSummary, type RouteSnapshot, type RouteStep, formatRouteDistance, formatRouteDuration, formatStepDistance, localizeRouteInstruction } from '@/lib/routing-shell';
 import { requestNavigationNotificationPermission } from '@/lib/navigation-notifications';
 import { formatRouteAlertAge } from '@/lib/route-alert-freshness';
+import { getRouteAlertGuidance } from '@/lib/route-alert-guidance';
 
 type NearbyEarthquakeAlert = {
   id: string;
@@ -200,6 +201,8 @@ export default function RouteCockpitMobile({
         eyebrow: `Terremoto · USGS · ${formatRouteAlertAge(nearbyEarthquakeAlert.time)}`,
         title: `M${nearbyEarthquakeAlert.magnitude} a ${formatStepDistance(nearbyEarthquakeAlert.distanceMeters)}`,
         detail: nearbyEarthquakeAlert.place,
+        distanceMeters: nearbyEarthquakeAlert.distanceMeters,
+        severity: nearbyEarthquakeAlert.magnitude >= 5 ? 'critical' as const : 'warning' as const,
         critical: nearbyEarthquakeAlert.magnitude >= 5,
         dismiss: onDismissNearbyEarthquake,
       }
@@ -209,10 +212,19 @@ export default function RouteCockpitMobile({
           eyebrow: `Incidencia en ruta · ${nearbyContextAlert.source}`,
           title: `${nearbyContextAlert.title} a ${formatStepDistance(nearbyContextAlert.distanceMeters)}`,
           detail: `${nearbyContextAlert.detail} · ${formatRouteAlertAge(nearbyContextAlert.observedAt)}`,
+          distanceMeters: nearbyContextAlert.distanceMeters,
+          severity: nearbyContextAlert.severity,
           critical: nearbyContextAlert.severity !== 'info',
           dismiss: onDismissNearbyContext,
         }
       : null;
+  const proximityGuidance = proximityAlert
+    ? getRouteAlertGuidance({
+        distanceMeters: proximityAlert.distanceMeters,
+        speedKmh: navigationSpeedKmh,
+        severity: proximityAlert.severity,
+      })
+    : null;
 
   const handleNavigationFollow = () => {
     if (!navigationActive) void requestNavigationNotificationPermission();
@@ -283,7 +295,14 @@ export default function RouteCockpitMobile({
                     <ShieldAlert className="h-[18px] w-[18px]" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className={`truncate text-[8px] font-semibold uppercase tracking-[0.13em] ${proximityAlert.critical ? 'text-orange-200' : 'text-cyan-200'}`}>{proximityAlert.eyebrow}</p>
+                    <div className="flex items-center gap-1.5">
+                      <p className={`min-w-0 truncate text-[8px] font-semibold uppercase tracking-[0.13em] ${proximityAlert.critical ? 'text-orange-200' : 'text-cyan-200'}`}>{proximityAlert.eyebrow}</p>
+                      {proximityGuidance && (
+                        <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.08em] ${proximityGuidance.phase === 'now' ? 'bg-rose-400 text-white' : proximityAlert.critical ? 'bg-orange-300/16 text-orange-100' : 'bg-cyan-300/14 text-cyan-100'}`}>
+                          {proximityGuidance.label}
+                        </span>
+                      )}
+                    </div>
                     <p className="mt-0.5 truncate text-[13px] font-bold text-white">{proximityAlert.title}</p>
                     <p className="truncate text-[9px] text-white/48">{proximityAlert.detail}</p>
                   </div>
