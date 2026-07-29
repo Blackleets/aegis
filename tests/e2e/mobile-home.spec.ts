@@ -6,6 +6,8 @@ test.use({
   hasTouch: true,
 });
 
+test.describe.configure({ mode: 'serial' });
+
 test('mobile shell loads AEGIS homepage', async ({ page }) => {
   await page.addInitScript(() => {
     window.sessionStorage.setItem('aegis-splash-seen', '1');
@@ -41,6 +43,7 @@ test('mobile map controls expose and change their real state', async ({ page }) 
   });
   await page.goto('/');
 
+  await expect(page.getByRole('heading', { name: 'AEGIS' }).first()).toBeVisible();
   const projection = page.getByRole('button', { name: 'Cambiar a mapa 2D' });
   await expect(projection).toHaveAttribute('data-view', 'globe');
   await projection.click();
@@ -63,12 +66,13 @@ test('mobile command menu closes with Escape and outside tap', async ({ page }) 
   });
   await page.goto('/');
 
+  await expect(page.getByRole('heading', { name: 'AEGIS' }).first()).toBeVisible();
   await page.getByRole('button', { name: 'Abrir menú AEGIS' }).click();
-  await expect(page.getByRole('button', { name: 'Cerrar menú AEGIS' }).first()).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.locator('button[aria-expanded="true"]')).toHaveAccessibleName('Cerrar menú AEGIS');
   await page.keyboard.press('Escape');
   await expect(page.getByRole('button', { name: 'Abrir menú AEGIS' })).toHaveAttribute('aria-expanded', 'false');
 
   await page.getByRole('button', { name: 'Abrir menú AEGIS' }).click();
-  await page.getByRole('button', { name: 'Cerrar menú AEGIS' }).first().click({ position: { x: 380, y: 800 } });
+  await page.locator('button[aria-label="Cerrar menú AEGIS"]:not([aria-expanded])').click({ position: { x: 380, y: 800 } });
   await expect(page.getByRole('button', { name: 'Abrir menú AEGIS' })).toBeVisible();
 });
