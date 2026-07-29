@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ExternalLink, RefreshCw, MapPin, Camera, Maximize2, Play, Shield, Clock3, Radio } from 'lucide-react';
 import Hls from 'hls.js';
+import { buildCctvFrameUrl, inferCctvRefreshIntervalSeconds } from '@/lib/cctv-feed';
 
 interface CameraFeed {
   name: string;
@@ -28,12 +29,6 @@ interface CameraViewerProps {
   onLocate?: (lat: number, lng: number) => void;
 }
 
-function buildJpgUrl(feedUrl?: string, refreshToken = 0) {
-  if (!feedUrl) return null;
-  const nonce = `${Date.now()}-${refreshToken}`;
-  return feedUrl.includes('?') ? `${feedUrl}&_t=${nonce}` : `${feedUrl}?_t=${nonce}`;
-}
-
 function sanitizeStreamUrl(url?: string) {
   if (!url) return null;
 
@@ -52,24 +47,6 @@ function isHighLoadStream(streamType: CameraFeed['stream_type'], streamUrl?: str
   if (streamType === 'hls' || streamType === 'iframe') return true;
   if (!streamUrl) return false;
   return /youtube|m3u8|embed/i.test(streamUrl);
-}
-
-function inferRefreshIntervalSeconds(camera: CameraFeed | null) {
-  if (!camera) return 15;
-  if (typeof camera.refresh_interval_seconds === 'number' && Number.isFinite(camera.refresh_interval_seconds)) {
-    return Math.max(5, Math.round(camera.refresh_interval_seconds));
-  }
-
-  const source = `${camera.source || ''} ${camera.feed_url || ''} ${camera.stream_url || ''}`.toLowerCase();
-
-  if (source.includes('511.alberta.ca') || source.includes('alberta 511')) return 60;
-  if (source.includes('axis-cgi')) return 5;
-  if (source.includes('ottawa')) return 20;
-  if (source.includes('travelmidwest') || source.includes('idot')) return 20;
-  if (source.includes('fl511')) return 30;
-  if (source.includes('511on')) return 30;
-
-  return 15;
 }
 
 function getLiveMode(camera: CameraFeed) {
@@ -117,11 +94,11 @@ function CameraViewerContent({
 }) {
   const streamType = camera.stream_type || 'jpg';
   const liveMode = getLiveMode(camera);
-  const refreshIntervalSeconds = inferRefreshIntervalSeconds(camera);
+  const refreshIntervalSeconds = inferCctvRefreshIntervalSeconds(camera);
   const externalFeedUrl = camera.external_url || camera.feed_url || camera.stream_url;
   const externalOnly = Boolean(camera.external_url && !camera.feed_url && !camera.stream_url);
   const safeStreamUrl = useMemo(() => sanitizeStreamUrl(camera.stream_url), [camera.stream_url]);
-  const imageUrl = useMemo(() => buildJpgUrl(camera.feed_url, refreshToken), [camera.feed_url, refreshToken]);
+  const imageUrl = useMemo(() => buildCctvFrameUrl(camera.feed_url, refreshToken), [camera.feed_url, refreshToken]);
   const highLoad = isHighLoadStream(streamType, camera.stream_url);
   const [streamLoading, setStreamLoading] = useState(() => !externalOnly && streamType !== 'jpg' && Boolean(camera.stream_url));
   const [streamError, setStreamError] = useState(() => !externalOnly && streamType !== 'jpg' && !camera.stream_url);
@@ -466,7 +443,7 @@ function CameraViewerContent({
 function CameraViewer({ camera, onClose, onLocate }: CameraViewerProps) {
   const [refreshKey, setRefreshKey] = useState(0);
   const streamType = camera?.stream_type || 'jpg';
-  const refreshIntervalSeconds = inferRefreshIntervalSeconds(camera);
+  const refreshIntervalSeconds = inferCctvRefreshIntervalSeconds(camera);
 
   useEffect(() => {
     if (streamType !== 'jpg' || !camera?.feed_url) return;
@@ -478,7 +455,20 @@ function CameraViewer({ camera, onClose, onLocate }: CameraViewerProps) {
       setRefreshKey((key) => key + 1);
     }, refreshIntervalSeconds * 1000);
 
-    return () => clearInterval(intervalId);
+    const refreshVisibleFrame = () => {
+      if (document.visibilityState === 'visible') {
+        setRefreshKey((key) => key + 1);
+      }
+    };
+
+    document.addEventListener('visibilitychange', refreshVisibleFrame);
+    window.addEventListener('online', refreshVisibleFrame);
+
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', refreshVisibleFrame);
+      window.removeEventListener('online', refreshVisibleFrame);
+    };
   }, [camera?.feed_url, streamType, refreshIntervalSeconds]);
 
   if (!camera) return null;

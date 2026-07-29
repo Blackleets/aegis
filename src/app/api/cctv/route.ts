@@ -16,6 +16,7 @@ import { fetchFranceCameras } from './france';
 import { fetchSpainCameras } from './spain';
 import { fetchPolandCameras } from './poland';
 import { fetchJapanCameras } from './japan';
+import { normalizeCctvDelivery, type CctvLiveMode, type CctvStreamType } from '@/lib/cctv-feed';
 
 /**
  * AEGIS — Worldwide CCTV Camera API v2
@@ -32,7 +33,12 @@ interface CameraRecord {
   city: string;
   country: string;
   feed_url?: string;
+  stream_url?: string;
+  stream_type?: CctvStreamType;
   external_url?: string;
+  refresh_interval_seconds?: number;
+  captured_at?: string;
+  live_mode?: CctvLiveMode;
   source: string;
 }
 
@@ -280,9 +286,6 @@ async function fetchCanadaCameras(): Promise<CameraRecord[]> {
     { id: 'ott-6', lat: 45.3484, lng: -75.758, name: 'Fallowfield / Woodroffe', city: 'Ottawa', country: 'Canada', feed_url: 'https://traffic.ottawa.ca/map/camera?id=6', source: 'Ottawa' },
     { id: 'ott-7', lat: 45.4012, lng: -75.6518, name: 'Hwy 417 / Vanier Pkwy', city: 'Ottawa', country: 'Canada', feed_url: 'https://traffic.ottawa.ca/map/camera?id=7', source: 'Ottawa' },
     { id: 'ott-8', lat: 45.4475, lng: -75.4822, name: 'Innes / Orleans Blvd', city: 'Ottawa', country: 'Canada', feed_url: 'https://traffic.ottawa.ca/map/camera?id=8', source: 'Ottawa' },
-    { id: 'tor-1', lat: 43.6532, lng: -79.3832, name: 'Yonge / Dundas Square', city: 'Toronto', country: 'Canada', feed_url: 'https://511on.ca/api/v2/get/cameras', source: '511 Ontario' },
-    { id: 'tor-2', lat: 43.6426, lng: -79.3871, name: 'CN Tower / Lakeshore', city: 'Toronto', country: 'Canada', feed_url: 'https://511on.ca/api/v2/get/cameras', source: '511 Ontario' },
-    { id: 'tor-3', lat: 43.6711, lng: -79.3868, name: 'Bloor / Yonge', city: 'Toronto', country: 'Canada', feed_url: 'https://511on.ca/api/v2/get/cameras', source: '511 Ontario' },
   ];
   cams.push(...curated);
 
@@ -561,12 +564,15 @@ export async function GET(request: Request) {
       }
     }
 
+    const capturedAt = new Date().toISOString();
+    const cameras = allCameras.map((camera) => normalizeCctvDelivery(camera, capturedAt));
+
     return NextResponse.json({
-      cameras: allCameras,
+      cameras,
       total: allCameras.length,
       sources,
       regions: regionsToFetch,
-      timestamp: new Date().toISOString(),
+      timestamp: capturedAt,
     }, {
       headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600' },
     });
