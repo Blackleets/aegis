@@ -1,0 +1,68 @@
+name: Bug report
+description: Report a reproducible AEGIS defect
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not report security vulnerabilities here. Follow SECURITY.md instead.
+  - type: textarea
+    id: observed
+    attributes:
+      label: What happened?
+      description: Describe the observed behavior without including secrets or private location history.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What should happen?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction steps
+      placeholder: |
+        1. Open…
+        2. Tap…
+        3. Observe…
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Surface
+      options:
+        - Mobile map
+        - GPS navigation
+        - Desktop map
+        - Data/API
+        - OSINT
+        - AI briefing
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Device and browser
+      placeholder: Samsung S25, Android 16, Chrome
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Add sanitized screenshots, logs, timestamps, and source URLs when relevant.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Safety checks
+      options:
+        - label: I removed secrets, tokens, and precise personal location data.
+          required: true
+        - label: I searched for an existing issue.
+          required: true

@@ -1,0 +1,47 @@
+name: Improvement proposal
+description: Propose one focused, evidence-backed AEGIS improvement
+title: "[Improve]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: User problem
+      description: What real problem does this solve, and for whom?
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: Describe the result, not a broad rewrite.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence or source
+      description: Link official APIs, screenshots, measurements, or reproducible behavior.
+  - type: dropdown
+    id: cost
+    attributes:
+      label: External cost
+      options:
+        - No external service
+        - Free and keyless
+        - Free tier requiring a key
+        - Paid or unknown
+    validations:
+      required: true
+  - type: checkboxes
+    id: product
+    attributes:
+      label: Product constraints
+      options:
+        - label: The proposal does not rely on fake or simulated live data.
+          required: true
+        - label: I considered mobile map obstruction and driving safety.
+          required: true
+        - label: I searched existing issues and pull requests.
+          required: true

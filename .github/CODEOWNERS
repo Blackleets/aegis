@@ -1,0 +1,9 @@
+# Maintainer approval is required for repository-wide and sensitive surfaces.
+* @Blackleets
+
+/.github/ @Blackleets
+/SECURITY.md @Blackleets
+/src/app/api/ @Blackleets
+/src/components/AegisMap.tsx @Blackleets
+/src/components/dashboard/RouteCockpitMobile.tsx @Blackleets
+/src/hooks/useRealtimePresence.ts @Blackleets
