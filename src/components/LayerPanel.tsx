@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useState } from 'react';
+import { Fragment, memo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plane,
@@ -24,6 +24,7 @@ import {
   Network,
 } from 'lucide-react';
 import type { Locale } from '@/lib/i18n';
+import { countCctvByMode, type CctvDeliveryMetadata, type CctvViewMode } from '@/lib/cctv-feed';
 
 type LayerDataMap = Record<string, unknown>;
 type ActiveLayers = Record<string, boolean>;
@@ -51,6 +52,8 @@ interface LayerPanelProps {
   activeLayers: ActiveLayers;
   setActiveLayers: React.Dispatch<React.SetStateAction<ActiveLayers>>;
   locale: Locale;
+  cctvViewMode: CctvViewMode;
+  onCctvViewModeChange: (mode: CctvViewMode) => void;
 }
 
 const panelCopy = {
@@ -136,7 +139,7 @@ const LAYER_GROUPS: LayerGroup[] = [
 const ALL_LAYERS = LAYER_GROUPS.flatMap((g) => g.layers);
 const DEFAULT_EXPANDED = new Set(['surveillance']);
 
-function LayerPanel({ data, activeLayers, setActiveLayers, locale }: LayerPanelProps) {
+function LayerPanel({ data, activeLayers, setActiveLayers, locale, cctvViewMode, onCctvViewModeChange }: LayerPanelProps) {
   const t = panelCopy[locale] ?? panelCopy.en;
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
@@ -166,6 +169,7 @@ function LayerPanel({ data, activeLayers, setActiveLayers, locale }: LayerPanelP
 
   const totalEntities = ALL_LAYERS.reduce((sum, layer) => sum + (getCount(layer.dataKey) || 0), 0);
   const activeCount = Object.values(activeLayers).filter(Boolean).length;
+  const cameraCounts = countCctvByMode(Array.isArray(data.cameras) ? data.cameras as CctvDeliveryMetadata[] : []);
 
   const toggleGroup = (groupKey: string) => {
     setExpandedGroups((prev) => ({ ...prev, [groupKey]: !prev[groupKey] }));
@@ -266,8 +270,8 @@ function LayerPanel({ data, activeLayers, setActiveLayers, locale }: LayerPanelP
                         const count = getCount(layer.dataKey);
 
                         return (
+                          <Fragment key={layer.key}>
                           <button
-                            key={layer.key}
                             onClick={() => toggle(layer.key)}
                             className={`group flex w-full items-center gap-2 rounded-md border px-2 py-1 transition-all duration-200 ${
                               isActive
@@ -303,6 +307,30 @@ function LayerPanel({ data, activeLayers, setActiveLayers, locale }: LayerPanelP
                             )}
                             <div className={`layer-toggle ${isActive ? 'active' : ''}`} />
                           </button>
+                          {layer.key === 'cctv' && isActive && (
+                            <div className="mb-1 ml-5 grid grid-cols-3 gap-1 rounded-md border border-[#39FF14]/15 bg-black/20 p-1" role="group" aria-label={locale === 'es' ? 'Filtrar cámaras' : 'Filter cameras'}>
+                              {([
+                                ['all', locale === 'es' ? 'TODAS' : 'ALL', cameraCounts.all],
+                                ['live', 'LIVE', cameraCounts.live],
+                                ['near-live', 'NEAR', cameraCounts.nearLive],
+                              ] as const).map(([mode, label, count]) => (
+                                <button
+                                  key={mode}
+                                  type="button"
+                                  onClick={() => onCctvViewModeChange(mode)}
+                                  aria-pressed={cctvViewMode === mode}
+                                  className={`rounded px-1 py-1 text-[7px] font-bold font-mono tracking-[0.08em] transition-colors ${
+                                    cctvViewMode === mode
+                                      ? 'bg-[#39FF14]/15 text-[#8cff75] ring-1 ring-[#39FF14]/35'
+                                      : 'text-[var(--text-muted)] hover:bg-white/[0.04] hover:text-[var(--text-secondary)]'
+                                  }`}
+                                >
+                                  {label} · {count}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                          </Fragment>
                         );
                       })}
                     </div>

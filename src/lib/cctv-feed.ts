@@ -1,5 +1,6 @@
 export type CctvLiveMode = 'snapshot' | 'video' | 'external';
 export type CctvStreamType = 'jpg' | 'hls' | 'iframe';
+export type CctvViewMode = 'all' | 'live' | 'near-live';
 
 export interface CctvDeliveryMetadata {
   feed_url?: string;
@@ -14,9 +15,34 @@ export interface CctvDeliveryMetadata {
 
 export type CctvOperationalStatus = 'connecting' | 'live' | 'stale' | 'offline';
 
-export function scoreCctvDelivery(camera: CctvDeliveryMetadata): number {
-  const mode = camera.live_mode
+export function getCctvLiveMode(camera: CctvDeliveryMetadata): CctvLiveMode {
+  return camera.live_mode
     || (camera.stream_url ? 'video' : camera.feed_url ? 'snapshot' : 'external');
+}
+
+export function filterCctvByViewMode<T extends CctvDeliveryMetadata>(
+  cameras: T[] | undefined,
+  viewMode: CctvViewMode,
+): T[] {
+  if (!cameras) return [];
+  if (viewMode === 'all') return cameras;
+  const expectedMode: CctvLiveMode = viewMode === 'live' ? 'video' : 'snapshot';
+  return cameras.filter((camera) => getCctvLiveMode(camera) === expectedMode);
+}
+
+export function countCctvByMode(cameras: CctvDeliveryMetadata[] | undefined) {
+  const counts = { all: cameras?.length || 0, live: 0, nearLive: 0, external: 0 };
+  for (const camera of cameras || []) {
+    const mode = getCctvLiveMode(camera);
+    if (mode === 'video') counts.live += 1;
+    else if (mode === 'snapshot') counts.nearLive += 1;
+    else counts.external += 1;
+  }
+  return counts;
+}
+
+export function scoreCctvDelivery(camera: CctvDeliveryMetadata): number {
+  const mode = getCctvLiveMode(camera);
   const transportScore = mode === 'video' ? 300 : mode === 'snapshot' ? 200 : 100;
   const cadence = inferCctvRefreshIntervalSeconds(camera);
   const cadenceScore = mode === 'snapshot' ? Math.max(0, 60 - cadence) : 0;
