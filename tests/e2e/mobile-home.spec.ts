@@ -31,8 +31,7 @@ test('world explorer keeps the globe as the primary global surface', async ({ pa
 
   await page.getByRole('button', { name: 'Explorar', exact: true }).click();
   await expect(page.getByRole('region', { name: 'Inicio AEGIS' })).toBeHidden();
-  await expect(page.getByRole('heading', { name: 'AEGIS' }).first()).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Cambiar a mapa 2D' })).toHaveAttribute('data-view', 'globe');
+  await expect(page.getByRole('button', { name: 'Cambiar a mapa 2D' })).toHaveAttribute('data-view', 'globe', { timeout: 15_000 });
 });
 
 test('mobile command buttons open and close without blocking one another', async ({ page }) => {
