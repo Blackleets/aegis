@@ -20,12 +20,22 @@ interface NewsItem extends Omit<FeedItem, 'coordsHint'> {
   machine_assessment: string | null;
 }
 
-const RSS_FEEDS: Array<{
+type FeedConfig = {
   source: string;
   url: string;
   country?: string;
   coordsHint?: [number, number];
-}> = [
+};
+
+interface FeedResult {
+  source: string;
+  country: string | null;
+  status: 'active' | 'empty' | 'http_error' | 'fetch_error';
+  articleCount: number;
+  items: FeedItem[];
+}
+
+const RSS_FEEDS: FeedConfig[] = [
   { source: 'BBC World', url: 'https://feeds.bbci.co.uk/news/world/rss.xml' },
   { source: 'Al Jazeera', url: 'https://www.aljazeera.com/xml/rss/all.xml' },
   { source: 'GDACS', url: 'https://www.gdacs.org/xml/rss.xml' },
@@ -50,6 +60,54 @@ const RSS_FEEDS: Array<{
     country: 'BO',
     coordsHint: [-17.3895, -66.1568],
   },
+  {
+    source: 'Chile News',
+    url: 'https://news.google.com/rss?hl=es-419&gl=CL&ceid=CL:es-419',
+    country: 'CL',
+    coordsHint: [-33.4489, -70.6693],
+  },
+  {
+    source: 'Peru News',
+    url: 'https://news.google.com/rss?hl=es-419&gl=PE&ceid=PE:es-419',
+    country: 'PE',
+    coordsHint: [-12.0464, -77.0428],
+  },
+  {
+    source: 'Ecuador News',
+    url: 'https://news.google.com/rss?hl=es-419&gl=EC&ceid=EC:es-419',
+    country: 'EC',
+    coordsHint: [-0.1807, -78.4678],
+  },
+  {
+    source: 'Colombia News',
+    url: 'https://news.google.com/rss?hl=es-419&gl=CO&ceid=CO:es-419',
+    country: 'CO',
+    coordsHint: [4.711, -74.0721],
+  },
+  {
+    source: 'Venezuela News',
+    url: 'https://news.google.com/rss?hl=es-419&gl=VE&ceid=VE:es-419',
+    country: 'VE',
+    coordsHint: [10.4806, -66.9036],
+  },
+  {
+    source: 'Brazil News',
+    url: 'https://news.google.com/rss?hl=pt-BR&gl=BR&ceid=BR:pt-419',
+    country: 'BR',
+    coordsHint: [-15.7939, -47.8828],
+  },
+  {
+    source: 'Uruguay News',
+    url: 'https://news.google.com/rss?hl=es-419&gl=UY&ceid=UY:es-419',
+    country: 'UY',
+    coordsHint: [-34.9011, -56.1645],
+  },
+  {
+    source: 'Paraguay News',
+    url: 'https://news.google.com/rss?hl=es-419&gl=PY&ceid=PY:es-419',
+    country: 'PY',
+    coordsHint: [-25.2637, -57.5759],
+  },
 ];
 
 const RISK_KEYWORDS = [
@@ -58,15 +116,32 @@ const RISK_KEYWORDS = [
   'destroyed', 'operation', 'casualty', 'frontline', 'threat', 'earthquake', 'tsunami', 'eruption', 'flood',
   'guerra', 'misil', 'ataque', 'crisis', 'conflicto', 'militar', 'bomba', 'dron', 'sanciones', 'amenaza',
   'terremoto', 'sismo', 'tsunami', 'erupción', 'inundación', 'incendio', 'evacuación', 'bloqueo',
+  'enchente', 'incêndio', 'terremoto', 'deslizamento', 'evacuação', 'bloqueio', 'conflito', 'ameaça',
 ];
 
 const KEYWORD_COORDS: Record<string, [number, number]> = {
   argentina: [-38.416, -63.616],
   bolivia: [-16.29, -63.589],
+  chile: [-33.449, -70.669],
+  peru: [-12.046, -77.043],
+  ecuador: [-0.181, -78.468],
+  paraguay: [-25.264, -57.576],
+  uruguay: [-34.901, -56.165],
   'buenos aires': [-34.604, -58.382],
   'la paz': [-16.49, -68.119],
   'santa cruz': [-17.784, -63.181],
   cochabamba: [-17.389, -66.157],
+  santiago: [-33.449, -70.669],
+  lima: [-12.046, -77.043],
+  quito: [-0.181, -78.468],
+  bogotá: [4.711, -74.072],
+  bogota: [4.711, -74.072],
+  caracas: [10.481, -66.904],
+  brasilia: [-15.794, -47.883],
+  brasília: [-15.794, -47.883],
+  montevideo: [-34.901, -56.165],
+  asunción: [-25.264, -57.576],
+  asuncion: [-25.264, -57.576],
   australia: [-25.274, 133.775],
   brazil: [-14.235, -51.925],
   canada: [56.13, -106.347],
@@ -181,7 +256,7 @@ function parseRSSItems(
 export async function GET() {
   try {
     const feedResults = await Promise.allSettled(
-      RSS_FEEDS.map(async ({ source, url, country = null, coordsHint = null }): Promise<FeedItem[]> => {
+      RSS_FEEDS.map(async ({ source, url, country = null, coordsHint = null }): Promise<FeedResult> => {
         try {
           const res = await fetch(url, {
             signal: AbortSignal.timeout(8000),
@@ -191,19 +266,44 @@ export async function GET() {
             },
             cache: 'no-store',
           });
-          if (!res.ok) return [];
+          if (!res.ok) {
+            return { source, country, status: 'http_error', articleCount: 0, items: [] };
+          }
           const xml = await res.text();
-          return parseRSSItems(xml, source, country, coordsHint).slice(0, 12);
+          const items = parseRSSItems(xml, source, country, coordsHint).slice(0, 8);
+          return {
+            source,
+            country,
+            status: items.length > 0 ? 'active' : 'empty',
+            articleCount: items.length,
+            items,
+          };
         } catch {
-          return [];
+          return { source, country, status: 'fetch_error', articleCount: 0, items: [] };
         }
       })
     );
 
     const allArticles: FeedItem[] = [];
     for (const result of feedResults) {
-      if (result.status === 'fulfilled') allArticles.push(...result.value);
+      if (result.status === 'fulfilled') allArticles.push(...result.value.items);
     }
+
+    const sourceHealth = feedResults.map((result, index) => (
+      result.status === 'fulfilled'
+        ? {
+            source: result.value.source,
+            country: result.value.country,
+            status: result.value.status,
+            articleCount: result.value.articleCount,
+          }
+        : {
+            source: RSS_FEEDS[index].source,
+            country: RSS_FEEDS[index].country ?? null,
+            status: 'fetch_error' as const,
+            articleCount: 0,
+          }
+    ));
 
     const deduped = Array.from(
       new Map(
@@ -239,10 +339,11 @@ export async function GET() {
 
     return NextResponse.json(
       {
-        news: newsItems.slice(0, 60),
+        news: newsItems.slice(0, 80),
         total: newsItems.length,
         sources: RSS_FEEDS.map((feed) => feed.source),
         activeSources: Array.from(new Set(newsItems.map((item) => item.source))),
+        sourceHealth,
         timestamp: new Date().toISOString(),
       },
       {
