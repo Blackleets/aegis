@@ -2,12 +2,9 @@
 
 import { useState, type ReactNode } from 'react';
 import { motion } from 'framer-motion';
-import { Activity, BarChart3, ChevronDown, ChevronUp, Globe, Wifi } from 'lucide-react';
+import { Activity, ChevronDown, ChevronUp, Globe, Wifi } from 'lucide-react';
 
-type UsageMetrics = {
-  onlineUsers: number;
-  totalUsers: number;
-};
+type PresenceStatus = 'connecting' | 'live' | 'unavailable';
 
 type SpaceWeather = {
   storm_color?: string;
@@ -22,14 +19,14 @@ type TopHudOverlaysProps = {
   systemLabel: string;
   feedsLabel: string;
   liveLabel: string;
-  visitsLabel: string;
   alertsLabel: string;
   backendStatus: 'connected' | 'error' | 'connecting';
   backendStatusLabel: string;
   backendStatusAccentClass: string;
   activeLayerCount: number;
   activeIntelAlerts: number;
-  usageMetrics: UsageMetrics | null;
+  onlineCount: number | null;
+  presenceStatus: PresenceStatus;
   spaceWeather: SpaceWeather | null;
   zuluClock: ReactNode;
   uptimeClock: ReactNode;
@@ -43,14 +40,14 @@ export default function TopHudOverlays({
   systemLabel,
   feedsLabel,
   liveLabel,
-  visitsLabel,
   alertsLabel,
   backendStatus,
   backendStatusLabel,
   backendStatusAccentClass,
   activeLayerCount,
   activeIntelAlerts,
-  usageMetrics,
+  onlineCount,
+  presenceStatus,
   spaceWeather,
   zuluClock,
   uptimeClock,
@@ -97,15 +94,12 @@ export default function TopHudOverlays({
             <span className="text-[var(--cyan-primary)] font-bold">{activeLayerCount}</span>
             <span className="text-[var(--text-muted)]/60">{feedsLabel}</span>
           </span>
-          {usageMetrics && (
+          {presenceStatus === 'live' && onlineCount !== null && (
             <span className="hidden 2xl:inline-flex items-center gap-2 rounded-full border border-[var(--border-primary)]/70 bg-[rgba(15,23,32,0.82)] px-2.5 py-1 shadow-[0_10px_30px_rgba(0,0,0,0.16)]">
               <Activity className="h-3 w-3 text-[var(--alert-green)]" />
               <span className="text-[var(--text-secondary)]">{liveLabel}</span>
-              <span className="font-bold text-[var(--text-primary)]">{usageMetrics.onlineUsers}</span>
-              <span className="text-[var(--border-primary)]">/</span>
-              <BarChart3 className="h-3 w-3 text-[var(--gold-primary)]" />
-              <span className="text-[var(--text-secondary)]">{visitsLabel}</span>
-              <span className="font-bold text-[var(--text-primary)]">{usageMetrics.totalUsers.toLocaleString()}</span>
+              <span className="font-bold text-[var(--text-primary)]">{onlineCount}</span>
+              <span className="text-[var(--text-muted)]">ahora</span>
             </span>
           )}
           <span className="hidden xl:inline-flex">{uptimeClock}</span>

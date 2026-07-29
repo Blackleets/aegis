@@ -108,6 +108,7 @@ type RouteCockpitMobileProps = {
   currentLocation: { lat: number; lng: number } | null;
   navigationCameraFollowing: boolean;
   onResumeNavigationCamera: () => void;
+  weatherSummary: string | null;
 };
 
 const LOCAL_REPORT_OPTIONS: Array<{
@@ -181,6 +182,7 @@ export default function RouteCockpitMobile({
   currentLocation,
   navigationCameraFollowing,
   onResumeNavigationCamera,
+  weatherSummary,
 }: RouteCockpitMobileProps) {
   const [reportComposerOpen, setReportComposerOpen] = useState(false);
   const [reportFeedback, setReportFeedback] = useState<string | null>(null);
@@ -353,6 +355,11 @@ export default function RouteCockpitMobile({
                     {routeRiskSummary?.level === 'high' && (
                       <span className="inline-flex items-center gap-1 rounded-full bg-amber-300/12 px-2 py-1 text-amber-200">
                         <ShieldAlert className="h-3 w-3" /> Precaución
+                      </span>
+                    )}
+                    {routeRiskSummary?.level !== 'high' && weatherSummary && (
+                      <span className="truncate rounded-full bg-white/[0.06] px-2 py-1 text-white/68">
+                        {weatherSummary}
                       </span>
                     )}
                   </div>

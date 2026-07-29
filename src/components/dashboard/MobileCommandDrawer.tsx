@@ -3,7 +3,6 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronRight, LocateFixed, Map, Menu, Navigation, RotateCw, Search, Satellite, X } from 'lucide-react';
 import { useEffect, useState, type ComponentType, type ReactNode } from 'react';
-import { useRealtimePresence } from '@/hooks/useRealtimePresence';
 
 type MobilePanel = 'layers' | 'markets' | 'intel' | 'alerts' | 'search' | 'recon';
 type MobileNavGlyphProps = { className?: string };
@@ -32,6 +31,8 @@ type MobileCommandDrawerProps = {
   onToggleMapStyle: () => void;
   ambientMotionEnabled: boolean;
   onToggleAmbientMotion: () => void;
+  onlineCount: number | null;
+  presenceStatus: 'connecting' | 'live' | 'unavailable';
 };
 
 export default function MobileCommandDrawer({
@@ -51,9 +52,10 @@ export default function MobileCommandDrawer({
   onToggleMapStyle,
   ambientMotionEnabled,
   onToggleAmbientMotion,
+  onlineCount,
+  presenceStatus,
 }: MobileCommandDrawerProps) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const { onlineCount, status: presenceStatus } = useRealtimePresence();
   const activeTab = mobileNavTabs.find((tab) => tab.id === mobilePanel) ?? null;
   const isSearchPanel = mobilePanel === 'search';
   const isReconPanel = mobilePanel === 'recon';

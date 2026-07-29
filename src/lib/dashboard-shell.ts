@@ -72,12 +72,6 @@ export interface GlobalStats {
   nuclear: number;
 }
 
-export interface UsageMetrics {
-  onlineUsers: number;
-  totalUsers: number;
-  updatedAt?: string;
-}
-
 export interface RegionDossier {
   location?: { display_name?: string };
   country?: {
