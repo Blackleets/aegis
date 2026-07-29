@@ -1610,7 +1610,7 @@ export default function Dashboard() {
             })
           : null;
         if (navigationActive && routeSnapshot && !routePosition) return [];
-        const distanceMeters = routePosition?.distanceAheadMeters ?? directDistanceMeters;
+        const distanceMeters = directDistanceMeters;
         if (distanceMeters > 25_000) return [];
         return [{
           id: earthquake.id || `${earthquake.time}-${earthquake.lat}-${earthquake.lng}`,
@@ -1650,13 +1650,16 @@ export default function Dashboard() {
     const alertDistance = (entity: DashboardEntity, corridorMeters: number, maxAheadMeters: number) => {
       if (typeof entity.lat !== 'number' || typeof entity.lng !== 'number') return null;
       if (navigationActive && routeSnapshot) {
-        return resolveRouteAlertPosition({
+        const routePosition = resolveRouteAlertPosition({
           user: userLocation,
           alert: entity as Coordinate,
           routeCoordinates: routeSnapshot.coordinates,
           corridorMeters,
           maxAheadMeters,
-        })?.distanceAheadMeters ?? null;
+        });
+        if (!routePosition) return null;
+        const directDistanceMeters = Math.round(distanceMetersBetween(userLocation, entity as Coordinate));
+        return corridorMeters <= 100 ? routePosition.distanceAheadMeters : directDistanceMeters;
       }
       const distanceMeters = Math.round(distanceMetersBetween(userLocation, entity as Coordinate));
       return distanceMeters <= maxAheadMeters ? distanceMeters : null;
