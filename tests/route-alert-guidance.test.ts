@@ -41,6 +41,7 @@ describe('route alert guidance', () => {
       guidance,
     })).toBe('Atención. Incendio en la ruta a 180 metros.');
   });
+
   it('announces each proximity phase at most once even after a regression', () => {
     const announced = new Set<string>();
 
@@ -49,5 +50,4 @@ describe('route alert guidance', () => {
     expect(shouldAnnounceRouteAlertPhase(announced, 'camera-1', 'near')).toBe(false);
     expect(shouldAnnounceRouteAlertPhase(announced, 'camera-1', 'now')).toBe(false);
   });
-
 });
