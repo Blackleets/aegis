@@ -2,8 +2,6 @@ import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import ErrorBoundary from '@/components/ErrorBoundary';
-import MobileSpeedOverlay from '@/components/dashboard/MobileSpeedOverlay';
-import NavigationVoiceCoordinator from '@/components/NavigationVoiceCoordinator';
 
 const SITE_URL = "https://aegis.blackleets.dev";
 const SITE_NAME = "AEGIS";
@@ -155,8 +153,6 @@ export default function RootLayout({
         <ErrorBoundary name="AEGIS Core">
           {children}
         </ErrorBoundary>
-        <NavigationVoiceCoordinator />
-        <MobileSpeedOverlay />
         <Analytics />
       </body>
     </html>
