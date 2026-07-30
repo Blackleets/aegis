@@ -544,6 +544,7 @@ export default function Dashboard() {
   const [mobilePanel, setMobilePanel] = useState<MobilePanel | null>(null);
   const [vectorDockOpen, setVectorDockOpen] = useState(false);
   const [mobileModeDockCollapsed, setMobileModeDockCollapsed] = useState(true);
+  const [voiceSearchRequestToken, setVoiceSearchRequestToken] = useState(0);
   const [dashboardMode, setDashboardMode] = useState<DashboardMode>('earth');
   const [mapProjection, setMapProjection] = useState<'globe'|'mercator'>('mercator');
   const [ambientMotionEnabled, setAmbientMotionEnabled] = useState(false);
@@ -2580,6 +2581,10 @@ export default function Dashboard() {
             mobileNavTabs={mobileNavTabs}
             mobilePanel={mobilePanel}
             onTogglePanel={(panel) => setMobilePanel(mobilePanel === panel ? null : panel)}
+            onOpenVoiceSearch={() => {
+              setVoiceSearchRequestToken((token) => token + 1);
+              setMobilePanel('search');
+            }}
             isGlobeView={mapProjection === 'globe'}
             isSatelliteView={mapStyle === 'satellite'}
             onToggleProjection={() => setMapProjection((projection) => projection === 'globe' ? 'mercator' : 'globe')}
@@ -2645,7 +2650,7 @@ export default function Dashboard() {
             searchContent={(
               <MobileSearchPanel
                 routeError={routeError}
-                searchBar={<SearchBar variant="mobile-nav" defaultOpen onLocate={(result) => { setFlyToLocation({ lat: result.lat, lng: result.lng, zoom: result.zoom, bbox: result.bbox, label: result.label, ts: Date.now() }); setMobilePanel(null); }} onRoute={async (request) => { await handleRouteRequest(request); setMobilePanel(null); }} />}
+                searchBar={<SearchBar variant="mobile-nav" defaultOpen autoStartVoiceToken={voiceSearchRequestToken} onLocate={(result) => { setFlyToLocation({ lat: result.lat, lng: result.lng, zoom: result.zoom, bbox: result.bbox, label: result.label, ts: Date.now() }); setMobilePanel(null); }} onRoute={async (request) => { await handleRouteRequest(request); setMobilePanel(null); }} />}
               />
             )}
             reconContent={(

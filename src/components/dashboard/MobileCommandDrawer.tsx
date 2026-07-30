@@ -1,7 +1,7 @@
 'use client';
 
 import { AnimatePresence, motion } from 'framer-motion';
-import { ChevronRight, LocateFixed, Map, Menu, Navigation, RotateCw, Search, Satellite, X } from 'lucide-react';
+import { ChevronRight, LocateFixed, Map, Menu, Mic, Navigation, RotateCw, Search, Satellite, X } from 'lucide-react';
 import { useEffect, useState, type ComponentType, type ReactNode } from 'react';
 
 type MobilePanel = 'layers' | 'markets' | 'intel' | 'alerts' | 'search' | 'recon';
@@ -18,6 +18,7 @@ type MobileCommandDrawerProps = {
   mobileNavTabs: MobileTab[];
   mobilePanel: MobilePanel | null;
   onTogglePanel: (panel: MobilePanel) => void;
+  onOpenVoiceSearch: () => void;
   layersContent: ReactNode;
   marketsContent: ReactNode;
   intelContent: ReactNode;
@@ -39,6 +40,7 @@ export default function MobileCommandDrawer({
   mobileNavTabs,
   mobilePanel,
   onTogglePanel,
+  onOpenVoiceSearch,
   layersContent,
   marketsContent,
   intelContent,
@@ -179,26 +181,35 @@ export default function MobileCommandDrawer({
             </button>
           </div>
 
-          <motion.button
-            type="button"
+          <motion.div
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
-            onClick={() => openPanel('search')}
-            className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-4 right-4 z-[390] flex min-h-[58px] items-center gap-3 rounded-[22px] border border-cyan-200/20 bg-[linear-gradient(135deg,rgba(5,18,29,0.92),rgba(4,12,20,0.88))] px-4 text-left shadow-[0_14px_38px_rgba(0,0,0,0.42),0_0_22px_rgba(34,211,238,0.09)] backdrop-blur-xl"
-            aria-label="Buscar destino"
+            className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-4 right-4 z-[390] flex min-h-[62px] items-center rounded-[22px] border border-cyan-200/20 bg-[linear-gradient(135deg,rgba(5,18,29,0.92),rgba(4,12,20,0.88))] p-1.5 shadow-[0_14px_38px_rgba(0,0,0,0.42),0_0_22px_rgba(34,211,238,0.09)] backdrop-blur-xl"
           >
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-cyan-300/12 text-cyan-200">
-              <Search className="h-5 w-5" strokeWidth={2.2} />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-[15px] font-semibold text-white">¿A dónde vas?</span>
-              <span className="mt-0.5 flex items-center gap-1.5 text-[9px] text-white/42">
-                <LocateFixed className="h-3 w-3 text-emerald-300" />
-                Ruta desde tu ubicación
+            <button type="button" onClick={() => openPanel('search')} className="flex min-w-0 flex-1 items-center gap-3 rounded-[17px] px-2.5 py-1.5 text-left" aria-label="Escribir o buscar destino">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-cyan-300/12 text-cyan-200">
+                <Search className="h-5 w-5" strokeWidth={2.2} />
               </span>
-            </span>
-            <ChevronRight className="h-5 w-5 text-white/35" />
-          </motion.button>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[15px] font-semibold text-white">¿A dónde vas?</span>
+                <span className="mt-0.5 flex items-center gap-1.5 text-[9px] text-white/42">
+                  <LocateFixed className="h-3 w-3 text-emerald-300" />
+                  Ruta desde tu ubicación
+                </span>
+              </span>
+              <ChevronRight className="h-5 w-5 text-white/35" />
+            </button>
+            <span className="h-8 w-px shrink-0 bg-white/10" aria-hidden="true" />
+            <button
+              type="button"
+              onClick={onOpenVoiceSearch}
+              className="ml-1 grid h-11 w-11 shrink-0 place-items-center rounded-[16px] bg-cyan-300 text-slate-950 shadow-[0_6px_20px_rgba(34,211,238,0.2)] transition-transform active:scale-95"
+              aria-label="Decir destino por voz"
+              title="Buscar destino por voz"
+            >
+              <Mic className="h-5 w-5" />
+            </button>
+          </motion.div>
         </>
       )}
 
