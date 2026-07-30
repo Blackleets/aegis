@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback, memo } from 'react';
 import maplibregl from 'maplibre-gl';
+import { NEARBY_PLACE_META, type NearbyPlace } from '@/lib/nearby-places';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 import { findNewEarthquakes, getEarthquakeSeverity, isRecentEarthquake } from '@/lib/earthquakes';
@@ -79,6 +80,7 @@ interface AegisMapProps {
   navigationBearing?: number | null;
   navigationMode?: VectorNavigationMode;
   ambientMotionEnabled?: boolean;
+  nearbyPlaces?: NearbyPlace[];
 }
 
 function computeSolarTerminator(): [number, number][] {
@@ -248,7 +250,7 @@ function takeTopEntities<T>(items: T[] | undefined, limit: number, score: (item:
   return [...items].sort((a, b) => score(b) - score(a)).slice(0, limit);
 }
 
-function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightClick, onViewStateChange, flyToLocation, projection = 'globe', mapStyle = 'dark', sweepData, scanTargets = [], currentLocation = null, gpsAccuracyMeters = null, routeDestination = null, routePath = [], navigationActive = false, navigationCameraFollowing = true, onNavigationCameraRelease, navigationBearing = null, navigationMode = 'driving', ambientMotionEnabled = true }: AegisMapProps) {
+function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightClick, onViewStateChange, flyToLocation, projection = 'globe', mapStyle = 'dark', sweepData, scanTargets = [], currentLocation = null, gpsAccuracyMeters = null, routeDestination = null, routePath = [], navigationActive = false, navigationCameraFollowing = true, onNavigationCameraRelease, navigationBearing = null, navigationMode = 'driving', ambientMotionEnabled = true, nearbyPlaces = [] }: AegisMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const popupRef = useRef<maplibregl.Popup | null>(null);
@@ -327,6 +329,30 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       height: size,
       data: new Uint8Array(ctx.getImageData(0, 0, size, size).data),
     }, { pixelRatio: 2 });
+  }, []);
+
+  const createPlaceIcon = useCallback((map: maplibregl.Map, category: keyof typeof NEARBY_PLACE_META) => {
+    const id = `place-${category}`;
+    if (map.hasImage(id)) return;
+    const meta = NEARBY_PLACE_META[category];
+    const size = 48;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d')!;
+    ctx.fillStyle = 'rgba(3, 12, 22, 0.94)';
+    ctx.beginPath();
+    ctx.roundRect(3, 3, 42, 42, 14);
+    ctx.fill();
+    ctx.strokeStyle = meta.color;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.fillStyle = '#F8FAFC';
+    ctx.font = meta.icon.length > 1 ? 'bold 17px sans-serif' : 'bold 23px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(meta.icon, 24, 25);
+    map.addImage(id, { width: size, height: size, data: new Uint8Array(ctx.getImageData(0, 0, size, size).data) });
   }, []);
 
   const createDot = useCallback((map: maplibregl.Map, id: string, color: string, size: number) => {
@@ -434,6 +460,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       createIcon(map, 'plane-red', '#FF3D3D', 24);
       createIcon(map, 'plane-grey', '#555555', 24);
       createNavigationArrow(map);
+      (Object.keys(NEARBY_PLACE_META) as Array<keyof typeof NEARBY_PLACE_META>).forEach((category) => createPlaceIcon(map, category));
       createDot(map, 'dot-gold', '#D4AF37', 8);
       createDot(map, 'dot-red', '#FF3D3D', 10);
       createDot(map, 'dot-orange', '#FF9500', 10);
@@ -442,7 +469,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       createDot(map, 'dot-cctv', '#39FF14', 10);
 
       // Sources
-      const sources = ['flights','military','jets','private-fl','flight-trails','military-trails','jet-trails','private-trails','satellites','earthquakes','earthquake-pulses','gdelt','gdelt-hotspots','gps-jamming','day-night','cctv','fires','weather','infrastructure','maritime','maritime-choke','maritime-ships','live-news','sigint-news','conflict-zones', 'war-alerts-targets', 'war-alerts-lines', 'balloons', 'radiation', 'ip-sweep-devices', 'ip-sweep-pulse', 'ip-sweep-connections', 'scan-targets', 'sdk-entities', 'sdk-links', 'user-route', 'route-markers'];
+      const sources = ['flights','military','jets','private-fl','flight-trails','military-trails','jet-trails','private-trails','satellites','earthquakes','earthquake-pulses','gdelt','gdelt-hotspots','gps-jamming','day-night','cctv','fires','weather','infrastructure','maritime','maritime-choke','maritime-ships','live-news','sigint-news','conflict-zones', 'war-alerts-targets', 'war-alerts-lines', 'balloons', 'radiation', 'ip-sweep-devices', 'ip-sweep-pulse', 'ip-sweep-connections', 'scan-targets', 'sdk-entities', 'sdk-links', 'nearby-places', 'user-route', 'route-markers'];
       sources.forEach((sourceId) => map.addSource(sourceId, sourceId === 'earthquakes'
         ? { type: 'geojson', data: EMPTY_FC, cluster: true, clusterRadius: 44, clusterMaxZoom: 5 }
         : { type: 'geojson', data: EMPTY_FC }));
@@ -546,6 +573,28 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       // Day/Night
       map.addLayer({ id: 'day-night-fill', type: 'fill', source: 'day-night', paint: { 'fill-color': '#000022', 'fill-opacity': 0.35 }});
 
+      map.addLayer({
+        id: 'nearby-places-icons',
+        type: 'symbol',
+        source: 'nearby-places',
+        minzoom: 11.5,
+        layout: {
+          'icon-image': ['concat', 'place-', ['get', 'category']],
+          'icon-size': ['interpolate', ['linear'], ['zoom'], 11.5, 0.52, 15, 0.72],
+          'icon-allow-overlap': false,
+          'icon-padding': 8,
+          'text-field': ['step', ['zoom'], '', 14.2, ['get', 'name']],
+          'text-size': 10,
+          'text-font': ['Open Sans Bold'],
+          'text-offset': [0, 2.25],
+          'text-optional': true,
+        },
+        paint: {
+          'text-color': '#F8FAFC',
+          'text-halo-color': 'rgba(2, 7, 18, 0.96)',
+          'text-halo-width': 1.5,
+        },
+      });
 
       // User route overlay (additive only — high contrast, does not affect Earth logic)
       map.addLayer({ id: 'user-route-glow', type: 'line', source: 'user-route', paint: {
@@ -1466,6 +1515,41 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       onEntityClick?.({ type: 'weather_event', lat: coords[1], lng: coords[0], title: p.title, severity: p.severity, source: p.source, id: p.id });
     });
 
+    map.on('click', 'nearby-places-icons', e => {
+      const feature = e.features?.[0];
+      if (!feature) return;
+      const p = feature.properties as EntityProperties;
+      const coords = feature.geometry.coordinates;
+      const category = String(p.category || 'restaurant') as keyof typeof NEARBY_PLACE_META;
+      const meta = NEARBY_PLACE_META[category] ?? NEARBY_PLACE_META.restaurant;
+      const content = document.createElement('div');
+      content.style.cssText = 'min-width:180px;padding:10px 12px;background:#07111d;color:#f8fafc;border-radius:12px;font-family:Inter,sans-serif;';
+      const title = document.createElement('div');
+      title.style.cssText = `font-size:13px;font-weight:700;color:${meta.color};`;
+      title.textContent = `${meta.icon} ${String(p.name || meta.label)}`;
+      const detail = document.createElement('div');
+      detail.style.cssText = 'margin-top:5px;font-size:10px;color:#a8bdca;';
+      detail.textContent = [meta.label, p.brand, p.openingHours].filter(Boolean).join(' · ');
+      const source = document.createElement('div');
+      source.style.cssText = 'margin-top:7px;font-size:8px;letter-spacing:.12em;color:#6f8797;text-transform:uppercase;';
+      source.textContent = 'Datos reales · OpenStreetMap';
+      content.append(title, detail, source);
+      popupRef.current?.remove();
+      popupRef.current = new maplibregl.Popup({ closeButton: true, maxWidth: '270px' })
+        .setLngLat(coords)
+        .setDOMContent(content)
+        .addTo(map);
+      onEntityClick?.({
+        type: 'nearby_place',
+        id: p.id,
+        name: p.name,
+        category,
+        lat: coords[1],
+        lng: coords[0],
+        source: 'OpenStreetMap',
+      });
+    });
+
     // ── Nuclear Infrastructure ──
     map.on('click', 'infra-dots', e => {
       if (!e.features?.length) return;
@@ -1548,7 +1632,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       mapRef.current = null;
       setMapReady(false);
     };
-  }, [applyAegisGlobeStyling, createDot, createIcon, createNavigationArrow, onEntityClick, onMouseCoords, onNavigationCameraRelease, onRightClick, onViewStateChange]);
+  }, [applyAegisGlobeStyling, createDot, createIcon, createNavigationArrow, createPlaceIcon, onEntityClick, onMouseCoords, onNavigationCameraRelease, onRightClick, onViewStateChange]);
 
   // Day/Night
   useEffect(() => {
@@ -2357,6 +2441,15 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       markerSource.setData({ type: 'FeatureCollection', features: markerFeatures });
     }
   }, [currentLocation, gpsAccuracyMeters, mapReady, navigationActive, navigationBearing, routeDestination, routePath]);
+
+  useEffect(() => {
+    if (!mapReady) return;
+    setGeo('nearby-places', nearbyPlaces.map((place) => ({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [place.lng, place.lat] },
+      properties: { ...place },
+    })));
+  }, [mapReady, nearbyPlaces, setGeo]);
 
   useEffect(() => {
     if (!mapReady || !mapRef.current || !currentLocation) return;

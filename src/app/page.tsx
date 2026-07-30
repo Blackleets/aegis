@@ -37,6 +37,7 @@ import WeatherCapsule from '@/components/dashboard/WeatherCapsule';
 import { useLocalWeather } from '@/hooks/useLocalWeather';
 import { useRealtimePresence } from '@/hooks/useRealtimePresence';
 import { useNavigationWakeLock } from '@/hooks/useNavigationWakeLock';
+import type { NearbyPlace } from '@/lib/nearby-places';
 import { DEFAULT_LOCALE, getDashboardCopy, isLocale, type Locale } from '@/lib/i18n';
 import { type ActiveLayers, type BoundingBox, type Coordinate, type FlyToLocation, type MapView, type RouteOption, type RouteRiskSummary, type RouteSnapshot, type RouteStep, computeBearing, countSignalsNearRoute, distanceMetersBetween, distanceToRoutePath, formatEtaLabel, formatProgressLabel, getClosestStepIndex, getYouTubeWatchUrl, localizeRouteInstruction } from '@/lib/routing-shell';
 import { getArrivalThresholdMeters, getNextSimulationIndex, resolveNavigationBearing, shouldAcceptNavigationFix, shouldRerouteNavigation, snapNavigationToRoute, stabilizeNavigationCoordinate } from '@/lib/vector-navigation';
@@ -556,11 +557,16 @@ export default function Dashboard() {
   const [mapStyle, setMapStyle] = useState<'dark'|'satellite'>('dark');
   const [sweepData, setSweepData] = useState<unknown>(null);
   const [scanTargets, setScanTargets] = useState<ScanTarget[]>([]);
+  const [nearbyPlaces, setNearbyPlaces] = useState<NearbyPlace[]>([]);
 
   const isMobile = useIsMobile();
   const { onlineCount, status: presenceStatus } = useRealtimePresence();
   const { weather: localWeather, status: localWeatherStatus } = useLocalWeather(userLocation);
   useNavigationWakeLock(navigationActive);
+  const placesAnchor = userLocation ?? routeSnapshot?.origin ?? null;
+  const placesGridKey = placesAnchor
+    ? `${Math.round(placesAnchor.lat * 50) / 50},${Math.round(placesAnchor.lng * 50) / 50}`
+    : null;
   const geocodeCache = useRef<Map<string, string>>(new Map());
   const geocodeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const geocodeAbortRef = useRef<AbortController | null>(null);
@@ -575,6 +581,25 @@ export default function Dashboard() {
   const lastNearSpokenStepRef = useRef<number | null>(null);
   const spokenEarthquakePhasesRef = useRef<Set<string>>(new Set());
   const alertedEarthquakeIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!placesGridKey) {
+      setNearbyPlaces([]);
+      return;
+    }
+    const [lat, lng] = placesGridKey.split(',').map(Number);
+    const controller = new AbortController();
+    void fetch(`/api/places?lat=${lat}&lng=${lng}&radius=3500`, {
+      signal: controller.signal,
+    }).then(async (response) => {
+      if (!response.ok) return;
+      const payload = await response.json() as { places?: NearbyPlace[] };
+      setNearbyPlaces(Array.isArray(payload.places) ? payload.places : []);
+    }).catch((error) => {
+      if ((error as Error).name !== 'AbortError') console.warn('[AEGIS] Nearby places unavailable');
+    });
+    return () => controller.abort();
+  }, [placesGridKey]);
 
   const alertedContextIdsRef = useRef<Set<string>>(new Set());
   const notifiedRouteAlertIdsRef = useRef<Set<string>>(new Set());
@@ -2200,6 +2225,7 @@ export default function Dashboard() {
             && dashboardMode === 'earth'
             && selectedCelestialBody === 'earth'
           }
+          nearbyPlaces={nearbyPlaces}
         />
       </ErrorBoundary>
 
