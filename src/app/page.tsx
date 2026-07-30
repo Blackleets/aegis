@@ -32,6 +32,7 @@ import RouteCockpitMobile from '@/components/dashboard/RouteCockpitMobile';
 import RouteAlertPreferencesPanel from '@/components/dashboard/RouteAlertPreferencesPanel';
 import SplashScreen from '@/components/dashboard/SplashScreen';
 import TopHudOverlays from '@/components/dashboard/TopHudOverlays';
+import WeatherAtmosphere from '@/components/dashboard/WeatherAtmosphere';
 import WeatherCapsule from '@/components/dashboard/WeatherCapsule';
 import { useLocalWeather } from '@/hooks/useLocalWeather';
 import { useRealtimePresence } from '@/hooks/useRealtimePresence';
@@ -2192,6 +2193,12 @@ export default function Dashboard() {
           }
         />
       </ErrorBoundary>
+
+      <WeatherAtmosphere
+        weather={localWeather}
+        navigationActive={navigationActive}
+        visible={isEarthOps && !showSplash}
+      />
 
       <SolarSystemMode
         selected={selectedCelestialBody}
