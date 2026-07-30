@@ -566,7 +566,6 @@ export default function Dashboard() {
   const lastNavigationLocationRef = useRef<Coordinate | null>(null);
   const lastNavigationBearingRef = useRef<number | null>(null);
   const lastAcceptedGpsAtRef = useRef(0);
-  const navigationActiveRef = useRef(navigationActive);
   const offRouteSinceRef = useRef<number | null>(null);
   const offRouteFixCountRef = useRef(0);
   const lastRerouteAtRef = useRef(0);
@@ -576,9 +575,6 @@ export default function Dashboard() {
   const spokenEarthquakePhasesRef = useRef<Set<string>>(new Set());
   const alertedEarthquakeIdsRef = useRef<Set<string>>(new Set());
 
-  useEffect(() => {
-    navigationActiveRef.current = navigationActive;
-  }, [navigationActive]);
   const alertedContextIdsRef = useRef<Set<string>>(new Set());
   const notifiedRouteAlertIdsRef = useRef<Set<string>>(new Set());
   const hapticRouteAlertIdsRef = useRef<Set<string>>(new Set());
@@ -1025,17 +1021,11 @@ export default function Dashboard() {
 
     // Polling — OPTIMIZED intervals to minimize edge requests
     const intervals = [
+      setInterval(() => fetchEndpoint('/api/earthquakes', undefined, { cache: 'no-store' }), 20000),
+      setInterval(() => fetchEndpoint('/api/news'), 1800000),        // 30 min (was 10)
+      setInterval(() => fetchEndpoint('/api/markets', d => ({ markets: d })), 900000), // 15 min (was 5)
       setInterval(() => {
-        if (!navigationActiveRef.current) void fetchEndpoint('/api/earthquakes', undefined, { cache: 'no-store' });
-      }, 20000),
-      setInterval(() => {
-        if (!navigationActiveRef.current) void fetchEndpoint('/api/news');
-      }, 1800000),        // 30 min (was 10)
-      setInterval(() => {
-        if (!navigationActiveRef.current) void fetchEndpoint('/api/markets', d => ({ markets: d }));
-      }, 900000), // 15 min (was 5)
-      setInterval(() => {
-        if (!navigationActiveRef.current) void loadNasaEvents();
+        void loadNasaEvents();
       }, 1800000),
     ];
     return () => {
@@ -1120,7 +1110,6 @@ export default function Dashboard() {
 
   // ── LAYER-AWARE POLLING — only poll data for active layers ──
   useEffect(() => {
-    if (navigationActive) return;
     const intervals: ReturnType<typeof setInterval>[] = [];
     if (activeLayers.flights || activeLayers.military || activeLayers.jets || activeLayers.private) {
       intervals.push(setInterval(() => fetchEndpoint('/api/flights'), 45000)); // ADS-B positions: 45s freshness window
@@ -1154,7 +1143,7 @@ export default function Dashboard() {
       intervals.push(setInterval(() => fetchEndpoint('/api/satellites'), 120000)); // 2m
     }
     return () => intervals.forEach(clearInterval);
-  }, [activeLayers, fetchEndpoint, navigationActive]);
+  }, [activeLayers, fetchEndpoint]);
 
   // Reactive layer fetch: handled by layerFetchedRef above (no duplicate)
 
