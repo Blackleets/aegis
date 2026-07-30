@@ -1,7 +1,10 @@
 'use client';
 
+import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { type RouteRiskSummary, type RouteSnapshot, type RouteStep, formatCoordinateLabel, formatRouteDistance, formatRouteDuration, formatRouteModeLabel } from '@/lib/routing-shell';
+
+type GpsSignalStatus = 'idle' | 'acquiring' | 'live' | 'degraded' | 'denied' | 'unavailable';
 
 type RouteCockpitDesktopProps = {
   routeSnapshot: RouteSnapshot;
@@ -16,6 +19,16 @@ type RouteCockpitDesktopProps = {
   onSelectRouteOption: (routeId: string) => void;
 };
 
+function getGpsQualityLabel(status: GpsSignalStatus, accuracyMeters: number | null) {
+  if (status === 'acquiring') return 'Buscando GPS';
+  if (status === 'denied') return 'GPS sin permiso';
+  if (status === 'unavailable') return 'GPS sin señal';
+  if (status === 'degraded') return accuracyMeters === null ? 'GPS débil' : `GPS ±${Math.round(accuracyMeters)} m`;
+  if (accuracyMeters === null) return 'GPS preparado';
+  if (accuracyMeters <= 15) return 'GPS preciso';
+  return `GPS ±${Math.round(accuracyMeters)} m`;
+}
+
 export default function RouteCockpitDesktop({
   routeSnapshot,
   navigationActive,
@@ -28,6 +41,50 @@ export default function RouteCockpitDesktop({
   onClearNavigationState,
   onSelectRouteOption,
 }: RouteCockpitDesktopProps) {
+  const [speedKmh, setSpeedKmh] = useState<number | null>(null);
+  const [gpsAccuracyMeters, setGpsAccuracyMeters] = useState<number | null>(null);
+  const [gpsStatus, setGpsStatus] = useState<GpsSignalStatus>('idle');
+
+  useEffect(() => {
+    if (!navigationActive) {
+      setSpeedKmh(null);
+      setGpsAccuracyMeters(null);
+      setGpsStatus('idle');
+      return;
+    }
+
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      setGpsStatus('unavailable');
+      return;
+    }
+
+    setGpsStatus('acquiring');
+    const watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        const accuracy = Number.isFinite(position.coords.accuracy) ? position.coords.accuracy : null;
+        const nextSpeed = typeof position.coords.speed === 'number' && Number.isFinite(position.coords.speed)
+          ? Math.max(0, position.coords.speed * 3.6)
+          : null;
+        setGpsAccuracyMeters(accuracy);
+        setSpeedKmh(nextSpeed);
+        setGpsStatus(accuracy !== null && accuracy > 40 ? 'degraded' : 'live');
+      },
+      (error) => {
+        setSpeedKmh(null);
+        setGpsAccuracyMeters(null);
+        setGpsStatus(error.code === error.PERMISSION_DENIED ? 'denied' : 'unavailable');
+      },
+      { enableHighAccuracy: true, maximumAge: 2_000, timeout: 12_000 },
+    );
+
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, [navigationActive]);
+
+  const gpsQualityLabel = useMemo(
+    () => getGpsQualityLabel(gpsStatus, gpsAccuracyMeters),
+    [gpsAccuracyMeters, gpsStatus],
+  );
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -70,10 +127,14 @@ export default function RouteCockpitDesktop({
                 </div>
               </div>
             )}
-            <div className="mt-2 grid grid-cols-2 gap-2 lg:grid-cols-4">
+            <div className="mt-2 grid grid-cols-2 gap-2 lg:grid-cols-5">
               <div className="rounded-xl border border-cyan-400/14 bg-cyan-400/[0.06] px-2.5 py-2">
                 <div className="text-[7px] font-mono uppercase tracking-[0.18em] text-cyan-300">Mode</div>
                 <div className="mt-1 text-[11px] font-semibold tracking-[0.05em] text-white">{formatRouteModeLabel(routeSnapshot.mode)}</div>
+              </div>
+              <div className="rounded-xl border border-cyan-400/18 bg-cyan-400/[0.08] px-2.5 py-2">
+                <div className="text-[7px] font-mono uppercase tracking-[0.18em] text-cyan-300">Speed</div>
+                <div className="mt-1 text-[11px] font-semibold tracking-[0.05em] text-white tabular-nums">{speedKmh === null ? '— km/h' : `${Math.round(speedKmh)} km/h`}</div>
               </div>
               <div className="rounded-xl border border-white/8 bg-black/20 px-2.5 py-2">
                 <div className="text-[7px] font-mono uppercase tracking-[0.18em] text-cyan-300">Remaining</div>
@@ -92,6 +153,8 @@ export default function RouteCockpitDesktop({
               <span>{formatRouteDuration(routeSnapshot.durationSeconds)}</span>
               <span>•</span>
               <span>{navigationActive ? 'FOLLOW LIVE' : 'READY TO FOLLOW'}</span>
+              <span>•</span>
+              <span className={gpsStatus === 'degraded' || gpsStatus === 'denied' || gpsStatus === 'unavailable' ? 'text-amber-300' : 'text-cyan-200'}>{gpsQualityLabel}</span>
               {routeRiskSummary && (
                 <>
                   <span>•</span>
