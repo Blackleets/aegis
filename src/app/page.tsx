@@ -566,6 +566,7 @@ export default function Dashboard() {
   const lastNavigationLocationRef = useRef<Coordinate | null>(null);
   const lastNavigationBearingRef = useRef<number | null>(null);
   const lastAcceptedGpsAtRef = useRef(0);
+  const navigationActiveRef = useRef(navigationActive);
   const offRouteSinceRef = useRef<number | null>(null);
   const offRouteFixCountRef = useRef(0);
   const lastRerouteAtRef = useRef(0);
@@ -574,6 +575,10 @@ export default function Dashboard() {
   const lastNearSpokenStepRef = useRef<number | null>(null);
   const spokenEarthquakePhasesRef = useRef<Set<string>>(new Set());
   const alertedEarthquakeIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    navigationActiveRef.current = navigationActive;
+  }, [navigationActive]);
   const alertedContextIdsRef = useRef<Set<string>>(new Set());
   const notifiedRouteAlertIdsRef = useRef<Set<string>>(new Set());
   const hapticRouteAlertIdsRef = useRef<Set<string>>(new Set());
@@ -988,10 +993,7 @@ export default function Dashboard() {
 
   // ── PROGRESSIVE DATA LOADING (request-optimized) ──
   useEffect(() => {
-    const loadCoreFeeds = async () => {
-      await fetchEndpoint('/api/earthquakes', undefined, { cache: 'no-store' });
-      await fetchEndpoint('/api/news');
-    };
+    if (showSplash) return;
 
     const loadNasaEvents = async () => {
       try {
@@ -1002,9 +1004,11 @@ export default function Dashboard() {
       }
     };
 
-    // Priority 1: Core feeds (always needed for panels)
-    void loadCoreFeeds();
-    const marketTimer = setTimeout(() => fetchEndpoint('/api/markets', d => ({ markets: d })), 800);
+    // Let MapLibre claim the main thread first. Secondary feeds arrive in small,
+    // staggered batches after the intro instead of competing with first paint.
+    void fetchEndpoint('/api/earthquakes', undefined, { cache: 'no-store' });
+    const newsTimer = setTimeout(() => fetchEndpoint('/api/news'), 900);
+    const marketTimer = setTimeout(() => fetchEndpoint('/api/markets', d => ({ markets: d })), 1800);
 
     // Priority 2: Space Weather (needed for MarketsPanel)
     const spaceTimer = setTimeout(async () => {
@@ -1012,45 +1016,58 @@ export default function Dashboard() {
         const r = await fetch('/api/space-weather');
         if (r.ok) setSpaceWeather(await r.json());
       } catch (e) { console.warn('[AEGIS] Suppressed error:', e instanceof Error ? e.message : e); }
-    }, 5000);
+    }, 5200);
 
     // Priority 3: NASA event mesh
     const nasaTimer = setTimeout(() => {
       void loadNasaEvents();
-    }, 2500);
+    }, 3400);
 
     // Polling — OPTIMIZED intervals to minimize edge requests
     const intervals = [
-      setInterval(() => fetchEndpoint('/api/earthquakes', undefined, { cache: 'no-store' }), 20000),
-      setInterval(() => fetchEndpoint('/api/news'), 1800000),        // 30 min (was 10)
-      setInterval(() => fetchEndpoint('/api/markets', d => ({ markets: d })), 900000), // 15 min (was 5)
       setInterval(() => {
-        void loadNasaEvents();
+        if (!navigationActiveRef.current) void fetchEndpoint('/api/earthquakes', undefined, { cache: 'no-store' });
+      }, 20000),
+      setInterval(() => {
+        if (!navigationActiveRef.current) void fetchEndpoint('/api/news');
+      }, 1800000),        // 30 min (was 10)
+      setInterval(() => {
+        if (!navigationActiveRef.current) void fetchEndpoint('/api/markets', d => ({ markets: d }));
+      }, 900000), // 15 min (was 5)
+      setInterval(() => {
+        if (!navigationActiveRef.current) void loadNasaEvents();
       }, 1800000),
     ];
     return () => {
+      clearTimeout(newsTimer);
       clearTimeout(marketTimer);
       clearTimeout(spaceTimer);
       clearTimeout(nasaTimer);
       intervals.forEach(clearInterval);
     };
-  }, [fetchEndpoint]);
+  }, [fetchEndpoint, showSplash]);
 
   // ── LAYER-AWARE DATA LOADING — only fetch when layer is toggled ON ──
   const layerFetchedRef = useRef<Set<string>>(new Set());
   useEffect(() => {
+    if (showSplash) return;
+    const scheduledLoads: number[] = [];
     const loadLayerOnce = (
       key: string,
       url: string,
       transform?: (payload: Record<string, unknown>) => Partial<DashboardData>,
+      delay = 0,
     ) => {
       if (layerFetchedRef.current.has(key)) return;
-      void fetchEndpoint(
-        url,
-        transform ? (payload) => transform(payload as Record<string, unknown>) : undefined,
-      ).then((loaded) => {
-        if (loaded) layerFetchedRef.current.add(key);
-      });
+      scheduledLoads.push(window.setTimeout(() => {
+        if (layerFetchedRef.current.has(key)) return;
+        void fetchEndpoint(
+          url,
+          transform ? (payload) => transform(payload as Record<string, unknown>) : undefined,
+        ).then((loaded) => {
+          if (loaded) layerFetchedRef.current.add(key);
+        });
+      }, delay));
     };
 
     // Flights
@@ -1067,11 +1084,11 @@ export default function Dashboard() {
     }
     // CCTV
     if (activeLayers.cctv) {
-      loadLayerOnce('cctv', '/api/cctv?region=all&v=2');
+      loadLayerOnce('cctv', '/api/cctv?region=all&v=2', undefined, 450);
     }
     // Maritime
     if (activeLayers.maritime) {
-      loadLayerOnce('maritime', '/api/maritime', d => ({ maritime_ports: d.ports as DashboardEntity[], maritime_chokepoints: d.chokepoints as DashboardEntity[], maritime_ships: d.ships as DashboardEntity[] }));
+      loadLayerOnce('maritime', '/api/maritime', d => ({ maritime_ports: d.ports as DashboardEntity[], maritime_chokepoints: d.chokepoints as DashboardEntity[], maritime_ships: d.ships as DashboardEntity[] }), 900);
     }
     // Balloons
     if (activeLayers.balloons) {
@@ -1083,7 +1100,7 @@ export default function Dashboard() {
     }
     // Live News
     if (activeLayers.live_news) {
-      loadLayerOnce('live_news', '/api/live-news', d => ({ live_feeds: d.feeds as DashboardEntity[] }));
+      loadLayerOnce('live_news', '/api/live-news', d => ({ live_feeds: d.feeds as DashboardEntity[] }), 1350);
     }
     // Weather
     if (activeLayers.weather) {
@@ -1095,13 +1112,15 @@ export default function Dashboard() {
     }
     // Global Incidents (GDELT)
     if (activeLayers.global_incidents) {
-      loadLayerOnce('gdelt', '/api/gdelt', d => ({ gdelt: d.events as DashboardData['gdelt'] }));
+      loadLayerOnce('gdelt', '/api/gdelt', d => ({ gdelt: d.events as DashboardData['gdelt'] }), 1800);
     }
 
-  }, [activeLayers, fetchEndpoint]);
+    return () => scheduledLoads.forEach(window.clearTimeout);
+  }, [activeLayers, fetchEndpoint, showSplash]);
 
   // ── LAYER-AWARE POLLING — only poll data for active layers ──
   useEffect(() => {
+    if (navigationActive) return;
     const intervals: ReturnType<typeof setInterval>[] = [];
     if (activeLayers.flights || activeLayers.military || activeLayers.jets || activeLayers.private) {
       intervals.push(setInterval(() => fetchEndpoint('/api/flights'), 45000)); // ADS-B positions: 45s freshness window
@@ -1135,7 +1154,7 @@ export default function Dashboard() {
       intervals.push(setInterval(() => fetchEndpoint('/api/satellites'), 120000)); // 2m
     }
     return () => intervals.forEach(clearInterval);
-  }, [activeLayers, fetchEndpoint]);
+  }, [activeLayers, fetchEndpoint, navigationActive]);
 
   // Reactive layer fetch: handled by layerFetchedRef above (no duplicate)
 
