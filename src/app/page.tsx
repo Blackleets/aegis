@@ -35,6 +35,7 @@ import TopHudOverlays from '@/components/dashboard/TopHudOverlays';
 import WeatherCapsule from '@/components/dashboard/WeatherCapsule';
 import { useLocalWeather } from '@/hooks/useLocalWeather';
 import { useRealtimePresence } from '@/hooks/useRealtimePresence';
+import { useNavigationWakeLock } from '@/hooks/useNavigationWakeLock';
 import { DEFAULT_LOCALE, getDashboardCopy, isLocale, type Locale } from '@/lib/i18n';
 import { type ActiveLayers, type BoundingBox, type Coordinate, type FlyToLocation, type MapView, type RouteOption, type RouteRiskSummary, type RouteSnapshot, type RouteStep, computeBearing, countSignalsNearRoute, distanceMetersBetween, distanceToRoutePath, formatEtaLabel, formatProgressLabel, getClosestStepIndex, getYouTubeWatchUrl, localizeRouteInstruction } from '@/lib/routing-shell';
 import { getArrivalThresholdMeters, getNextSimulationIndex, resolveNavigationBearing, shouldAcceptNavigationFix, shouldRerouteNavigation, snapNavigationToRoute, stabilizeNavigationCoordinate } from '@/lib/vector-navigation';
@@ -512,6 +513,7 @@ export default function Dashboard() {
   const [navigationBearing, setNavigationBearing] = useState<number | null>(null);
   const [currentRouteStepIndex, setCurrentRouteStepIndex] = useState(0);
   const [gpsAccuracyMeters, setGpsAccuracyMeters] = useState<number | null>(null);
+  const [navigationGpsStatus, setNavigationGpsStatus] = useState<'idle' | 'acquiring' | 'live' | 'degraded' | 'denied' | 'unavailable'>('idle');
   const [navigationSpeedKmh, setNavigationSpeedKmh] = useState<number | null>(null);
   const [navigationRerouting, setNavigationRerouting] = useState(false);
   const [navigationSimulationActive, setNavigationSimulationActive] = useState(false);
@@ -556,6 +558,7 @@ export default function Dashboard() {
   const isMobile = useIsMobile();
   const { onlineCount, status: presenceStatus } = useRealtimePresence();
   const { weather: localWeather, status: localWeatherStatus } = useLocalWeather(userLocation);
+  useNavigationWakeLock(navigationActive);
   const geocodeCache = useRef<Map<string, string>>(new Map());
   const geocodeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const geocodeAbortRef = useRef<AbortController | null>(null);
@@ -837,6 +840,7 @@ export default function Dashboard() {
       setUserLocation(origin);
       setGpsAccuracyMeters(origin.accuracy ?? null);
       setNavigationActive(startImmediately);
+      setNavigationGpsStatus(startImmediately ? 'acquiring' : 'idle');
       setNavigationSimulationActive(false);
       setNavigationArrived(false);
       const initialBearing = route.steps?.[0]?.maneuver.bearingAfter ?? null;
@@ -1383,6 +1387,7 @@ export default function Dashboard() {
           elapsedMs,
         })) {
           setGpsAccuracyMeters(accuracy);
+          setNavigationGpsStatus(accuracy !== null && accuracy > 40 ? 'degraded' : 'acquiring');
           return;
         }
         lastAcceptedGpsAtRef.current = now;
@@ -1393,6 +1398,7 @@ export default function Dashboard() {
 
         setUserLocation(nextLocation);
         setGpsAccuracyMeters(accuracy);
+        setNavigationGpsStatus(accuracy !== null && accuracy > 40 ? 'degraded' : 'live');
         setNavigationSpeedKmh(speedKmh);
 
         const computedBearing = resolveNavigationBearing({
@@ -1455,6 +1461,7 @@ export default function Dashboard() {
         lastNavigationLocationRef.current = nextLocation;
       },
       (error) => {
+        setNavigationGpsStatus(error.code === error.PERMISSION_DENIED ? 'denied' : 'unavailable');
         console.warn('[AEGIS] Navigation watch failed:', error.message);
       },
       {
@@ -1534,6 +1541,7 @@ export default function Dashboard() {
     setNavigationBearing(null);
     setCurrentRouteStepIndex(0);
     setGpsAccuracyMeters(null);
+    setNavigationGpsStatus('idle');
     setNavigationSpeedKmh(null);
     setNavigationRerouting(false);
     setNavigationSimulationActive(false);
@@ -1582,7 +1590,12 @@ export default function Dashboard() {
   const toggleNavigationFollow = useCallback(() => {
     if (!routeSnapshot) return;
     setNavigationActive((value) => {
-      if (!value) setNavigationCameraFollowing(true);
+      if (!value) {
+        setNavigationCameraFollowing(true);
+        setNavigationGpsStatus('acquiring');
+      } else {
+        setNavigationGpsStatus('idle');
+      }
       return !value;
     });
   }, [routeSnapshot]);
@@ -2522,6 +2535,7 @@ export default function Dashboard() {
               nextRouteStep={nextRouteStep}
               currentStepDistanceMeters={currentStepDistanceMeters}
               gpsAccuracyMeters={gpsAccuracyMeters}
+              gpsSignalStatus={navigationGpsStatus}
               navigationSpeedKmh={navigationSpeedKmh}
               navigationRerouting={navigationRerouting}
               navigationSimulationActive={navigationSimulationActive}
