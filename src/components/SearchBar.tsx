@@ -1,7 +1,7 @@
 'use client';
 
 import { memo, useState, useRef, useEffect, useCallback } from 'react';
-import { Search, X, MapPin, Navigation, LocateFixed, Car, Footprints, Bike, Plus, Flag, GitCommitHorizontal } from 'lucide-react';
+import { Search, X, MapPin, Navigation, LocateFixed, Car, Footprints, Bike, Plus, Flag, GitCommitHorizontal, Mic, MicOff } from 'lucide-react';
 
 /* ═══════════════════════════════════════════════════════════════
    AEGIS — Search / Locate Bar
@@ -34,6 +34,34 @@ interface SearchBarProps {
 
 
 type GeoState = 'idle' | 'locating' | 'ready' | 'denied' | 'error';
+type VoiceState = 'idle' | 'listening' | 'unsupported' | 'denied' | 'error';
+
+type SpeechRecognitionResultEvent = Event & {
+  results: {
+    [index: number]: {
+      [index: number]: { transcript: string };
+    };
+  };
+};
+
+type BrowserSpeechRecognition = {
+  lang: string;
+  interimResults: boolean;
+  continuous: boolean;
+  maxAlternatives: number;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+  onresult: ((event: SpeechRecognitionResultEvent) => void) | null;
+  onerror: ((event: Event & { error?: string }) => void) | null;
+  onend: (() => void) | null;
+};
+
+type SpeechRecognitionConstructor = new () => BrowserSpeechRecognition;
+type VoiceWindow = Window & {
+  SpeechRecognition?: SpeechRecognitionConstructor;
+  webkitSpeechRecognition?: SpeechRecognitionConstructor;
+};
 
 type NavigatorWithPermissions = Navigator & {
   permissions?: {
@@ -81,7 +109,9 @@ function SearchBar({ onLocate, onRoute, defaultOpen = false, variant = 'default'
   const [routeMode, setRouteMode] = useState<'driving' | 'walking' | 'cycling'>('driving');
   const [draftWaypoints, setDraftWaypoints] = useState<SearchResult[]>([]);
   const [lastResolvedQuery, setLastResolvedQuery] = useState('');
+  const [voiceState, setVoiceState] = useState<VoiceState>('idle');
   const inputRef = useRef<HTMLInputElement>(null);
+  const voiceRecognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchAbortRef = useRef<AbortController | null>(null);
   const searchSeqRef = useRef(0);
@@ -117,6 +147,7 @@ function SearchBar({ onLocate, onRoute, defaultOpen = false, variant = 'default'
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
       searchAbortRef.current?.abort();
+      voiceRecognitionRef.current?.abort();
     };
   }, []);
 
@@ -233,7 +264,54 @@ function SearchBar({ onLocate, onRoute, defaultOpen = false, variant = 'default'
     }, 350);
   }, []);
 
+  const toggleVoiceSearch = useCallback(() => {
+    if (voiceState === 'listening') {
+      voiceRecognitionRef.current?.stop();
+      setVoiceState('idle');
+      return;
+    }
+
+    const voiceWindow = window as VoiceWindow;
+    const Recognition = voiceWindow.SpeechRecognition || voiceWindow.webkitSpeechRecognition;
+    if (!Recognition) {
+      setVoiceState('unsupported');
+      return;
+    }
+
+    voiceRecognitionRef.current?.abort();
+    const recognition = new Recognition();
+    voiceRecognitionRef.current = recognition;
+    recognition.lang = navigator.language || 'es-ES';
+    recognition.interimResults = false;
+    recognition.continuous = false;
+    recognition.maxAlternatives = 1;
+    recognition.onresult = (event) => {
+      const transcript = event.results?.[0]?.[0]?.transcript?.trim();
+      if (transcript) {
+        void handleSearch(transcript);
+        setVoiceState('idle');
+      }
+    };
+    recognition.onerror = (event) => {
+      setVoiceState(event.error === 'not-allowed' || event.error === 'service-not-allowed' ? 'denied' : 'error');
+    };
+    recognition.onend = () => {
+      setVoiceState((current) => current === 'listening' ? 'idle' : current);
+      if (voiceRecognitionRef.current === recognition) voiceRecognitionRef.current = null;
+    };
+
+    setVoiceState('listening');
+    try {
+      recognition.start();
+    } catch {
+      setVoiceState('error');
+    }
+  }, [handleSearch, voiceState]);
+
   const resetAndClose = () => {
+    voiceRecognitionRef.current?.abort();
+    voiceRecognitionRef.current = null;
+    setVoiceState('idle');
     setOpen(false);
     setValue('');
     setResults([]);
@@ -338,10 +416,43 @@ function SearchBar({ onLocate, onRoute, defaultOpen = false, variant = 'default'
           className={`flex-1 bg-transparent outline-none placeholder:text-[var(--text-muted)] ${isMobileNav ? 'text-[13px] text-white font-medium tracking-[0.02em]' : 'text-[10px] text-[var(--text-primary)] font-mono tracking-wider'}`}
         />
         {loading && <div className="w-3 h-3 border border-[var(--gold-primary)] border-t-transparent rounded-full animate-spin" />}
+        <button
+          type="button"
+          onClick={toggleVoiceSearch}
+          className={`grid h-8 w-8 shrink-0 place-items-center rounded-full border transition-all ${
+            voiceState === 'listening'
+              ? 'border-rose-300/45 bg-rose-400/15 text-rose-100 shadow-[0_0_18px_rgba(251,113,133,0.22)]'
+              : 'border-cyan-300/20 bg-cyan-300/[0.07] text-cyan-100 hover:border-cyan-300/40'
+          }`}
+          aria-label={voiceState === 'listening' ? 'Detener búsqueda por voz' : 'Buscar destino por voz'}
+          aria-pressed={voiceState === 'listening'}
+          title={voiceState === 'listening' ? 'Escuchando… toca para detener' : 'Buscar por voz'}
+        >
+          {voiceState === 'listening' ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
+        </button>
         <button onClick={resetAndClose} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]">
           <X className="w-3 h-3" />
         </button>
       </div>
+
+      {voiceState !== 'idle' && (
+        <div
+          className={`rounded-2xl border px-3 py-2 text-[8px] font-mono uppercase tracking-[0.14em] ${
+            voiceState === 'listening'
+              ? 'border-cyan-300/24 bg-cyan-300/[0.08] text-cyan-100'
+              : 'border-amber-300/22 bg-amber-300/[0.08] text-amber-100'
+          }`}
+          role="status"
+        >
+          {voiceState === 'listening'
+            ? 'Escuchando destino…'
+            : voiceState === 'unsupported'
+              ? 'La búsqueda por voz no está disponible en este navegador'
+              : voiceState === 'denied'
+                ? 'Permite el micrófono para buscar por voz'
+                : 'No pudimos escuchar el destino. Toca el micrófono para reintentar'}
+        </div>
+      )}
 
 
 
