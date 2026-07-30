@@ -30,6 +30,7 @@ interface SearchBarProps {
   onRoute?: (request: RouteRequest) => void | Promise<void>;
   defaultOpen?: boolean;
   variant?: 'default' | 'mobile-nav';
+  autoStartVoiceToken?: number;
 }
 
 
@@ -97,7 +98,7 @@ const ROUTE_MODE_META = {
   },
 } as const;
 
-function SearchBar({ onLocate, onRoute, defaultOpen = false, variant = 'default' }: SearchBarProps) {
+function SearchBar({ onLocate, onRoute, defaultOpen = false, variant = 'default', autoStartVoiceToken = 0 }: SearchBarProps) {
   const [open, setOpen] = useState(defaultOpen);
   const [value, setValue] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -112,6 +113,7 @@ function SearchBar({ onLocate, onRoute, defaultOpen = false, variant = 'default'
   const [voiceState, setVoiceState] = useState<VoiceState>('idle');
   const inputRef = useRef<HTMLInputElement>(null);
   const voiceRecognitionRef = useRef<BrowserSpeechRecognition | null>(null);
+  const handledAutoVoiceTokenRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchAbortRef = useRef<AbortController | null>(null);
   const searchSeqRef = useRef(0);
@@ -307,6 +309,13 @@ function SearchBar({ onLocate, onRoute, defaultOpen = false, variant = 'default'
       setVoiceState('error');
     }
   }, [handleSearch, voiceState]);
+
+  useEffect(() => {
+    if (autoStartVoiceToken <= 0 || handledAutoVoiceTokenRef.current === autoStartVoiceToken) return;
+    handledAutoVoiceTokenRef.current = autoStartVoiceToken;
+    const timer = window.setTimeout(() => toggleVoiceSearch(), 180);
+    return () => window.clearTimeout(timer);
+  }, [autoStartVoiceToken, toggleVoiceSearch]);
 
   const resetAndClose = () => {
     voiceRecognitionRef.current?.abort();
