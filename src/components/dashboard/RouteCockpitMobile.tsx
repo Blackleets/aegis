@@ -87,6 +87,7 @@ type RouteCockpitMobileProps = {
   nextRouteStep: RouteStep | null;
   currentStepDistanceMeters: number | null;
   gpsAccuracyMeters: number | null;
+  gpsSignalStatus: 'idle' | 'acquiring' | 'live' | 'degraded' | 'denied' | 'unavailable';
   navigationSpeedKmh: number | null;
   navigationRerouting: boolean;
   navigationSimulationActive: boolean;
@@ -161,6 +162,7 @@ export default function RouteCockpitMobile({
   nextRouteStep,
   currentStepDistanceMeters,
   gpsAccuracyMeters,
+  gpsSignalStatus,
   navigationSpeedKmh,
   navigationRerouting,
   navigationSimulationActive,
@@ -195,13 +197,19 @@ export default function RouteCockpitMobile({
   const stepDistance = currentStepDistanceMeters !== null ? formatStepDistance(currentStepDistanceMeters) : null;
   const statusLabel = routeLoading ? 'Calculando ruta…' : navigationArrived ? 'Has llegado' : navigationRerouting ? 'Recalculando…' : navigationSimulationActive ? 'Simulación GPS' : navigationActive ? 'Copiloto activo' : 'Ruta lista';
   const nextInstruction = nextRouteStep ? localizeRouteInstruction(nextRouteStep.instruction) : null;
-  const gpsQualityLabel = gpsAccuracyMeters === null
-    ? 'GPS'
-    : gpsAccuracyMeters <= 15
-      ? 'GPS preciso'
-      : gpsAccuracyMeters <= 40
-        ? `GPS ±${Math.round(gpsAccuracyMeters)} m`
-        : 'GPS débil';
+  const gpsQualityLabel = gpsSignalStatus === 'acquiring'
+    ? 'Buscando GPS…'
+    : gpsSignalStatus === 'denied'
+      ? 'GPS sin permiso'
+      : gpsSignalStatus === 'unavailable'
+        ? 'GPS sin señal'
+        : gpsSignalStatus === 'degraded'
+          ? 'GPS débil'
+          : gpsAccuracyMeters === null
+            ? 'GPS'
+            : gpsAccuracyMeters <= 15
+              ? 'GPS preciso'
+              : `GPS ±${Math.round(gpsAccuracyMeters)} m`;
   const routeOptions = routeSnapshot?.alternatives ?? [];
   const activeRouteIndex = routeSnapshot ? Math.max(0, routeOptions.findIndex((option) => option.id === routeSnapshot.activeRouteId)) : 0;
   const activeRouteOption = routeOptions[activeRouteIndex] ?? null;
