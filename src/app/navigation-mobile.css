@@ -1,28 +1,24 @@
-/* Mobile navigation HUD cleanup — isolated from the global design system. */
+/* Mobile navigation HUD — focused driving hierarchy, isolated from the global system. */
 
 @media (max-width: 640px) {
   [aria-label^="Velocidad "] {
     position: fixed !important;
-    left: 0.65rem;
+    left: max(0.65rem, env(safe-area-inset-left));
     right: auto !important;
-    top: clamp(11rem, 53dvh, calc(100dvh - 11.5rem));
+    top: clamp(12.5rem, 48dvh, calc(100dvh - 13rem));
     bottom: auto !important;
     transform: translateY(-50%);
     z-index: 372;
-    width: 4.35rem !important;
-    height: 5.5rem !important;
-    padding: 0.7rem 0.35rem 0.55rem !important;
-    border-radius: 1.45rem !important;
-    border: 1px solid rgba(118, 228, 234, 0.34) !important;
-    background:
-      radial-gradient(circle at 50% 30%, rgba(118, 228, 234, 0.16), transparent 48%),
-      linear-gradient(180deg, rgba(7, 22, 34, 0.97), rgba(4, 12, 21, 0.95)) !important;
-    box-shadow:
-      0 14px 34px rgba(0, 0, 0, 0.46),
-      0 0 0 3px rgba(5, 14, 24, 0.42),
-      0 0 22px rgba(118, 228, 234, 0.12) !important;
-    backdrop-filter: blur(18px) saturate(1.2);
-    -webkit-backdrop-filter: blur(18px) saturate(1.2);
+    width: 4rem !important;
+    min-width: 4rem !important;
+    height: 5.1rem !important;
+    padding: 0.72rem 0.3rem 0.52rem !important;
+    border-radius: 1.25rem !important;
+    border: 1px solid rgba(118, 228, 234, 0.3) !important;
+    background: rgba(5, 17, 28, 0.94) !important;
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.38) !important;
+    backdrop-filter: blur(16px) saturate(1.05);
+    -webkit-backdrop-filter: blur(16px) saturate(1.05);
     pointer-events: none;
     isolation: isolate;
   }
@@ -30,77 +26,103 @@
   [aria-label^="Velocidad "]::before {
     content: "VELOCIDAD";
     position: absolute;
-    top: 0.48rem;
+    top: 0.46rem;
     left: 50%;
     transform: translateX(-50%);
     font-family: var(--font-hud);
-    font-size: 0.34rem;
+    font-size: 0.32rem;
     font-weight: 700;
-    letter-spacing: 0.12em;
-    color: rgba(165, 243, 252, 0.74);
+    letter-spacing: 0.1em;
+    color: rgba(165, 243, 252, 0.78);
     white-space: nowrap;
   }
 
   [aria-label^="Velocidad "] > span:first-child {
-    margin-top: 0.55rem;
-    font-size: 1.7rem !important;
+    margin-top: 0.52rem;
+    font-size: 1.75rem !important;
+    font-variant-numeric: tabular-nums;
     line-height: 1 !important;
   }
 
   [aria-label^="Velocidad "] > span:nth-child(2) {
-    margin-top: 0.16rem !important;
+    margin-top: 0.12rem !important;
     font-size: 0.42rem !important;
+    letter-spacing: 0.04em;
   }
 
   [aria-label^="Velocidad "] > span:last-child {
-    margin-top: 0.36rem !important;
-    max-width: 3.6rem !important;
-    font-size: 0.4rem !important;
+    margin-top: 0.4rem !important;
+    max-width: 3.35rem !important;
+    font-size: 0.38rem !important;
+    line-height: 1.25 !important;
+    color: rgba(183, 199, 212, 0.82) !important;
   }
 
   [aria-label="Reportar incidencia"] {
     margin-left: auto;
   }
 
+  [aria-label="Reportar incidencia"],
+  [aria-label="Centrar en mi ubicación"],
+  [aria-label="Pausar navegación"],
+  [aria-label="Reanudar navegación"],
+  [aria-label="Finalizar navegación"] {
+    min-width: 44px !important;
+    min-height: 44px !important;
+  }
+
+  section[aria-live="polite"] > div:first-child {
+    border-color: rgba(143, 166, 184, 0.16) !important;
+    background: rgba(5, 17, 28, 0.94) !important;
+    box-shadow: 0 12px 34px rgba(0, 0, 0, 0.42) !important;
+  }
+
   section[aria-live="polite"] > div:first-child > div:first-child > div:first-child {
-    width: 4.35rem !important;
-    height: 4.35rem !important;
-    border-radius: 1.35rem !important;
+    width: 4.2rem !important;
+    height: 4.2rem !important;
+    border-radius: 1.2rem !important;
     color: rgb(207 250 254) !important;
-    background:
-      linear-gradient(145deg, rgba(17, 47, 65, 0.98), rgba(5, 20, 32, 0.98)) !important;
-    border: 1px solid rgba(103, 232, 249, 0.34);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.08),
-      0 10px 26px rgba(0, 0, 0, 0.38),
-      0 0 20px rgba(34, 211, 238, 0.12) !important;
+    background: rgba(10, 35, 50, 0.96) !important;
+    border: 1px solid rgba(103, 232, 249, 0.3);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
   }
 
   section[aria-live="polite"] > div:first-child > div:first-child > div:first-child svg {
-    width: 2.55rem !important;
-    height: 2.55rem !important;
-    stroke-width: 2.25 !important;
-    filter: drop-shadow(0 3px 7px rgba(0, 0, 0, 0.38));
+    width: 2.45rem !important;
+    height: 2.45rem !important;
+    stroke-width: 2.35 !important;
+    filter: none !important;
   }
 
   section[aria-live="polite"] > div:first-child > div:first-child > div:first-child > span {
-    bottom: -0.45rem !important;
-    border-color: rgba(7, 17, 29, 0.95) !important;
+    bottom: -0.42rem !important;
+    border-color: rgba(7, 17, 29, 0.96) !important;
     background: rgb(207 250 254) !important;
     color: rgb(8 25 38) !important;
-    box-shadow: 0 5px 14px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.26);
+    font-variant-numeric: tabular-nums;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    [aria-label^="Velocidad "],
+    section[aria-live="polite"] * {
+      animation: none !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 }
 
 @media (max-width: 380px) {
   [aria-label^="Velocidad "] {
-    left: 0.45rem;
-    width: 3.95rem !important;
-    height: 5.15rem !important;
+    left: max(0.4rem, env(safe-area-inset-left));
+    top: clamp(12rem, 46dvh, calc(100dvh - 12.5rem));
+    width: 3.7rem !important;
+    min-width: 3.7rem !important;
+    height: 4.85rem !important;
   }
 
   section[aria-live="polite"] > div:first-child > div:first-child > div:first-child {
-    width: 3.95rem !important;
-    height: 3.95rem !important;
+    width: 3.85rem !important;
+    height: 3.85rem !important;
   }
 }
