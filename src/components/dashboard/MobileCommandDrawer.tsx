@@ -213,16 +213,17 @@ export default function MobileCommandDrawer({
         </>
       )}
 
-      <AnimatePresence>
-        {mobilePanel && (
-          <motion.div
+      <div aria-hidden={!mobilePanel}>
+        <AnimatePresence>
+          {mobilePanel && (
+            <motion.div
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={{ type: 'spring', damping: 32, stiffness: 320 }}
             className="fixed inset-x-0 bottom-0 z-[400] overflow-y-auto rounded-t-[30px] border-t border-cyan-200/15 bg-[linear-gradient(180deg,rgba(6,17,27,0.98),rgba(3,10,17,0.99))] shadow-[0_-22px_64px_rgba(0,0,0,0.52)] backdrop-blur-2xl styled-scrollbar"
             style={{ maxHeight: isSearchPanel ? 'min(58vh, calc(100dvh - 170px))' : 'min(68vh, calc(100dvh - 110px))', paddingBottom: 'max(14px, env(safe-area-inset-bottom))' }}
-          >
+            >
             <div className="mx-auto mt-2.5 h-1 w-10 rounded-full bg-white/26" />
             <div className={`px-3 pb-3 ${isSearchPanel ? 'pt-2' : ''}`}>
               {isSearchPanel ? (
@@ -260,9 +261,10 @@ export default function MobileCommandDrawer({
               {mobilePanel === 'recon' && reconContent}
               {!isSearchPanel && activeTab && <span className="sr-only">{activeTab.label}</span>}
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </>
   );
 }

@@ -584,7 +584,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!placesGridKey) {
-      setNearbyPlaces([]);
+      queueMicrotask(() => setNearbyPlaces([]));
       return;
     }
     const [lat, lng] = placesGridKey.split(',').map(Number);
@@ -1028,7 +1028,7 @@ export default function Dashboard() {
 
     // Let MapLibre claim the main thread first. Secondary feeds arrive in small,
     // staggered batches after the intro instead of competing with first paint.
-    void fetchEndpoint('/api/earthquakes', undefined, { cache: 'no-store' });
+    queueMicrotask(() => void fetchEndpoint('/api/earthquakes', undefined, { cache: 'no-store' }));
     const newsTimer = setTimeout(() => fetchEndpoint('/api/news'), 900);
     const marketTimer = setTimeout(() => fetchEndpoint('/api/markets', d => ({ markets: d })), 1800);
 
@@ -1672,8 +1672,10 @@ export default function Dashboard() {
     let cancelled = false;
     const refreshCommunityIncidents = async () => {
       try {
-        const incidents = await createBrowserCommunityIncidentService(window.localStorage)
-          .active(new Date().toISOString());
+        const service = createBrowserCommunityIncidentService(window.localStorage);
+        const now = new Date().toISOString();
+        await service.cleanup(now);
+        const incidents = await service.active(now);
         if (!cancelled) setCommunityIncidents(incidents.filter(({ status }) => status === 'active'));
       } catch {
         if (!cancelled) setCommunityIncidents([]);

@@ -188,6 +188,7 @@ export default function RouteCockpitMobile({
 }: RouteCockpitMobileProps) {
   const [reportComposerOpen, setReportComposerOpen] = useState(false);
   const [reportFeedback, setReportFeedback] = useState<string | null>(null);
+  const [communityVoteBusy, setCommunityVoteBusy] = useState(false);
   const destinationLabel = routeSnapshot?.destination.label ?? 'Preparando ruta';
   const distanceLabel = routeSnapshot ? formatRouteDistance(remainingRouteDistance || routeSnapshot.distanceMeters) : '--';
   const durationLabel = routeSnapshot ? formatRouteDuration(routeSnapshot.durationSeconds) : 'Calculando…';
@@ -296,6 +297,21 @@ export default function RouteCockpitMobile({
     window.setTimeout(() => setReportComposerOpen(false), 900);
   };
 
+  const voteOnLocalIncident = async (vote: 'confirm' | 'reject') => {
+    if (!proximityAlert?.id.startsWith('community-') || typeof window === 'undefined') return;
+    setCommunityVoteBusy(true);
+    try {
+      const reporterId = getOrCreateCommunityReporterId(window.localStorage, () => window.crypto.randomUUID());
+      await createBrowserCommunityIncidentService(window.localStorage).vote(proximityAlert.id, reporterId, vote, new Date().toISOString());
+      window.dispatchEvent(new Event(COMMUNITY_INCIDENTS_CHANGED_EVENT));
+      setReportFeedback(vote === 'confirm' ? 'Confirmación local guardada' : 'Rechazo local guardado');
+    } catch (error) {
+      setReportFeedback(error instanceof Error && error.message.includes('own incident') ? 'No puedes confirmar tu propio reporte' : 'No se pudo actualizar la incidencia');
+    } finally {
+      setCommunityVoteBusy(false);
+    }
+  };
+
   return (
     <>
       <AnimatePresence>
@@ -394,12 +410,11 @@ export default function RouteCockpitMobile({
                   initial={{ opacity: 0, y: -8, scale: 0.98 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -6, scale: 0.98 }}
-                  className={`mx-auto mt-2 flex max-w-[32rem] items-center gap-2.5 rounded-[1.1rem] border px-3 py-2 shadow-[0_12px_32px_rgba(0,0,0,0.34)] backdrop-blur-xl ${proximityAlert.critical ? 'border-orange-300/24 bg-[rgba(45,22,10,0.92)]' : 'border-cyan-300/18 bg-[rgba(5,24,31,0.92)]'}`}
+                  className={`mx-auto mt-2 max-w-[32rem] rounded-[1.1rem] border px-3 py-2 shadow-[0_12px_32px_rgba(0,0,0,0.34)] backdrop-blur-xl ${proximityAlert.critical ? 'border-orange-300/24 bg-[rgba(45,22,10,0.92)]' : 'border-cyan-300/18 bg-[rgba(5,24,31,0.92)]'}`}
                   aria-label="Incidencia próxima en la ruta"
                 >
-                  <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${proximityAlert.critical ? 'bg-orange-300 text-slate-950' : 'bg-cyan-300 text-slate-950'}`}>
-                    <ShieldAlert className="h-[18px] w-[18px]" />
-                  </div>
+                  <div className="flex items-center gap-2.5">
+                    <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${proximityAlert.critical ? 'bg-orange-300 text-slate-950' : 'bg-cyan-300 text-slate-950'}`}><ShieldAlert className="h-[18px] w-[18px]" /></div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
                       <p className={`min-w-0 truncate text-[8px] font-semibold uppercase tracking-[0.13em] ${proximityAlert.critical ? 'text-orange-200' : 'text-cyan-200'}`}>{proximityAlert.eyebrow}</p>
@@ -415,6 +430,34 @@ export default function RouteCockpitMobile({
                   <button type="button" onClick={proximityAlert.dismiss} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white/60" aria-label="Cerrar incidencia próxima">
                     <X className="h-4 w-4" />
                   </button>
+                  </div>
+                  {proximityAlert.id.startsWith('community-') && (
+                    <>
+                      <div className="mt-2 flex gap-2 border-t border-white/10 pt-2">
+                        <button
+                          type="button"
+                          disabled={communityVoteBusy}
+                          onClick={() => void voteOnLocalIncident('confirm')}
+                          className="min-h-11 flex-1 rounded-xl bg-emerald-300/15 text-[9px] font-bold text-emerald-100 disabled:opacity-50"
+                        >
+                          Sigue ahí
+                        </button>
+                        <button
+                          type="button"
+                          disabled={communityVoteBusy}
+                          onClick={() => void voteOnLocalIncident('reject')}
+                          className="min-h-11 flex-1 rounded-xl bg-rose-300/12 text-[9px] font-bold text-rose-100 disabled:opacity-50"
+                        >
+                          Ya no está
+                        </button>
+                      </div>
+                      {reportFeedback && (
+                        <p className="mt-2 text-center text-[9px] font-medium text-amber-100" aria-live="polite">
+                          {reportFeedback}
+                        </p>
+                      )}
+                    </>
+                  )}
                 </motion.aside>
               )}
             </AnimatePresence>
