@@ -1,0 +1,76 @@
+.scope {
+  position: contents;
+}
+
+.scope :global([class*='rounded-2xl']),
+.scope :global([class*='rounded-xl']) {
+  border-radius: 14px !important;
+}
+
+.scope :global([class*='backdrop-blur']) {
+  backdrop-filter: blur(18px) saturate(1.08) !important;
+}
+
+.scope :global([class*='font-mono']) {
+  font-family: var(--font-sans), Inter, ui-sans-serif, system-ui, sans-serif !important;
+  letter-spacing: 0.04em !important;
+}
+
+.scope :global([class*='tracking-[0.2em]']),
+.scope :global([class*='tracking-[0.18em]']),
+.scope :global([class*='tracking-[0.16em]']) {
+  letter-spacing: 0.08em !important;
+}
+
+.scope :global([class*='text-[7px]']) {
+  font-size: 9px !important;
+  line-height: 1.35 !important;
+}
+
+.scope :global([class*='text-[8px]']) {
+  font-size: 10px !important;
+  line-height: 1.4 !important;
+}
+
+.scope :global([class*='text-[9px]']) {
+  font-size: 11px !important;
+}
+
+.scope :global(button) {
+  box-shadow: none !important;
+}
+
+.scope :global(textarea),
+.scope :global(input) {
+  border-radius: 12px !important;
+  background: rgba(12, 17, 24, 0.94) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.scope :global([style*='linear-gradient']) {
+  background-image: none !important;
+}
+
+.scope :global([style*='box-shadow']) {
+  box-shadow: 0 18px 56px rgba(0, 0, 0, 0.42) !important;
+}
+
+.scope :global(h2),
+.scope :global(h3),
+.scope :global(h4) {
+  text-transform: none !important;
+  letter-spacing: 0.02em !important;
+  font-family: var(--font-sans), Inter, ui-sans-serif, system-ui, sans-serif !important;
+}
+
+.scope :global(strong) {
+  color: rgba(255, 255, 255, 0.94) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scope :global(*) {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
