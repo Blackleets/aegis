@@ -1,3 +1,4 @@
+import { safeVibrate } from './browser-capabilities';
 import type { RouteAlertSeverity } from './route-alert-priority';
 
 export type RouteAlertChannel = 'earthquake' | 'context';
@@ -26,16 +27,5 @@ export function vibrateForRouteAlert(
   channel: RouteAlertChannel,
   vibrate?: ((pattern: number | number[]) => boolean) | null,
 ): boolean {
-  const vibration = vibrate
-    ?? (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function'
-      ? navigator.vibrate.bind(navigator)
-      : null);
-
-  if (!vibration) return false;
-
-  try {
-    return vibration(getRouteAlertHapticPattern(severity, channel));
-  } catch {
-    return false;
-  }
+  return safeVibrate(getRouteAlertHapticPattern(severity, channel), vibrate).value === true;
 }
