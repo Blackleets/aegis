@@ -1,0 +1,59 @@
+.scope {
+  position: contents;
+}
+
+.scope :global(.desktop-panel) {
+  gap: 0.55rem !important;
+  scrollbar-width: thin;
+}
+
+.scope :global(.glass-panel) {
+  border-radius: 14px !important;
+  background: rgba(10, 16, 23, 0.9) !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.16) !important;
+  backdrop-filter: blur(16px);
+}
+
+.scope :global(button) {
+  min-height: 30px;
+  border-radius: 9px !important;
+  letter-spacing: 0.05em !important;
+  box-shadow: none !important;
+}
+
+.scope :global(.font-mono) {
+  font-family: var(--font-sans), Inter, ui-sans-serif, system-ui, sans-serif !important;
+  letter-spacing: 0.055em !important;
+}
+
+.scope :global(.rounded-2xl),
+.scope :global(.rounded-xl) {
+  border-radius: 11px !important;
+}
+
+.scope :global(.rounded-full) {
+  border-radius: 9px !important;
+}
+
+.scope :global(.shadow-none) {
+  box-shadow: none !important;
+}
+
+.scope :global(h2),
+.scope :global(h3) {
+  letter-spacing: 0.04em !important;
+}
+
+@media (min-width: 1280px) {
+  .scope :global(.desktop-panel) {
+    max-width: 15.25rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scope :global(*) {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
