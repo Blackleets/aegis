@@ -9,42 +9,14 @@
   letter-spacing: 0.16em !important;
 }
 
-.scope :global([class*='font-mono']) {
-  font-family: var(--font-sans), Inter, ui-sans-serif, system-ui, sans-serif !important;
-  letter-spacing: 0.06em !important;
-}
-
-.scope :global([class*='tracking-']) {
-  letter-spacing: 0.08em !important;
-}
-
-.scope :global([class*='rounded-full']) {
-  border-radius: 10px !important;
-}
-
-.scope :global([class*='shadow-']) {
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.18) !important;
-}
-
-.scope :global([class*='bg-[rgba(15,23,32']) {
-  background: rgba(10, 16, 23, 0.82) !important;
-}
-
-.scope :global([class*='text-[6px]') {
-  font-size: 9px !important;
-  line-height: 1.25 !important;
-}
-
-.scope :global([class*='text-[7px]') {
-  font-size: 9px !important;
-}
-
-.scope :global([class*='text-[8px]') {
-  font-size: 10px !important;
+.scope :global(button),
+.scope :global(span) {
+  font-family: var(--font-sans), Inter, ui-sans-serif, system-ui, sans-serif;
 }
 
 .scope :global(button) {
   min-height: 30px;
+  border-radius: 10px !important;
   box-shadow: none !important;
 }
 
@@ -53,13 +25,14 @@
   opacity: 0.45 !important;
 }
 
-.scope :global([class*='animate-glow-pulse']) {
+.scope :global([class~='animate-glow-pulse']) {
   animation: none !important;
 }
 
 @media (max-width: 767px) {
-  .scope :global([class*='top-']) {
-    --aegis-mobile-hud-offset: 4.75rem;
+  .scope :global(button),
+  .scope :global(span) {
+    line-height: 1.3;
   }
 }
 
