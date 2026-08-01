@@ -21,22 +21,6 @@ function incidentPoints(incident: NormalizedRouteIncident): Coordinate[] {
     .map(([lng, lat]) => ({ lat, lng }));
 }
 
-function closestRouteMatch(point: Coordinate, route: [number, number][]) {
-  let bestIndex = -1;
-  let bestDistance = Number.POSITIVE_INFINITY;
-
-  for (let index = 0; index < route.length; index += route.length > 360 ? 2 : 1) {
-    const [lng, lat] = route[index];
-    const distance = distanceMetersBetween(point, { lat, lng });
-    if (distance < bestDistance) {
-      bestDistance = distance;
-      bestIndex = index;
-    }
-  }
-
-  return { routeIndex: bestIndex, distanceMeters: bestDistance };
-}
-
 function cumulativeRouteDistances(route: [number, number][]) {
   const distances = new Array<number>(route.length).fill(0);
   for (let index = 1; index < route.length; index += 1) {
@@ -48,6 +32,46 @@ function cumulativeRouteDistances(route: [number, number][]) {
     );
   }
   return distances;
+}
+
+function closestRouteMatch(
+  point: Coordinate,
+  route: [number, number][],
+  cumulative: number[],
+) {
+  let bestIndex = -1;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  let bestProgressMeters = 0;
+
+  for (let index = 0; index < route.length - 1; index += 1) {
+    const [startLng, startLat] = route[index];
+    const [endLng, endLat] = route[index + 1];
+    const deltaLng = endLng - startLng;
+    const deltaLat = endLat - startLat;
+    const segmentLengthSquared = deltaLng * deltaLng + deltaLat * deltaLat;
+    const projection = segmentLengthSquared === 0
+      ? 0
+      : ((point.lng - startLng) * deltaLng + (point.lat - startLat) * deltaLat) / segmentLengthSquared;
+    const ratio = Math.max(0, Math.min(1, projection));
+    const projectedPoint = {
+      lng: startLng + deltaLng * ratio,
+      lat: startLat + deltaLat * ratio,
+    };
+    const distance = distanceMetersBetween(point, projectedPoint);
+
+    if (distance < bestDistance) {
+      const segmentLength = cumulative[index + 1] - cumulative[index];
+      bestDistance = distance;
+      bestIndex = ratio >= 0.5 ? index + 1 : index;
+      bestProgressMeters = cumulative[index] + segmentLength * ratio;
+    }
+  }
+
+  return {
+    routeIndex: bestIndex,
+    distanceMeters: bestDistance,
+    progressMeters: bestProgressMeters,
+  };
 }
 
 function severityWeight(severity: NormalizedRouteIncident['severity']) {
@@ -72,21 +96,32 @@ export function rankIncidentsForRoute({
   if (route.length < 2) return [];
 
   const cumulative = cumulativeRouteDistances(route);
-  const currentMatch = closestRouteMatch(currentLocation, route);
-  const currentProgressMeters = currentMatch.routeIndex >= 0 ? cumulative[currentMatch.routeIndex] : 0;
+  const currentMatch = closestRouteMatch(currentLocation, route, cumulative);
+  const currentProgressMeters = currentMatch.routeIndex >= 0 ? currentMatch.progressMeters : 0;
 
   return incidents
     .flatMap((incident) => {
-      let best: { point: Coordinate; routeIndex: number; distanceMeters: number } | null = null;
+      let best: {
+        point: Coordinate;
+        routeIndex: number;
+        distanceMeters: number;
+        progressMeters: number;
+      } | null = null;
+
       for (const point of incidentPoints(incident)) {
-        const match = closestRouteMatch(point, route);
+        const match = closestRouteMatch(point, route, cumulative);
         if (!best || match.distanceMeters < best.distanceMeters) {
-          best = { point, routeIndex: match.routeIndex, distanceMeters: match.distanceMeters };
+          best = {
+            point,
+            routeIndex: match.routeIndex,
+            distanceMeters: match.distanceMeters,
+            progressMeters: match.progressMeters,
+          };
         }
       }
       if (!best || best.routeIndex < 0 || best.distanceMeters > maxDistanceToRouteMeters) return [];
 
-      const distanceAheadMeters = cumulative[best.routeIndex] - currentProgressMeters;
+      const distanceAheadMeters = best.progressMeters - currentProgressMeters;
       if (distanceAheadMeters < -100 || distanceAheadMeters > maxDistanceAheadMeters) return [];
 
       const delayWeight = Math.min(180, Math.round((incident.delaySeconds ?? 0) / 5));

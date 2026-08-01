@@ -1,0 +1,45 @@
+.scope {
+  position: contents;
+}
+
+.scope :global(h1) {
+  font-family: var(--font-sans), Inter, ui-sans-serif, system-ui, sans-serif !important;
+  font-size: clamp(1rem, 1.8vw, 1.25rem) !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.16em !important;
+}
+
+.scope :global(button),
+.scope :global(span) {
+  font-family: var(--font-sans), Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+.scope :global(button) {
+  min-height: 30px;
+  border-radius: 10px !important;
+  box-shadow: none !important;
+}
+
+.scope :global([style*='aegis-rotate']) {
+  animation-duration: 28s !important;
+  opacity: 0.45 !important;
+}
+
+.scope :global([class~='animate-glow-pulse']) {
+  animation: none !important;
+}
+
+@media (max-width: 767px) {
+  .scope :global(button),
+  .scope :global(span) {
+    line-height: 1.3;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scope :global(*) {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
