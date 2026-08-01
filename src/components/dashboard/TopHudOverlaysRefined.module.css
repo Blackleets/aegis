@@ -1,0 +1,76 @@
+.scope {
+  position: contents;
+}
+
+.scope :global(h1) {
+  font-family: var(--font-sans), Inter, ui-sans-serif, system-ui, sans-serif !important;
+  font-size: clamp(1rem, 1.8vw, 1.25rem) !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.16em !important;
+}
+
+.scope :global([class*='font-mono']) {
+  font-family: var(--font-sans), Inter, ui-sans-serif, system-ui, sans-serif !important;
+  letter-spacing: 0.06em !important;
+}
+
+.scope :global([class*='tracking-[0.5em]'),
+.scope :global([class*='tracking-[0.3em]'),
+.scope :global([class*='tracking-[0.28em]'),
+.scope :global([class*='tracking-[0.2em]'),
+.scope :global([class*='tracking-[0.16em]') {
+  letter-spacing: 0.08em !important;
+}
+
+.scope :global([class*='rounded-full']) {
+  border-radius: 10px !important;
+}
+
+.scope :global([class*='shadow-[0_10px_30px']) {
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.18) !important;
+}
+
+.scope :global([class*='bg-[rgba(15,23,32']) {
+  background: rgba(10, 16, 23, 0.82) !important;
+}
+
+.scope :global([class*='text-[6px]') {
+  font-size: 9px !important;
+  line-height: 1.25 !important;
+}
+
+.scope :global([class*='text-[7px]') {
+  font-size: 9px !important;
+}
+
+.scope :global([class*='text-[8px]') {
+  font-size: 10px !important;
+}
+
+.scope :global(button) {
+  min-height: 30px;
+  box-shadow: none !important;
+}
+
+.scope :global([style*='aegis-rotate']) {
+  animation-duration: 28s !important;
+  opacity: 0.45 !important;
+}
+
+.scope :global([class*='animate-glow-pulse']) {
+  animation: none !important;
+}
+
+@media (max-width: 767px) {
+  .scope :global([class*='top-[5.35rem]']) {
+    top: 4.75rem !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scope :global(*) {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
