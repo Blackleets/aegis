@@ -17,7 +17,7 @@ export class BrowserCommunityIncidentRepository implements CommunityIncidentRepo
   ) {}
 
   async list(): Promise<CommunityIncident[]> {
-    return parseStoredIncidents(this.storage.getItem(this.storageKey));
+    return parseStoredIncidents(safeStorageGet(this.storage, this.storageKey));
   }
 
   async mutate<T>(
@@ -32,7 +32,7 @@ export class BrowserCommunityIncidentRepository implements CommunityIncidentRepo
     try {
       const incidents = await this.list();
       const result = await mutation(incidents);
-      this.storage.setItem(this.storageKey, JSON.stringify(incidents));
+      safeStorageSet(this.storage, this.storageKey, JSON.stringify(incidents));
       return result;
     } finally {
       release();
@@ -48,10 +48,18 @@ export function getOrCreateCommunityReporterId(
   storage: Pick<Storage, 'getItem' | 'setItem'>,
   createId: () => string,
 ) {
-  const existing = storage.getItem(COMMUNITY_REPORTER_STORAGE_KEY);
+  const existing = safeStorageGet(storage, COMMUNITY_REPORTER_STORAGE_KEY);
   if (existing?.trim()) return existing;
-  const reporterId = `local-${createId()}`;
-  storage.setItem(COMMUNITY_REPORTER_STORAGE_KEY, reporterId);
+
+  let generatedId: string;
+  try {
+    generatedId = createId();
+  } catch {
+    generatedId = createFallbackReporterId();
+  }
+
+  const reporterId = `local-${generatedId}`;
+  safeStorageSet(storage, COMMUNITY_REPORTER_STORAGE_KEY, reporterId);
   return reporterId;
 }
 
@@ -64,6 +72,29 @@ export function parseStoredIncidents(value: string | null): CommunityIncident[] 
   } catch {
     return [];
   }
+}
+
+function safeStorageGet(storage: Pick<Storage, 'getItem'>, key: string) {
+  try {
+    return storage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function safeStorageSet(storage: Pick<Storage, 'setItem'>, key: string, value: string) {
+  try {
+    storage.setItem(key, value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function createFallbackReporterId() {
+  const timestamp = Date.now().toString(36);
+  const entropy = Math.random().toString(36).slice(2, 10) || 'offline';
+  return `fallback-${timestamp}-${entropy}`;
 }
 
 function isStoredIncident(value: unknown): value is CommunityIncident {
