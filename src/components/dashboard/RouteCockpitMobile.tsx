@@ -310,7 +310,7 @@ export default function RouteCockpitMobile({
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-amber-200">¿Qué ocurre aquí?</p>
-                <p className="mt-1 text-[9px] leading-relaxed text-white/48">Se guarda 30 min en tu dispositivo. Aún no se comparte con otros usuarios.</p>
+                <p className="mt-1 text-[9px] leading-relaxed text-white/48">Se guarda solo en este dispositivo y caduca según el tipo de incidencia. Aún no se comparte con otros usuarios.</p>
               </div>
               <button type="button" onClick={() => setReportComposerOpen(false)} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white/60" aria-label="Cerrar reporte">
                 <X className="h-4 w-4" />
