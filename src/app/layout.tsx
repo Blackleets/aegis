@@ -3,6 +3,7 @@ import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import "./navigation-mobile.css";
 import ErrorBoundary from '@/components/ErrorBoundary';
+import { MOBILE_NOTIFICATION_GUARD_SCRIPT } from '@/lib/notification-compatibility';
 
 const SITE_URL = "https://aegis.blackleets.dev";
 const SITE_NAME = "AEGIS";
@@ -145,6 +146,10 @@ export default function RootLayout({
         <link rel="icon" href="/favicon.svg" sizes="any" type="image/svg+xml" />
         <link rel="apple-touch-icon" href="/favicon.svg" />
         <link rel="canonical" href={SITE_URL} />
+        <script
+          id="aegis-mobile-notification-guard"
+          dangerouslySetInnerHTML={{ __html: MOBILE_NOTIFICATION_GUARD_SCRIPT }}
+        />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
