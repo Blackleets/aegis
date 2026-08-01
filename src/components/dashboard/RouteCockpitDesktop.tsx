@@ -47,18 +47,20 @@ export default function RouteCockpitDesktop({
 
   useEffect(() => {
     if (!navigationActive) {
-      setSpeedKmh(null);
-      setGpsAccuracyMeters(null);
-      setGpsStatus('idle');
+      queueMicrotask(() => {
+        setSpeedKmh(null);
+        setGpsAccuracyMeters(null);
+        setGpsStatus('idle');
+      });
       return;
     }
 
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      setGpsStatus('unavailable');
+      queueMicrotask(() => setGpsStatus('unavailable'));
       return;
     }
 
-    setGpsStatus('acquiring');
+    queueMicrotask(() => setGpsStatus('acquiring'));
     const watchId = navigator.geolocation.watchPosition(
       (position) => {
         const accuracy = Number.isFinite(position.coords.accuracy) ? position.coords.accuracy : null;
