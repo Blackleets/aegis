@@ -1,6 +1,9 @@
 'use client';
 
 import React, { type ComponentProps, type ErrorInfo, type ReactNode } from 'react';
+import { TriangleAlert, X } from 'lucide-react';
+import { useLiveRouteIncidents } from '@/hooks/useLiveRouteIncidents';
+import { buildLiveRouteIncidentCockpitModel } from '@/lib/live-route-incident-cockpit';
 import RouteCockpitMobile from './RouteCockpitMobile';
 
 type RouteCockpitMobileProps = ComponentProps<typeof RouteCockpitMobile>;
@@ -76,9 +79,72 @@ class NavigationCockpitBoundary extends React.Component<BoundaryProps, BoundaryS
   }
 }
 
+function LiveRouteIncidentBanner({
+  model,
+  onDismiss,
+}: {
+  model: NonNullable<ReturnType<typeof buildLiveRouteIncidentCockpitModel>>;
+  onDismiss: () => void;
+}) {
+  const critical = model.severity === 'critical';
+
+  return (
+    <aside
+      className={`pointer-events-auto fixed left-3 right-3 top-[10.75rem] z-[366] mx-auto max-w-md rounded-2xl border px-3 py-2.5 shadow-[0_12px_32px_rgba(0,0,0,0.34)] backdrop-blur-xl ${
+        critical
+          ? 'border-rose-300/30 bg-[rgba(38,12,18,0.94)]'
+          : 'border-amber-200/24 bg-[rgba(29,22,10,0.94)]'
+      }`}
+      role="status"
+      aria-live="polite"
+      aria-label={model.title}
+    >
+      <div className="flex items-start gap-2.5">
+        <span
+          className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
+            critical ? 'bg-rose-300/12 text-rose-100' : 'bg-amber-200/10 text-amber-100'
+          }`}
+          aria-hidden="true"
+        >
+          <TriangleAlert className="h-5 w-5" strokeWidth={2.2} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className={`text-[9px] font-semibold uppercase tracking-[0.14em] ${critical ? 'text-rose-100/78' : 'text-amber-100/76'}`}>
+            {model.eyebrow}
+          </p>
+          <p className="mt-0.5 text-sm font-semibold leading-tight text-white">
+            {model.title}
+          </p>
+          <p className="mt-1 truncate text-[11px] leading-tight text-white/66">
+            {model.detail}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl text-white/58 transition-colors active:bg-white/10"
+          aria-label="Ocultar incidencia de esta ruta"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+    </aside>
+  );
+}
+
 export default function RouteCockpitMobileSafe(props: RouteCockpitMobileProps) {
+  const routeSnapshot = props.routeSnapshot;
+  const liveRouteIncidents = useLiveRouteIncidents({
+    enabled: props.navigationActive && routeSnapshot?.mode === 'driving',
+    route: routeSnapshot?.coordinates ?? [],
+    currentLocation: props.currentLocation,
+    destination: routeSnapshot
+      ? { lat: routeSnapshot.destination.lat, lng: routeSnapshot.destination.lng }
+      : null,
+  });
+  const incidentModel = buildLiveRouteIncidentCockpitModel(liveRouteIncidents);
   const resetKey = [
-    props.routeSnapshot?.activeRouteId ?? 'no-route',
+    routeSnapshot?.activeRouteId ?? 'no-route',
     props.navigationActive ? 'active' : 'inactive',
     props.navigationArrived ? 'arrived' : 'en-route',
   ].join(':');
@@ -89,6 +155,12 @@ export default function RouteCockpitMobileSafe(props: RouteCockpitMobileProps) {
       resetKey={resetKey}
     >
       <RouteCockpitMobile {...props} />
+      {incidentModel && (
+        <LiveRouteIncidentBanner
+          model={incidentModel}
+          onDismiss={() => liveRouteIncidents.dismissIncident(incidentModel.incidentId)}
+        />
+      )}
     </NavigationCockpitBoundary>
   );
 }
