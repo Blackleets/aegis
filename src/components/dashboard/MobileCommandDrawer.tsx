@@ -258,3 +258,12 @@ export default function MobileCommandDrawer({
               {mobilePanel === 'intel' && intelContent}
               {mobilePanel === 'alerts' && alertsContent}
               {mobilePanel === 'search' && searchContent}
+              {mobilePanel === 'recon' && reconContent}
+              {!isSearchPanel && activeTab && <span className="sr-only">{activeTab.label}</span>}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
+  );
+}
