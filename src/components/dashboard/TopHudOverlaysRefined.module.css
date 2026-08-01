@@ -14,11 +14,7 @@
   letter-spacing: 0.06em !important;
 }
 
-.scope :global([class*='tracking-[0.5em]'),
-.scope :global([class*='tracking-[0.3em]'),
-.scope :global([class*='tracking-[0.28em]'),
-.scope :global([class*='tracking-[0.2em]'),
-.scope :global([class*='tracking-[0.16em]') {
+.scope :global([class*='tracking-']) {
   letter-spacing: 0.08em !important;
 }
 
@@ -26,7 +22,7 @@
   border-radius: 10px !important;
 }
 
-.scope :global([class*='shadow-[0_10px_30px']) {
+.scope :global([class*='shadow-']) {
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.18) !important;
 }
 
@@ -62,8 +58,8 @@
 }
 
 @media (max-width: 767px) {
-  .scope :global([class*='top-[5.35rem]']) {
-    top: 4.75rem !important;
+  .scope :global([class*='top-']) {
+    --aegis-mobile-hud-offset: 4.75rem;
   }
 }
 
