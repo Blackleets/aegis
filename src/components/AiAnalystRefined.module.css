@@ -16,23 +16,23 @@
   letter-spacing: 0.04em !important;
 }
 
-.scope :global([class*='tracking-[0.2em]'),
-.scope :global([class*='tracking-[0.18em]'),
-.scope :global([class*='tracking-[0.16em]') {
+.scope :global([class*='tracking-[0.2em]']),
+.scope :global([class*='tracking-[0.18em]']),
+.scope :global([class*='tracking-[0.16em]']) {
   letter-spacing: 0.08em !important;
 }
 
-.scope :global([class*='text-[7px]') {
+.scope :global([class*='text-[7px]']) {
   font-size: 9px !important;
   line-height: 1.35 !important;
 }
 
-.scope :global([class*='text-[8px]') {
+.scope :global([class*='text-[8px]']) {
   font-size: 10px !important;
   line-height: 1.4 !important;
 }
 
-.scope :global([class*='text-[9px]') {
+.scope :global([class*='text-[9px]']) {
   font-size: 11px !important;
 }
 
