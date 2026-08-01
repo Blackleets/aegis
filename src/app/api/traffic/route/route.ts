@@ -1,23 +1,38 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
+import {
+  buildTrafficCacheKey,
+  normalizeTomTomRouteTraffic,
+  parseCoordinate,
+  type NormalizedRouteTraffic,
+  type TomTomRouteTrafficSummary,
+} from '@/lib/tomtom-route-traffic';
 
 export const dynamic = 'force-dynamic';
 
-function parseCoordinate(value: string | null, min: number, max: number) {
-  if (!value) return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed >= min && parsed <= max ? parsed : null;
+const CACHE_TTL_MS = 90_000;
+const STALE_TTL_MS = 5 * 60_000;
+const trafficCache = new Map<string, { value: NormalizedRouteTraffic; storedAt: number }>();
+
+function json(body: Record<string, unknown>, status = 200) {
+  return NextResponse.json(body, {
+    status,
+    headers: {
+      'Cache-Control': 'no-store',
+      'X-AEGIS-Traffic-Provider': 'TomTom',
+    },
+  });
 }
 
 export async function GET(request: NextRequest) {
   const apiKey = process.env.TOMTOM_API_KEY;
   if (!apiKey) {
-    return NextResponse.json({
+    return json({
       status: 'unavailable',
       configured: false,
       source: 'TomTom Traffic',
       message: 'Live traffic provider is not configured',
-    }, { headers: { 'Cache-Control': 'no-store' } });
+    });
   }
 
   const fromLat = parseCoordinate(request.nextUrl.searchParams.get('fromLat'), -90, 90);
@@ -26,7 +41,21 @@ export async function GET(request: NextRequest) {
   const toLng = parseCoordinate(request.nextUrl.searchParams.get('toLng'), -180, 180);
 
   if (fromLat === null || fromLng === null || toLat === null || toLng === null) {
-    return NextResponse.json({ error: 'Invalid traffic corridor coordinates' }, { status: 400 });
+    return json({ error: 'Invalid traffic corridor coordinates' }, 400);
+  }
+
+  const cacheKey = buildTrafficCacheKey(fromLat, fromLng, toLat, toLng);
+  const cached = trafficCache.get(cacheKey);
+  const now = Date.now();
+  if (cached && now - cached.storedAt <= CACHE_TTL_MS) {
+    return json({
+      status: 'live',
+      configured: true,
+      source: 'TomTom Traffic',
+      ...cached.value,
+      cached: true,
+      checkedAt: new Date(cached.storedAt).toISOString(),
+    });
   }
 
   const locations = `${fromLat},${fromLng}:${toLat},${toLng}`;
@@ -42,57 +71,87 @@ export async function GET(request: NextRequest) {
   try {
     const response = await fetch(url, {
       cache: 'no-store',
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(8_000),
     });
+
     if (!response.ok) {
-      return NextResponse.json({
+      const stale = cached && now - cached.storedAt <= STALE_TTL_MS ? cached : null;
+      if (stale) {
+        return json({
+          status: 'live',
+          configured: true,
+          source: 'TomTom Traffic',
+          ...stale.value,
+          cached: true,
+          stale: true,
+          providerStatus: response.status,
+          checkedAt: new Date(stale.storedAt).toISOString(),
+        });
+      }
+
+      return json({
         status: 'unavailable',
         configured: true,
         source: 'TomTom Traffic',
-        message: 'Traffic provider temporarily unavailable',
-      }, { status: 502, headers: { 'Cache-Control': 'no-store' } });
+        reason: response.status === 429 ? 'quota_exceeded' : 'provider_error',
+        retryAfterSeconds: Number(response.headers.get('retry-after')) || null,
+        message: response.status === 429
+          ? 'TomTom free quota is temporarily exhausted'
+          : 'Traffic provider temporarily unavailable',
+      }, response.status === 429 ? 429 : 502);
     }
 
     const payload = await response.json() as {
-      routes?: Array<{
-        summary?: {
-          travelTimeInSeconds?: number;
-          noTrafficTravelTimeInSeconds?: number;
-          trafficDelayInSeconds?: number;
-          trafficLengthInMeters?: number;
-          departureTime?: string;
-          arrivalTime?: string;
-        };
-      }>;
+      routes?: Array<{ summary?: TomTomRouteTrafficSummary }>;
     };
-    const summary = payload.routes?.[0]?.summary;
-    if (!summary || typeof summary.travelTimeInSeconds !== 'number') {
-      return NextResponse.json({ status: 'unavailable', configured: true, source: 'TomTom Traffic' });
+    const normalized = payload.routes?.[0]?.summary
+      ? normalizeTomTomRouteTraffic(payload.routes[0].summary)
+      : null;
+
+    if (!normalized) {
+      return json({
+        status: 'unavailable',
+        configured: true,
+        source: 'TomTom Traffic',
+        reason: 'invalid_provider_payload',
+      }, 502);
     }
 
-    const delaySeconds = Math.max(0, summary.trafficDelayInSeconds
-      ?? (summary.travelTimeInSeconds - (summary.noTrafficTravelTimeInSeconds ?? summary.travelTimeInSeconds)));
-    const level = delaySeconds >= 900 ? 'heavy' : delaySeconds >= 300 ? 'moderate' : delaySeconds >= 120 ? 'light' : 'clear';
+    trafficCache.set(cacheKey, { value: normalized, storedAt: now });
+    if (trafficCache.size > 250) {
+      for (const [key, entry] of trafficCache) {
+        if (now - entry.storedAt > STALE_TTL_MS) trafficCache.delete(key);
+      }
+    }
 
-    return NextResponse.json({
+    return json({
       status: 'live',
       configured: true,
       source: 'TomTom Traffic',
-      delaySeconds,
-      trafficLengthMeters: Math.max(0, summary.trafficLengthInMeters ?? 0),
-      travelTimeSeconds: summary.travelTimeInSeconds,
-      freeFlowTimeSeconds: summary.noTrafficTravelTimeInSeconds ?? null,
-      departureTime: summary.departureTime ?? null,
-      arrivalTime: summary.arrivalTime ?? null,
-      level,
-      checkedAt: new Date().toISOString(),
-    }, { headers: { 'Cache-Control': 'no-store' } });
+      ...normalized,
+      cached: false,
+      checkedAt: new Date(now).toISOString(),
+    });
   } catch {
-    return NextResponse.json({
+    const stale = cached && now - cached.storedAt <= STALE_TTL_MS ? cached : null;
+    if (stale) {
+      return json({
+        status: 'live',
+        configured: true,
+        source: 'TomTom Traffic',
+        ...stale.value,
+        cached: true,
+        stale: true,
+        checkedAt: new Date(stale.storedAt).toISOString(),
+      });
+    }
+
+    return json({
       status: 'unavailable',
       configured: true,
       source: 'TomTom Traffic',
+      reason: 'timeout',
       message: 'Traffic request timed out',
-    }, { status: 504, headers: { 'Cache-Control': 'no-store' } });
+    }, 504);
   }
 }
