@@ -365,7 +365,7 @@ function SearchBar({ onLocate, onRoute, defaultOpen = false, variant = 'default'
     if (!location) return;
     setRoutingLabel(result.label);
     try {
-      await onRoute({ origin: location, destination: result, mode: routeMode, waypoints: draftWaypoints, startImmediately: false });
+      await onRoute({ origin: location, destination: result, mode: routeMode, waypoints: draftWaypoints, startImmediately: isMobileNav });
       resetAndClose();
     } finally {
       setRoutingLabel(null);
@@ -419,7 +419,10 @@ function SearchBar({ onLocate, onRoute, defaultOpen = false, variant = 'default'
           onChange={(e) => void handleSearch(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Escape') resetAndClose();
-            if (e.key === 'Enter' && results.length > 0) handleSelect(results[0]);
+            if (e.key === 'Enter' && results.length > 0) {
+              if (isMobileNav && onRoute) void handleRoute(results[0]);
+              else handleSelect(results[0]);
+            }
           }}
           placeholder={isMobileNav ? 'Busca un destino…' : 'Busca ciudad, dirección o coordenadas…'}
           className={`flex-1 bg-transparent outline-none placeholder:text-[var(--text-muted)] ${isMobileNav ? 'text-[13px] text-white font-medium tracking-[0.02em]' : 'text-[10px] text-[var(--text-primary)] font-mono tracking-wider'}`}
