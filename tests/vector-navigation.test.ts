@@ -25,11 +25,12 @@ describe('vector navigation camera', () => {
     expect(smoothNavigationBearing(350, 10, 0.5)).toBeCloseTo(0);
   });
 
-  it('reroutes only after a sustained deviation with reliable GPS', () => {
-    expect(shouldRerouteNavigation({ offRouteDistanceMeters: 120, gpsAccuracyMeters: 12, deviationDurationMs: 8_000, cooldownElapsedMs: 31_000, consecutiveOffRouteFixes: 3 })).toBe(true);
-    expect(shouldRerouteNavigation({ offRouteDistanceMeters: 120, gpsAccuracyMeters: 80, deviationDurationMs: 8_000, cooldownElapsedMs: 31_000, consecutiveOffRouteFixes: 3 })).toBe(false);
-    expect(shouldRerouteNavigation({ offRouteDistanceMeters: 120, gpsAccuracyMeters: 12, deviationDurationMs: 2_000, cooldownElapsedMs: 31_000, consecutiveOffRouteFixes: 3 })).toBe(false);
-    expect(shouldRerouteNavigation({ offRouteDistanceMeters: 120, gpsAccuracyMeters: 12, deviationDurationMs: 8_000, cooldownElapsedMs: 31_000, consecutiveOffRouteFixes: 1 })).toBe(false);
+  it('uses hysteresis for ordinary drift but reacts faster to a decisive deviation', () => {
+    expect(shouldRerouteNavigation({ offRouteDistanceMeters: 120, gpsAccuracyMeters: 12, deviationDurationMs: 8_000, cooldownElapsedMs: 31_000, consecutiveOffRouteFixes: 3 })).toBe(false);
+    expect(shouldRerouteNavigation({ offRouteDistanceMeters: 120, gpsAccuracyMeters: 12, deviationDurationMs: 10_000, cooldownElapsedMs: 31_000, consecutiveOffRouteFixes: 5 })).toBe(true);
+    expect(shouldRerouteNavigation({ offRouteDistanceMeters: 220, gpsAccuracyMeters: 12, deviationDurationMs: 6_000, cooldownElapsedMs: 31_000, consecutiveOffRouteFixes: 3 })).toBe(true);
+    expect(shouldRerouteNavigation({ offRouteDistanceMeters: 220, gpsAccuracyMeters: 80, deviationDurationMs: 12_000, cooldownElapsedMs: 31_000, consecutiveOffRouteFixes: 6 })).toBe(false);
+    expect(shouldRerouteNavigation({ offRouteDistanceMeters: 220, gpsAccuracyMeters: 12, deviationDurationMs: 12_000, cooldownElapsedMs: 20_000, consecutiveOffRouteFixes: 6 })).toBe(false);
   });
 
   it('snaps reliable GPS positions to a nearby route without hiding real deviations', () => {
