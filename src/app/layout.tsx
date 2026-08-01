@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
+import "./navigation-mobile.css";
 import ErrorBoundary from '@/components/ErrorBoundary';
 
 const SITE_URL = "https://aegis.blackleets.dev";
