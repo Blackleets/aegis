@@ -15,6 +15,13 @@ export type LiveRouteIncidentState = {
 
 export const LIVE_ROUTE_INCIDENT_REFRESH_MS = 90_000;
 
+const IDLE_ROUTE_INCIDENT_STATE: LiveRouteIncidentState = {
+  status: 'idle',
+  incident: null,
+  checkedAt: null,
+  stale: false,
+};
+
 export function buildRouteIncidentRequestUrl(origin: Coordinate, destination: Coordinate) {
   const params = new URLSearchParams({
     fromLat: String(origin.lat),
@@ -56,14 +63,10 @@ export function useLiveRouteIncidents({
   currentLocation: Coordinate | null;
   destination: Coordinate | null;
 }) {
-  const [state, setState] = useState<LiveRouteIncidentState>({
-    status: 'idle',
-    incident: null,
-    checkedAt: null,
-    stale: false,
-  });
+  const [state, setState] = useState<LiveRouteIncidentState>(IDLE_ROUTE_INCIDENT_STATE);
   const dismissedIncidentIdsRef = useRef(new Set<string>());
   const requestSequenceRef = useRef(0);
+  const canMonitorRoute = enabled && currentLocation !== null && destination !== null && route.length >= 2;
 
   const dismissIncident = useCallback((incidentId: string) => {
     dismissedIncidentIdsRef.current.add(incidentId);
@@ -73,10 +76,7 @@ export function useLiveRouteIncidents({
   }, []);
 
   useEffect(() => {
-    if (!enabled || !currentLocation || !destination || route.length < 2) {
-      setState({ status: 'idle', incident: null, checkedAt: null, stale: false });
-      return;
-    }
+    if (!canMonitorRoute || !currentLocation || !destination) return;
 
     let active = true;
     let controller: AbortController | null = null;
@@ -134,10 +134,10 @@ export function useLiveRouteIncidents({
       controller?.abort();
       window.clearInterval(interval);
     };
-  }, [enabled, route, currentLocation, destination]);
+  }, [canMonitorRoute, route, currentLocation, destination]);
 
   return {
-    ...state,
+    ...(canMonitorRoute ? state : IDLE_ROUTE_INCIDENT_STATE),
     dismissIncident,
   };
 }
