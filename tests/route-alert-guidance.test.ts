@@ -32,22 +32,39 @@ describe('route alert guidance', () => {
     expect(guidance.shouldSpeak).toBe(false);
   });
 
-  it('builds a concise proximity voice instruction', () => {
-    const guidance = getRouteAlertGuidance({ distanceMeters: 180, speedKmh: 60, severity: 'warning' });
+  it('builds concise phase-specific voice instructions', () => {
+    const nearGuidance = getRouteAlertGuidance({ distanceMeters: 180, speedKmh: 60, severity: 'warning' });
+    const nowGuidance = getRouteAlertGuidance({ distanceMeters: 35, speedKmh: 50, severity: 'critical' });
 
     expect(buildRouteAlertVoiceMessage({
-      title: 'Incendio en la ruta',
+      title: 'incendio en la ruta',
       distanceMeters: 180,
-      guidance,
-    })).toBe('Atención. Incendio en la ruta a 180 metros.');
+      guidance: nearGuidance,
+    })).toBe('En 180 metros, incendio en la ruta.');
+
+    expect(buildRouteAlertVoiceMessage({
+      title: 'cierre de vía',
+      distanceMeters: 35,
+      guidance: nowGuidance,
+    })).toBe('Atención ahora. cierre de vía.');
   });
 
-  it('announces each proximity phase at most once even after a regression', () => {
+  it('advances through each phase only once', () => {
     const announced = new Set<string>();
 
+    expect(shouldAnnounceRouteAlertPhase(announced, 'camera-1', 'ahead')).toBe(true);
     expect(shouldAnnounceRouteAlertPhase(announced, 'camera-1', 'near')).toBe(true);
     expect(shouldAnnounceRouteAlertPhase(announced, 'camera-1', 'now')).toBe(true);
-    expect(shouldAnnounceRouteAlertPhase(announced, 'camera-1', 'near')).toBe(false);
     expect(shouldAnnounceRouteAlertPhase(announced, 'camera-1', 'now')).toBe(false);
+  });
+
+  it('blocks phase regressions caused by noisy GPS distance', () => {
+    const announced = new Set<string>();
+
+    expect(shouldAnnounceRouteAlertPhase(announced, 'hazard-1', 'near')).toBe(true);
+    expect(shouldAnnounceRouteAlertPhase(announced, 'hazard-1', 'ahead')).toBe(false);
+    expect(shouldAnnounceRouteAlertPhase(announced, 'hazard-1', 'now')).toBe(true);
+    expect(shouldAnnounceRouteAlertPhase(announced, 'hazard-1', 'near')).toBe(false);
+    expect(shouldAnnounceRouteAlertPhase(announced, 'hazard-1', 'ahead')).toBe(false);
   });
 });
