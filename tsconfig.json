@@ -20,6 +20,7 @@
     ],
     "paths": {
       "@/components/AiAnalyst": ["./src/components/AiAnalystRefined"],
+      "@/components/dashboard/DesktopOpsRails": ["./src/components/dashboard/DesktopOpsRailsRefined"],
       "@/components/dashboard/RouteCockpitMobile": ["./src/components/dashboard/RouteCockpitMobileSafe"],
       "@/components/dashboard/SentinelCompanion": ["./src/components/dashboard/SentinelCompanionRefined"],
       "@/components/dashboard/TopHudOverlays": ["./src/components/dashboard/TopHudOverlaysRefined"],
