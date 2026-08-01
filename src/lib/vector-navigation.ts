@@ -40,12 +40,18 @@ export function shouldRerouteNavigation({
   consecutiveOffRouteFixes: number;
 }) {
   if (gpsAccuracyMeters === null || gpsAccuracyMeters > 45) return false;
+  if (cooldownElapsedMs <= 30_000) return false;
 
-  const accuracyAwareDistance = Math.max(85, gpsAccuracyMeters * 2.25);
-  return offRouteDistanceMeters > accuracyAwareDistance
-    && consecutiveOffRouteFixes >= 3
-    && deviationDurationMs > 7_000
-    && cooldownElapsedMs > 30_000;
+  const accuracyAwareDistance = Math.max(95, gpsAccuracyMeters * 2.5);
+  if (offRouteDistanceMeters <= accuracyAwareDistance) return false;
+
+  const decisiveDistance = Math.max(180, gpsAccuracyMeters * 4);
+  const decisiveDeviation = offRouteDistanceMeters >= decisiveDistance;
+  const requiredFixes = decisiveDeviation ? 3 : 5;
+  const requiredDurationMs = decisiveDeviation ? 6_000 : 10_000;
+
+  return consecutiveOffRouteFixes >= requiredFixes
+    && deviationDurationMs >= requiredDurationMs;
 }
 
 export function getNextSimulationIndex(currentIndex: number, coordinateCount: number) {
