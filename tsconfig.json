@@ -20,6 +20,7 @@
     ],
     "paths": {
       "@/components/dashboard/RouteCockpitMobile": ["./src/components/dashboard/RouteCockpitMobileSafe"],
+      "@/components/dashboard/SentinelCompanion": ["./src/components/dashboard/SentinelCompanionRefined"],
       "@/*": ["./src/*"]
     }
   },
