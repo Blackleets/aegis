@@ -207,6 +207,16 @@ export class CommunityIncidentService {
         .map(cloneIncident);
     });
   }
+
+  async cleanup(at: string): Promise<number> {
+    const now = parseTimestamp(at, "at");
+    return this.repository.mutate((incidents) => {
+      const before = incidents.length;
+      expireIncidents(incidents, now);
+      incidents.splice(0, incidents.length, ...incidents.filter(({ status }) => status !== "expired"));
+      return before - incidents.length;
+    });
+  }
 }
 
 function validateReport(input: CommunityIncidentReport): void {

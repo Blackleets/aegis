@@ -207,6 +207,12 @@ describe("CommunityIncidentService", () => {
     expect(rejected.confidence).toBeLessThan(incident.confidence);
   });
 
+  it("removes expired incidents during cleanup", async () => {
+    const service = createService();
+    await service.report({ kind: "road_hazard", location: { latitude: 40.4168, longitude: -3.7038 }, reporterId: "driver-a", reportedAt: "2026-07-29T18:00:00.000Z" });
+    expect(await service.cleanup("2026-07-29T20:00:00.000Z")).toBe(1);
+  });
+
   it("marks sufficiently rejected incidents as disputed", async () => {
     const service = createService();
     const incident = await service.report({

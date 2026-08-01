@@ -1672,8 +1672,10 @@ export default function Dashboard() {
     let cancelled = false;
     const refreshCommunityIncidents = async () => {
       try {
-        const incidents = await createBrowserCommunityIncidentService(window.localStorage)
-          .active(new Date().toISOString());
+        const service = createBrowserCommunityIncidentService(window.localStorage);
+        const now = new Date().toISOString();
+        await service.cleanup(now);
+        const incidents = await service.active(now);
         if (!cancelled) setCommunityIncidents(incidents.filter(({ status }) => status === 'active'));
       } catch {
         if (!cancelled) setCommunityIncidents([]);
