@@ -211,6 +211,7 @@ export default function RouteCockpitMobile({
             : gpsAccuracyMeters <= 15
               ? 'GPS preciso'
               : `GPS ±${Math.round(gpsAccuracyMeters)} m`;
+  const gpsWarning = gpsSignalStatus === 'degraded' || gpsSignalStatus === 'denied' || gpsSignalStatus === 'unavailable';
   const routeOptions = routeSnapshot?.alternatives ?? [];
   const activeRouteIndex = routeSnapshot ? Math.max(0, routeOptions.findIndex((option) => option.id === routeSnapshot.activeRouteId)) : 0;
   const activeRouteOption = routeOptions[activeRouteIndex] ?? null;
@@ -482,7 +483,7 @@ export default function RouteCockpitMobile({
                   transition={{ type: 'spring', stiffness: 140, damping: 24 }}
                 />
               </div>
-              <div className="flex items-center gap-2.5 px-3 py-2.5">
+              <div className="flex items-center gap-2 px-3 py-2.5">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-baseline gap-2">
                     <span className="text-[23px] font-bold leading-none tracking-[-0.04em] text-white tabular-nums">{routeEtaLabel}</span>
@@ -497,7 +498,6 @@ export default function RouteCockpitMobile({
                   </div>
                   <div className="mt-1 flex items-center gap-1.5 overflow-hidden whitespace-nowrap text-[9px] font-medium text-cyan-100/52">
                     <span>{gpsQualityLabel}</span>
-                    {navigationSpeedKmh !== null && <><span>·</span><span>{Math.round(navigationSpeedKmh)} km/h</span></>}
                     {navigationRerouting && <><span>·</span><span className="text-amber-200">Buscando mejor ruta</span></>}
                     {navigationSimulationActive && <><span>·</span><span className="text-violet-200">Modo prueba</span></>}
                     {trafficInsight?.status === 'live' && (
@@ -519,6 +519,16 @@ export default function RouteCockpitMobile({
                       </button>
                     )}
                   </div>
+                </div>
+                <div
+                  className={`flex h-14 w-[3.65rem] shrink-0 flex-col items-center justify-center rounded-2xl border text-center ${gpsWarning ? 'border-amber-200/28 bg-amber-200/[0.08]' : 'border-cyan-200/22 bg-cyan-300/[0.08]'}`}
+                  aria-label={`Velocidad ${navigationSpeedKmh === null ? 'no disponible' : `${Math.round(navigationSpeedKmh)} kilómetros por hora`}. ${gpsQualityLabel}`}
+                >
+                  <span className="text-[23px] font-bold leading-none tracking-[-0.05em] text-white tabular-nums">{navigationSpeedKmh === null ? '—' : Math.round(navigationSpeedKmh)}</span>
+                  <span className="mt-0.5 text-[7px] font-mono uppercase tracking-[0.14em] text-cyan-100/70">km/h</span>
+                  <span className={`mt-0.5 max-w-[3.2rem] truncate text-[6px] font-medium ${gpsWarning ? 'text-amber-200' : 'text-cyan-100/44'}`}>
+                    {gpsSignalStatus === 'acquiring' ? 'GPS…' : gpsAccuracyMeters === null ? 'GPS' : `±${Math.round(gpsAccuracyMeters)}m`}
+                  </span>
                 </div>
                 <button
                   type="button"
