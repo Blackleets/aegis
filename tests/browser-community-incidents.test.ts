@@ -42,4 +42,49 @@ describe('browser community incident repository', () => {
     expect(parseStoredIncidents('not-json')).toEqual([]);
     expect(parseStoredIncidents(JSON.stringify([{ id: 'fake' }]))).toEqual([]);
   });
+
+  it('does not reject a report when mobile storage writes are blocked', async () => {
+    const storage = {
+      getItem: () => null,
+      setItem: () => {
+        throw new DOMException('Storage blocked', 'SecurityError');
+      },
+    };
+    const service = createBrowserCommunityIncidentService(storage);
+
+    await expect(service.report({
+      kind: 'accident',
+      location: { latitude: 40.4168, longitude: -3.7038 },
+      reporterId: 'local-driver',
+      reportedAt: '2026-08-01T18:00:00.000Z',
+    })).resolves.toMatchObject({ kind: 'accident' });
+  });
+
+  it('treats blocked storage reads as an empty incident list', async () => {
+    const storage = {
+      getItem: () => {
+        throw new DOMException('Storage blocked', 'SecurityError');
+      },
+      setItem: () => undefined,
+    };
+
+    await expect(new BrowserCommunityIncidentRepository(storage).list()).resolves.toEqual([]);
+  });
+
+  it('creates a fallback reporter id when randomUUID and storage are unavailable', () => {
+    const storage = {
+      getItem: () => {
+        throw new DOMException('Storage blocked', 'SecurityError');
+      },
+      setItem: () => {
+        throw new DOMException('Storage blocked', 'SecurityError');
+      },
+    };
+
+    const reporterId = getOrCreateCommunityReporterId(storage, () => {
+      throw new Error('randomUUID unavailable');
+    });
+
+    expect(reporterId).toMatch(/^local-fallback-/);
+  });
 });
