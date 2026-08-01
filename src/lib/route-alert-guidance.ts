@@ -15,6 +15,12 @@ type RouteAlertGuidanceInput = {
   severity: RouteAlertSeverity;
 };
 
+const ROUTE_ALERT_PHASE_RANK: Record<RouteAlertPhase, number> = {
+  ahead: 0,
+  near: 1,
+  now: 2,
+};
+
 export function getRouteAlertGuidance({
   distanceMeters,
   speedKmh,
@@ -71,9 +77,9 @@ export function buildRouteAlertVoiceMessage({
     ? `${Math.max(10, Math.round(distanceMeters / 10) * 10)} metros`
     : `${(distanceMeters / 1000).toFixed(1)} kilómetros`;
 
-  if (guidance.phase === 'now') return `Atención. ${title}, ahora.`;
-  if (guidance.phase === 'near') return `Atención. ${title} a ${roundedDistance}.`;
-  return `Aviso AEGIS. ${title} más adelante, a ${roundedDistance}.`;
+  if (guidance.phase === 'now') return `Atención ahora. ${title}.`;
+  if (guidance.phase === 'near') return `En ${roundedDistance}, ${title}.`;
+  return `Aviso AEGIS. ${title} a ${roundedDistance}.`;
 }
 
 export function shouldAnnounceRouteAlertPhase(
@@ -81,8 +87,14 @@ export function shouldAnnounceRouteAlertPhase(
   alertId: string,
   phase: RouteAlertPhase,
 ) {
-  const key = `${alertId}:${phase}`;
-  if (announcedPhases.has(key)) return false;
-  announcedPhases.add(key);
+  const requestedRank = ROUTE_ALERT_PHASE_RANK[phase];
+  const alreadyAnnouncedAtSameOrLaterPhase = (Object.keys(ROUTE_ALERT_PHASE_RANK) as RouteAlertPhase[])
+    .some((announcedPhase) => (
+      ROUTE_ALERT_PHASE_RANK[announcedPhase] >= requestedRank
+      && announcedPhases.has(`${alertId}:${announcedPhase}`)
+    ));
+
+  if (alreadyAnnouncedAtSameOrLaterPhase) return false;
+  announcedPhases.add(`${alertId}:${phase}`);
   return true;
 }
