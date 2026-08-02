@@ -13,6 +13,8 @@ interface DashboardGeocodeState {
 
 export function useDashboardGeocode(): DashboardGeocodeState {
   const mouseCoordsRef = useRef<Coordinate | null>(null);
+  const pendingCoordsRef = useRef<Coordinate | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
   const coordsDisplayRef = useRef<HTMLDivElement>(null);
   const [locationLabel, setLocationLabel] = useState('');
   const [regionDossier, setRegionDossier] = useState<RegionDossier | null>(null);
@@ -22,27 +24,23 @@ export function useDashboardGeocode(): DashboardGeocodeState {
   const geocodeAbortRef = useRef<AbortController | null>(null);
   const lastGeocodedPos = useRef<Coordinate | null>(null);
   const lastGeocodeKeyRef = useRef('');
+  const scheduledGeocodeKeyRef = useRef('');
   const lastLocationLabelRef = useRef('');
 
-  const handleMouseCoords = useCallback((coords: Coordinate) => {
-    mouseCoordsRef.current = coords;
+  const scheduleReverseGeocode = useCallback((coords: Coordinate) => {
+    const geocodeKey = `${coords.lat.toFixed(1)},${coords.lng.toFixed(1)}`;
+    if (geocodeKey === scheduledGeocodeKeyRef.current || geocodeKey === lastGeocodeKeyRef.current) return;
+    scheduledGeocodeKeyRef.current = geocodeKey;
 
-    if (coordsDisplayRef.current) {
-      coordsDisplayRef.current.innerText = `${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)}`;
-    }
-
-    if (geocodeTimer.current) {
-      clearTimeout(geocodeTimer.current);
-    }
+    if (geocodeTimer.current) clearTimeout(geocodeTimer.current);
 
     geocodeTimer.current = setTimeout(async () => {
+      scheduledGeocodeKeyRef.current = '';
+
       if (lastGeocodedPos.current) {
         const distance = Math.abs(coords.lat - lastGeocodedPos.current.lat) + Math.abs(coords.lng - lastGeocodedPos.current.lng);
         if (distance < 0.5) return;
       }
-
-      const geocodeKey = `${coords.lat.toFixed(1)},${coords.lng.toFixed(1)}`;
-      if (geocodeKey === lastGeocodeKeyRef.current) return;
 
       if (geocodeCache.current.has(geocodeKey)) {
         const cachedLabel = geocodeCache.current.get(geocodeKey) ?? 'Unknown';
@@ -103,8 +101,27 @@ export function useDashboardGeocode(): DashboardGeocodeState {
           console.warn('[AEGIS] Suppressed error:', error instanceof Error ? error.message : error);
         }
       }
-    }, 3000);
+    }, 900);
   }, []);
+
+  const handleMouseCoords = useCallback((coords: Coordinate) => {
+    mouseCoordsRef.current = coords;
+    pendingCoordsRef.current = coords;
+
+    if (animationFrameRef.current !== null) return;
+
+    animationFrameRef.current = window.requestAnimationFrame(() => {
+      animationFrameRef.current = null;
+      const nextCoords = pendingCoordsRef.current;
+      if (!nextCoords) return;
+
+      if (coordsDisplayRef.current) {
+        coordsDisplayRef.current.innerText = `${nextCoords.lat.toFixed(4)}, ${nextCoords.lng.toFixed(4)}`;
+      }
+
+      scheduleReverseGeocode(nextCoords);
+    });
+  }, [scheduleReverseGeocode]);
 
   const handleRightClick = useCallback(async (coords: Coordinate) => {
     setDossierLoading(true);
@@ -123,9 +140,8 @@ export function useDashboardGeocode(): DashboardGeocodeState {
   }, []);
 
   useEffect(() => () => {
-    if (geocodeTimer.current) {
-      clearTimeout(geocodeTimer.current);
-    }
+    if (geocodeTimer.current) clearTimeout(geocodeTimer.current);
+    if (animationFrameRef.current !== null) cancelAnimationFrame(animationFrameRef.current);
     geocodeAbortRef.current?.abort();
   }, []);
 
