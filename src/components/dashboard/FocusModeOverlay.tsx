@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Activity, AlertTriangle, Database, Wifi } from 'lucide-react';
+import { AlertTriangle, Database, Wifi } from 'lucide-react';
 import type { Locale } from '@/lib/i18n';
 import { getDashboardCopy } from '@/lib/i18n';
 
@@ -36,42 +36,35 @@ export default function FocusModeOverlay({ backendStatus, trackedEntityCount, ac
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: -10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.18, duration: 0.38 }}
-      className="absolute left-1/2 top-[5.9rem] z-[190] hidden w-[min(42rem,calc(100vw-2rem))] -translate-x-1/2 pointer-events-none md:block"
+      initial={{ opacity: 0, x: -10 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: 0.12, duration: 0.24 }}
+      className="absolute bottom-[5.4rem] left-3 z-[190] hidden w-[min(19rem,calc(100vw-1.5rem))] pointer-events-none md:block"
     >
-      <div className="sovereign-panel px-4 py-3 backdrop-blur-xl">
-        <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-[rgba(77,255,154,0.30)] to-transparent" />
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <div className="text-[7px] font-mono tracking-[0.34em] text-[var(--alert-green)]">{copy.title}</div>
-            <div className="mt-1 text-[11px] font-semibold tracking-[0.2em] text-[var(--text-primary)]">{copy.subtitle}</div>
+      <div className="rounded-xl border border-white/10 bg-[rgba(7,13,19,0.86)] px-3 py-2 shadow-[0_10px_28px_rgba(0,0,0,0.18)] backdrop-blur-md">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-[10px] font-semibold text-[var(--text-primary)]">{copy.title}</div>
+            <div className="mt-0.5 truncate text-[9px] text-[var(--text-muted)]">{postureLabel}</div>
           </div>
-          <div className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-[7px] font-mono tracking-[0.22em]" style={{ color: currentStatusColor }}>
+          <div className="shrink-0 text-[9px] font-medium" style={{ color: currentStatusColor }}>
             {focusTone} · {currentStatusLabel}
           </div>
         </div>
 
-        <div className="mt-3 h-px bg-gradient-to-r from-transparent via-[rgba(77,255,154,0.24)] to-transparent" />
-
-        <div className="mt-3 grid grid-cols-4 gap-2">
-          <div className="rounded-2xl border border-white/8 bg-white/[0.035] px-3 py-2">
-            <div className="flex items-center gap-1.5 text-[7px] font-mono tracking-[0.2em] text-[var(--text-muted)]"><Wifi className="h-3 w-3" /> SYS</div>
-            <div className="mt-1 text-[10px] font-semibold tracking-[0.14em]" style={{ color: currentStatusColor }}>{currentStatusLabel}</div>
-          </div>
-          <div className="rounded-2xl border border-white/8 bg-white/[0.035] px-3 py-2">
-            <div className="flex items-center gap-1.5 text-[7px] font-mono tracking-[0.2em] text-[var(--text-muted)]"><Database className="h-3 w-3" /> {copy.tracked}</div>
-            <div className="mt-1 text-[10px] font-semibold tracking-[0.14em] text-[var(--gold-primary)]">{trackedEntityCount.toLocaleString()}</div>
-          </div>
-          <div className="rounded-2xl border border-white/8 bg-white/[0.035] px-3 py-2">
-            <div className="flex items-center gap-1.5 text-[7px] font-mono tracking-[0.2em] text-[var(--text-muted)]"><AlertTriangle className="h-3 w-3" /> {copy.alerts}</div>
-            <div className="mt-1 text-[10px] font-semibold tracking-[0.14em]" style={{ color: activeIntelAlerts > 0 ? '#F59E0B' : 'var(--alert-green)' }}>{activeIntelAlerts}</div>
-          </div>
-          <div className="rounded-2xl border border-white/8 bg-white/[0.035] px-3 py-2">
-            <div className="flex items-center gap-1.5 text-[7px] font-mono tracking-[0.2em] text-[var(--text-muted)]"><Activity className="h-3 w-3" /> {copy.posture}</div>
-            <div className="mt-1 truncate text-[10px] font-semibold tracking-[0.12em] text-[var(--text-primary)]">{postureLabel}</div>
-          </div>
+        <div className="mt-2 flex items-center gap-2 text-[9px] text-[var(--text-secondary)]">
+          <span className="inline-flex items-center gap-1.5 rounded-md border border-white/8 bg-white/[0.03] px-2 py-1">
+            <Wifi className="h-3 w-3" />
+            {currentStatusLabel}
+          </span>
+          <span className="inline-flex items-center gap-1.5 rounded-md border border-white/8 bg-white/[0.03] px-2 py-1">
+            <Database className="h-3 w-3" />
+            {trackedEntityCount.toLocaleString()}
+          </span>
+          <span className="inline-flex items-center gap-1.5 rounded-md border border-white/8 bg-white/[0.03] px-2 py-1" style={{ color: activeIntelAlerts > 0 ? '#F59E0B' : 'var(--alert-green)' }}>
+            <AlertTriangle className="h-3 w-3" />
+            {activeIntelAlerts}
+          </span>
         </div>
       </div>
     </motion.div>
