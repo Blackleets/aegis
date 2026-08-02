@@ -9,6 +9,14 @@
   backdrop-filter: blur(16px) saturate(108%) !important;
 }
 
+.scope :global(.grid.grid-cols-3) {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+
+.scope :global(.grid.grid-cols-3 > button:nth-child(2)) {
+  display: none !important;
+}
+
 .scope :global(button) {
   min-height: 34px;
   border-radius: 9px !important;
