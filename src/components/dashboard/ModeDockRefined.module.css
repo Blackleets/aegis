@@ -1,5 +1,5 @@
 .scope {
-  position: contents;
+  display: contents;
 }
 
 .scope :global(.sovereign-panel) {
