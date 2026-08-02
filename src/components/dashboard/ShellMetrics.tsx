@@ -24,34 +24,66 @@ export function UptimeClock() {
   );
 }
 
+function formatLocalClock(now: Date, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat('es-ES', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+    hourCycle: 'h23',
+    timeZone,
+    timeZoneName: 'short',
+  }).formatToParts(now);
+
+  const hour = parts.find((part) => part.type === 'hour')?.value ?? '--';
+  const minute = parts.find((part) => part.type === 'minute')?.value ?? '--';
+  const second = parts.find((part) => part.type === 'second')?.value ?? '--';
+  const zone = parts.find((part) => part.type === 'timeZoneName')?.value ?? timeZone;
+
+  return `LOCAL ${hour}:${minute}:${second} ${zone}`;
+}
+
 export function LocalClock() {
-  const [time, setTime] = useState('');
+  const [time, setTime] = useState('LOCAL --:--:--');
 
   useEffect(() => {
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+
     const updateTime = () => {
-      const parts = new Intl.DateTimeFormat(undefined, {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false,
-        timeZoneName: 'short',
-      }).formatToParts(new Date());
-
-      const hour = parts.find((part) => part.type === 'hour')?.value ?? '--';
-      const minute = parts.find((part) => part.type === 'minute')?.value ?? '--';
-      const second = parts.find((part) => part.type === 'second')?.value ?? '--';
-      const zone = parts.find((part) => part.type === 'timeZoneName')?.value ?? 'LOCAL';
-
-      setTime(`LOCAL ${hour}:${minute}:${second} ${zone}`);
+      setTime(formatLocalClock(new Date(), timeZone));
     };
 
-    updateTime();
-    const intervalId = setInterval(updateTime, 1000);
+    const startAlignedClock = () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      if (intervalId) clearInterval(intervalId);
 
-    return () => clearInterval(intervalId);
+      updateTime();
+      const delayToNextSecond = 1000 - (Date.now() % 1000) + 8;
+      timeoutId = setTimeout(() => {
+        updateTime();
+        intervalId = setInterval(updateTime, 1000);
+      }, delayToNextSecond);
+    };
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden) startAlignedClock();
+    };
+
+    startAlignedClock();
+    window.addEventListener('focus', startAlignedClock);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      if (intervalId) clearInterval(intervalId);
+      window.removeEventListener('focus', startAlignedClock);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
-  return <span className="text-[var(--cyan-primary)] font-bold tabular-nums">{time || 'LOCAL --:--:--'}</span>;
+  return <span className="text-[var(--cyan-primary)] font-bold tabular-nums">{time}</span>;
 }
 
 export function ActiveEntityCount({ data }: { data: Record<string, unknown[]> }) {
