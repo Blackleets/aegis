@@ -19,6 +19,7 @@
       }
     ],
     "paths": {
+      "@/components/AegisMap": ["./src/components/AegisMapResponsive"],
       "@/components/AiAnalyst": ["./src/components/AiAnalystRefined"],
       "@/components/dashboard/BottomDesktopHud": ["./src/components/dashboard/BottomDesktopHudRefined"],
       "@/components/dashboard/DesktopOpsRails": ["./src/components/dashboard/DesktopOpsRailsRefined"],
