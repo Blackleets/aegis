@@ -1,0 +1,45 @@
+.scope {
+  position: contents;
+}
+
+.scope :global(.glass-panel) {
+  border-radius: 13px !important;
+  border: 1px solid rgba(148, 163, 184, 0.18) !important;
+  background: rgba(9, 15, 22, 0.9) !important;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.16) !important;
+  backdrop-filter: blur(16px);
+}
+
+.scope :global(.aegis-glow) {
+  filter: none !important;
+  text-shadow: none !important;
+}
+
+.scope :global(.hud-label) {
+  font-family: var(--font-sans), Inter, ui-sans-serif, system-ui, sans-serif !important;
+  font-size: 8px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.08em !important;
+  color: var(--text-muted) !important;
+}
+
+.scope :global(.font-mono) {
+  font-family: var(--font-sans), Inter, ui-sans-serif, system-ui, sans-serif !important;
+  letter-spacing: 0.03em !important;
+}
+
+.scope :global(svg) {
+  opacity: 0.82;
+}
+
+.scope :global(.desktop-only) {
+  --aegis-bottom-hud-density: compact;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scope :global(*) {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
