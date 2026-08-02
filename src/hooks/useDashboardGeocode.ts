@@ -11,10 +11,12 @@ interface DashboardGeocodeState {
   handleRightClick: (coords: Coordinate) => Promise<void>;
 }
 
+const POINTER_TELEMETRY_INTERVAL_MS = 100;
+
 export function useDashboardGeocode(): DashboardGeocodeState {
   const mouseCoordsRef = useRef<Coordinate | null>(null);
   const pendingCoordsRef = useRef<Coordinate | null>(null);
-  const animationFrameRef = useRef<number | null>(null);
+  const pointerTelemetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const coordsDisplayRef = useRef<HTMLDivElement>(null);
   const [locationLabel, setLocationLabel] = useState('');
   const [regionDossier, setRegionDossier] = useState<RegionDossier | null>(null);
@@ -104,24 +106,29 @@ export function useDashboardGeocode(): DashboardGeocodeState {
     }, 900);
   }, []);
 
+  const flushPointerTelemetry = useCallback(() => {
+    pointerTelemetryTimerRef.current = null;
+    const nextCoords = pendingCoordsRef.current;
+    if (!nextCoords) return;
+
+    if (coordsDisplayRef.current) {
+      coordsDisplayRef.current.innerText = `${nextCoords.lat.toFixed(4)}, ${nextCoords.lng.toFixed(4)}`;
+    }
+
+    scheduleReverseGeocode(nextCoords);
+  }, [scheduleReverseGeocode]);
+
   const handleMouseCoords = useCallback((coords: Coordinate) => {
     mouseCoordsRef.current = coords;
     pendingCoordsRef.current = coords;
 
-    if (animationFrameRef.current !== null) return;
+    if (pointerTelemetryTimerRef.current !== null) return;
 
-    animationFrameRef.current = window.requestAnimationFrame(() => {
-      animationFrameRef.current = null;
-      const nextCoords = pendingCoordsRef.current;
-      if (!nextCoords) return;
-
-      if (coordsDisplayRef.current) {
-        coordsDisplayRef.current.innerText = `${nextCoords.lat.toFixed(4)}, ${nextCoords.lng.toFixed(4)}`;
-      }
-
-      scheduleReverseGeocode(nextCoords);
-    });
-  }, [scheduleReverseGeocode]);
+    pointerTelemetryTimerRef.current = setTimeout(
+      flushPointerTelemetry,
+      POINTER_TELEMETRY_INTERVAL_MS,
+    );
+  }, [flushPointerTelemetry]);
 
   const handleRightClick = useCallback(async (coords: Coordinate) => {
     setDossierLoading(true);
@@ -141,7 +148,7 @@ export function useDashboardGeocode(): DashboardGeocodeState {
 
   useEffect(() => () => {
     if (geocodeTimer.current) clearTimeout(geocodeTimer.current);
-    if (animationFrameRef.current !== null) cancelAnimationFrame(animationFrameRef.current);
+    if (pointerTelemetryTimerRef.current !== null) clearTimeout(pointerTelemetryTimerRef.current);
     geocodeAbortRef.current?.abort();
   }, []);
 
