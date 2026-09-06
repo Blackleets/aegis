@@ -41,8 +41,9 @@ export default function WorldPulsePanel({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
+  const refresh = useCallback(async (options?: { showSpinner?: boolean }) => {
+    const showSpinner = options?.showSpinner === true;
+    if (showSpinner) setLoading(true);
     setError(null);
     try {
       const response = await fetch('/api/world-pulse', { cache: 'no-store' });
@@ -57,14 +58,41 @@ export default function WorldPulsePanel({
       setError('No se pudo cargar World Pulse');
       setPayload(null);
     } finally {
-      setLoading(false);
+      if (showSpinner) setLoading(false);
+      else setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    void refresh();
-    const timer = window.setInterval(() => void refresh(), 180_000);
-    return () => window.clearInterval(timer);
+    let cancelled = false;
+    const boot = async () => {
+      try {
+        const response = await fetch('/api/world-pulse', { cache: 'no-store' });
+        const json = await response.json() as PulsePayload;
+        if (cancelled) return;
+        if (!response.ok && json.status === 'unavailable') {
+          setPayload(json);
+          setError('Fuentes globales no disponibles ahora');
+        } else {
+          setPayload(json);
+        }
+      } catch {
+        if (!cancelled) {
+          setError('No se pudo cargar World Pulse');
+          setPayload(null);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    void boot();
+    const timer = window.setInterval(() => {
+      void refresh({ showSpinner: false });
+    }, 180_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
   }, [refresh]);
 
   const events = payload?.events ?? [];
@@ -89,7 +117,7 @@ export default function WorldPulsePanel({
         </div>
         <button
           type="button"
-          onClick={() => void refresh()}
+          onClick={() => void refresh({ showSpinner: true })}
           className="flex min-h-9 min-w-9 items-center justify-center rounded-lg border border-white/10 bg-black/20 text-white/70"
           aria-label="Actualizar World Pulse"
         >
