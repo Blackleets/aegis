@@ -1,9 +1,10 @@
 'use client';
 
 import { AnimatePresence, motion } from 'framer-motion';
-import { ChevronDown, ChevronUp, Globe, Layers, Radar } from 'lucide-react';
+import { ChevronDown, ChevronUp, Globe, Layers, Monitor, Moon, Radar, Sun } from 'lucide-react';
 import type { Locale } from '@/lib/i18n';
 import { getDashboardCopy } from '@/lib/i18n';
+import type { AppearanceMode } from '@/lib/appearance-preferences';
 
 type DashboardMode = 'earth' | 'solar' | 'focus';
 
@@ -14,6 +15,8 @@ type ModeDockProps = {
   collapsed?: boolean;
   onToggleCollapsed?: () => void;
   onLocaleChange: (locale: Locale) => void;
+  appearanceMode?: AppearanceMode;
+  onAppearanceModeChange?: (mode: AppearanceMode) => void;
   onEarthOps: () => void;
   onSolarView: () => void;
   onFocus: () => void;
@@ -41,7 +44,7 @@ function localeButtonClass(active: boolean) {
     : 'border-white/10 bg-white/[0.03] text-[var(--text-secondary)] hover:border-white/20 hover:text-[var(--text-primary)]';
 }
 
-export default function ModeDock({ mode, locale, isMobile = false, collapsed = false, onToggleCollapsed, onLocaleChange, onEarthOps, onSolarView, onFocus }: ModeDockProps) {
+export default function ModeDock({ mode, locale, isMobile = false, collapsed = false, onToggleCollapsed, onLocaleChange, appearanceMode = 'dark', onAppearanceModeChange, onEarthOps, onSolarView, onFocus }: ModeDockProps) {
   const copy = getDashboardCopy(locale);
   const modeMeta: Record<DashboardMode, { label: string; signal: string; accent: string }> = {
     earth: {
@@ -85,6 +88,14 @@ export default function ModeDock({ mode, locale, isMobile = false, collapsed = f
                 {collapsed ? <ChevronDown className="h-3 w-3" /> : <ChevronUp className="h-3 w-3" />}
                 <span>{collapsed ? 'ABRIR' : 'CERRAR'}</span>
               </button>
+            )}
+
+            {onAppearanceModeChange && (
+              <div className="hidden items-center gap-1 rounded-full border border-white/8 bg-white/[0.03] px-1 py-1 sm:flex" role="radiogroup" aria-label="Apariencia">
+                <button type="button" aria-checked={appearanceMode === 'dark'} role="radio" onClick={() => onAppearanceModeChange('dark')} className={`rounded-full border p-1.5 transition-colors ${localeButtonClass(appearanceMode === 'dark')}`} aria-label="Fondo oscuro"><Moon className="h-3 w-3" /></button>
+                <button type="button" aria-checked={appearanceMode === 'light'} role="radio" onClick={() => onAppearanceModeChange('light')} className={`rounded-full border p-1.5 transition-colors ${localeButtonClass(appearanceMode === 'light')}`} aria-label="Fondo claro"><Sun className="h-3 w-3" /></button>
+                <button type="button" aria-checked={appearanceMode === 'system'} role="radio" onClick={() => onAppearanceModeChange('system')} className={`rounded-full border p-1.5 transition-colors ${localeButtonClass(appearanceMode === 'system')}`} aria-label="Seguir sistema"><Monitor className="h-3 w-3" /></button>
+              </div>
             )}
             <div className="hidden items-center gap-1 rounded-full border border-white/8 bg-white/[0.03] px-1 py-1 sm:flex">
               <span className="px-1 text-[6px] font-mono tracking-[0.2em] text-[var(--text-muted)]">{copy.language.label}</span>
