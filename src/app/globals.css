@@ -66,6 +66,52 @@
   --edge-pad: 20px;
 }
 
+
+/* ── Light appearance (DESIGN.md inverted surfaces, same brass/cyan authority) ── */
+html[data-theme="light"] {
+  color-scheme: light;
+  --bg-void: #F3F6F9;
+  --bg-primary: #EEF2F6;
+  --bg-secondary: #FFFFFF;
+  --bg-tertiary: #E7EDF3;
+  --bg-panel: rgba(255, 255, 255, 0.88);
+  --bg-panel-solid: #FFFFFF;
+
+  --gold-primary: #5F7260;
+  --gold-light: #8FA693;
+  --gold-dim: #6F806E;
+  --gold-glow: rgba(95, 114, 96, 0.18);
+
+  --cyan-primary: #0E8E96;
+  --cyan-dim: #327B82;
+  --cyan-glow: rgba(14, 142, 150, 0.12);
+
+  --border-primary: rgba(38, 57, 74, 0.16);
+  --border-secondary: rgba(38, 57, 74, 0.09);
+  --border-active: rgba(95, 114, 96, 0.42);
+  --border-cyan: rgba(14, 142, 150, 0.22);
+
+  --text-primary: #0A121B;
+  --text-secondary: #3E5163;
+  --text-muted: #6B7F90;
+  --text-heading: #05080D;
+  --text-gold: #5F7260;
+  --text-cyan: #0E8E96;
+
+  --scrollbar-thumb: rgba(38, 57, 74, 0.22);
+  --scrollbar-thumb-hover: rgba(38, 57, 74, 0.4);
+  --hover-accent: rgba(14, 142, 150, 0.08);
+}
+
+html[data-theme="light"] body {
+  background: var(--bg-void);
+  color: var(--text-primary);
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+}
+
 @theme inline {
   --color-background: var(--bg-void);
   --color-foreground: var(--text-primary);
