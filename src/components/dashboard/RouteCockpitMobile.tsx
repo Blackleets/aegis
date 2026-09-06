@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   ArrowDownLeft,
@@ -37,7 +37,7 @@ import { type RouteRiskSummary, type RouteSnapshot, type RouteStep, formatRouteD
 import { buildJourneyBoard, buildLiveArrivalLabel } from '@/lib/route-journey-board';
 import { requestNavigationNotificationPermission } from '@/lib/navigation-notifications';
 import { formatRouteAlertAge } from '@/lib/route-alert-freshness';
-import { getRouteAlertGuidance } from '@/lib/route-alert-guidance';
+import { buildRouteAlertVoiceMessage, getRouteAlertGuidance } from '@/lib/route-alert-guidance';
 import { buildLiveRouteIncidentCockpitModel } from '@/lib/live-route-incident-cockpit';
 import { useLiveRouteIncidents } from '@/hooks/useLiveRouteIncidents';
 import {
@@ -336,6 +336,33 @@ export default function RouteCockpitMobile({
         severity: proximityAlert.severity,
       })
     : null;
+
+  const spokenIncidentIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!navigationActive || !navigationVoiceEnabled || !proximityAlert || !proximityGuidance) return;
+    if (!proximityGuidance.shouldSpeak) return;
+    if (spokenIncidentIdRef.current === proximityAlert.id) return;
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    spokenIncidentIdRef.current = proximityAlert.id;
+    const message = buildRouteAlertVoiceMessage({
+      title: proximityAlert.title,
+      distanceMeters: proximityAlert.distanceMeters,
+      guidance: proximityGuidance,
+    });
+    const action = 'action' in proximityAlert && typeof proximityAlert.action === 'string'
+      ? proximityAlert.action
+      : '';
+    const utterance = new SpeechSynthesisUtterance(action ? `${message} ${action}.` : message);
+    utterance.lang = 'es-ES';
+    utterance.rate = 1.05;
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utterance);
+  }, [navigationActive, navigationVoiceEnabled, proximityAlert, proximityGuidance]);
+
+  useEffect(() => {
+    if (!navigationActive) spokenIncidentIdRef.current = null;
+  }, [navigationActive]);
+
 
   const handleNavigationFollow = () => {
     if (!navigationActive) void requestNavigationNotificationPermission();
