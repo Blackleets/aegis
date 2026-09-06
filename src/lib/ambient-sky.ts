@@ -3,8 +3,12 @@ import type { LocalWeather } from '@/hooks/useLocalWeather';
 /** Real-data day phase for subtle sky wash — never invents weather. */
 export type AmbientSkyPhase = 'dawn' | 'day' | 'golden' | 'dusk' | 'night';
 
+/** Soft weather mood from live Open-Meteo icon — no fake conditions. */
+export type AmbientWeatherMood = 'clear' | 'overcast' | 'precip' | 'storm';
+
 export type AmbientSky = {
   phase: AmbientSkyPhase;
+  mood: AmbientWeatherMood;
   /** soft | medium — wash strength; always soft during navigation */
   intensity: 'soft' | 'medium';
   /** true when Open-Meteo reports daytime */
@@ -18,6 +22,23 @@ function parseTime(iso: string | null | undefined): number | null {
   if (!iso) return null;
   const ms = new Date(iso).getTime();
   return Number.isFinite(ms) ? ms : null;
+}
+
+export function getAmbientWeatherMood(icon: LocalWeather['icon']): AmbientWeatherMood {
+  switch (icon) {
+    case 'storm':
+      return 'storm';
+    case 'rain':
+    case 'snow':
+    case 'fog':
+      return 'precip';
+    case 'cloud':
+      return 'overcast';
+    case 'sun':
+    case 'moon':
+    default:
+      return 'clear';
+  }
 }
 
 /**
@@ -52,7 +73,6 @@ export function getAmbientSky(
     } else if (weather.isDay && untilSet > 0 && sinceRise > 0) {
       phase = 'day';
     } else if (!weather.isDay) {
-      // Pre-dawn approach
       if (untilRise > 0 && untilRise < DAWN_DUSK_WINDOW_MS) {
         phase = 'dawn';
       } else {
@@ -67,6 +87,7 @@ export function getAmbientSky(
 
   return {
     phase,
+    mood: getAmbientWeatherMood(weather.icon),
     intensity: navigationActive ? 'soft' : 'medium',
     isDay: weather.isDay,
   };

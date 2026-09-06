@@ -60,7 +60,7 @@ export default function WeatherCapsule({ weather, status, navigationActive }: We
     : weather.condition;
 
   return (
-    <div className="fixed left-4 top-[calc(env(safe-area-inset-top)+4.75rem)] z-[390] flex items-start gap-2">
+    <div className="ambient-weather-capsule fixed left-4 top-[calc(env(safe-area-inset-top)+4.75rem)] z-[390] flex items-start gap-2">
       <button
         type="button"
         onClick={() => setExpanded((value) => !value)}

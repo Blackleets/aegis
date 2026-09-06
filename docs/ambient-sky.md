@@ -1,6 +1,6 @@
 # Ambient sky (day / night / weather feel)
 
-Subtle full-viewport wash driven by **live Open-Meteo** via `useLocalWeather`. No invented weather, no decorative particles.
+Subtle full-viewport wash driven by **live Open-Meteo** via `useLocalWeather`. No invented weather, no decorative particles/stars.
 
 ## Data
 
@@ -8,9 +8,10 @@ Subtle full-viewport wash driven by **live Open-Meteo** via `useLocalWeather`. N
 |-------|-----|
 | `isDay` | Fallback day vs night |
 | `sunrise` / `sunset` | Dawn, golden hour, dusk windows |
-| `icon` / atmosphere | Existing `WeatherAtmosphere` for cloud/rain/snow/fog/storm only |
+| `icon` | Mood: clear / overcast / precip / storm |
+| atmosphere | Existing `WeatherAtmosphere` for cloud/rain/snow/fog/storm only |
 
-Clear sun/moon still has **no** cloud atmosphere (policy unchanged). Clear sky gets wash only.
+Clear sun/moon still has **no** cloud atmosphere (policy unchanged). Clear sky gets wash + soft horizon band only.
 
 ## Phases
 
@@ -18,16 +19,18 @@ Clear sun/moon still has **no** cloud atmosphere (policy unchanged). Clear sky g
 - `day` — daytime outside dawn/golden/dusk
 - `golden` — last ~45 min before sunset
 - `dusk` — around sunset (±50 min)
-- `night` — otherwise when not day
+- `night` — otherwise when not day (screen-blend so it reads on dark basemap)
+
+## Mood
+
+Derived from live icon only: `clear` | `overcast` | `precip` | `storm` (CSS filter tint).
 
 ## Navigation
 
-While a route is active, wash + weather atmosphere dim (`--navigation`) so the HUD stays glanceable.
+While a route is active, wash dims (`--navigation`) so the HUD stays glanceable.
 
-## Surfaces
+## DOM hooks
 
-- `AmbientSky` — fixed wash (`z-index` below chrome, above map)
-- `WeatherAtmosphere` — precip/clouds when live icon supports them
-- `WeatherCapsule` — compact live readout (hidden during nav)
+`document.documentElement` gets `data-ambient-phase` and `data-ambient-mood` while Earth Ops is visible — used for a light capsule rim, not clutter.
 
-Respects `prefers-reduced-motion` (no animated wash).
+Respects `prefers-reduced-motion`.

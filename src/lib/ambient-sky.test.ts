@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { LocalWeather } from '@/hooks/useLocalWeather';
-import { getAmbientSky } from './ambient-sky';
+import { getAmbientSky, getAmbientWeatherMood } from './ambient-sky';
 
 function weather(partial: Partial<LocalWeather>): LocalWeather {
   return {
@@ -56,10 +56,18 @@ describe('ambient sky phase', () => {
       Date.parse('2026-09-06T21:00:00Z'),
     );
     expect(sky?.phase).toBe('night');
+    expect(sky?.mood).toBe('clear');
   });
 
   it('softens intensity while navigating', () => {
     expect(getAmbientSky(weather({}), true)?.intensity).toBe('soft');
     expect(getAmbientSky(weather({}), false)?.intensity).toBe('medium');
+  });
+
+  it('maps live icons to weather mood without inventing', () => {
+    expect(getAmbientWeatherMood('moon')).toBe('clear');
+    expect(getAmbientWeatherMood('cloud')).toBe('overcast');
+    expect(getAmbientWeatherMood('rain')).toBe('precip');
+    expect(getAmbientWeatherMood('storm')).toBe('storm');
   });
 });
