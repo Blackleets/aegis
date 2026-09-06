@@ -223,13 +223,6 @@ export default function RouteCockpitDesktop({
             ))}
           </div>
         )}
-                className={`rounded-full border px-2.5 py-1 text-[8px] font-mono uppercase tracking-[0.18em] transition-colors ${routeSnapshot.activeRouteId === option.id ? 'border-cyan-400/35 bg-cyan-400/14 text-cyan-200' : 'border-white/10 bg-white/[0.03] text-[var(--text-secondary)] hover:text-white'}`}
-              >
-                {option.label} · {formatRouteDuration(option.durationSeconds)}{option.id !== routeSnapshot.activeRouteId ? ` · ${option.durationSeconds >= routeSnapshot.durationSeconds ? '+' : '-'}${formatRouteDuration(Math.abs(option.durationSeconds - routeSnapshot.durationSeconds))}` : ''}
-              </button>
-            ))}
-          </div>
-        )}
         {routeRiskSummary && (
           <div className="mt-3 rounded-2xl border border-white/8 bg-black/20 px-3 py-2.5">
             <div className="flex flex-wrap items-center gap-2 text-[8px] font-mono uppercase tracking-[0.18em]">
