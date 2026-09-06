@@ -362,45 +362,36 @@ export default function RouteCockpitMobile({
             className="pointer-events-auto fixed left-2.5 right-2.5 top-[max(0.6rem,env(safe-area-inset-top))] z-[362]"
             aria-live="polite"
           >
-            <div className="mx-auto max-w-[34rem] overflow-hidden rounded-[1.35rem] border border-white/10 bg-[rgba(5,14,24,0.9)] shadow-[0_14px_38px_rgba(0,0,0,0.34)] backdrop-blur-xl">
-              <div className="flex items-center gap-2.5 p-2.5 pr-2">
-                <div className="relative flex h-[3.75rem] w-[3.75rem] shrink-0 items-center justify-center rounded-[1rem] bg-cyan-300 text-slate-950 shadow-[0_6px_20px_rgba(34,211,238,0.2)] [&_svg]:h-8 [&_svg]:w-8">
-                  {renderManeuverIcon(currentRouteStep)}
-                  <span className="absolute -bottom-1.5 rounded-full border-2 border-[#07111d] bg-white px-2 py-0.5 text-[10px] font-bold tabular-nums text-slate-950">
-                    {stepDistance}
+            <div className="aegis-nav-banner mx-auto max-w-[34rem] overflow-hidden rounded-[1.5rem] border border-[color:var(--border-secondary)] bg-[color:var(--bg-panel)] shadow-[0_16px_40px_rgba(0,0,0,0.4)] backdrop-blur-xl">
+              <div className="flex items-stretch gap-0">
+                <div className="aegis-nav-maneuver flex w-[5.25rem] shrink-0 flex-col items-center justify-center gap-1 bg-[color:var(--cyan-primary)] px-2 py-3 text-[color:var(--bg-void)]">
+                  <div className="flex h-11 w-11 items-center justify-center [&_svg]:h-9 [&_svg]:w-9">
+                    {renderManeuverIcon(currentRouteStep)}
+                  </div>
+                  <span className="text-[15px] font-bold leading-none tabular-nums tracking-[-0.02em]">
+                    {stepDistance ?? '—'}
                   </span>
                 </div>
 
-                <div className="min-w-0 flex-1 py-0.5">
-                  <div className="mb-1 flex items-center gap-1.5 text-[9px] font-medium text-cyan-100/70">
-                    <span className="inline-flex items-center gap-1.5 text-cyan-100">
-                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
-                      {statusLabel}
-                    </span>
-                    {routeRiskSummary?.level === 'high' && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-300/12 px-2 py-1 text-amber-200">
-                        <ShieldAlert className="h-3 w-3" /> Precaución
-                      </span>
-                    )}
-                    {routeRiskSummary?.level !== 'high' && weatherSummary && (
-                      <span className="truncate rounded-full bg-white/[0.06] px-2 py-1 text-white/68">
-                        {weatherSummary}
-                      </span>
-                    )}
-                  </div>
-                  <h2 className="line-clamp-2 text-[16px] font-bold leading-[1.16] tracking-[-0.02em] text-white">{stepInstruction}</h2>
+                <div className="min-w-0 flex-1 px-3 py-2.5">
+                  {routeRiskSummary?.level === 'high' ? (
+                    <p className="mb-1 inline-flex items-center gap-1 text-[10px] font-semibold text-amber-200">
+                      <ShieldAlert className="h-3 w-3" /> Precaución en ruta
+                    </p>
+                  ) : null}
+                  <h2 className="line-clamp-2 text-[17px] font-bold leading-[1.15] tracking-[-0.02em] text-[color:var(--text-primary)]">{stepInstruction}</h2>
                   {nextInstruction && (
-                    <p className="mt-1 truncate text-[9px] text-cyan-100/52">Después · {nextInstruction}</p>
+                    <p className="mt-1 truncate text-[12px] text-[color:var(--text-muted)]">Luego · {nextInstruction}</p>
                   )}
                 </div>
 
                 <button
                   type="button"
                   onClick={onToggleVoice}
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-white/76 transition-colors active:bg-white/15"
+                  className="m-2 flex h-11 w-11 shrink-0 items-center self-center justify-center rounded-full border border-[color:var(--border-secondary)] bg-white/[0.04] text-[color:var(--text-secondary)] active:bg-white/10"
                   aria-label={navigationVoiceEnabled ? 'Silenciar instrucciones' : 'Activar instrucciones por voz'}
                 >
-                  {navigationVoiceEnabled ? <Volume2 className="h-[18px] w-[18px]" /> : <VolumeX className="h-[18px] w-[18px]" />}
+                  {navigationVoiceEnabled ? <Volume2 className="h-5 w-5" strokeWidth={2.25} /> : <VolumeX className="h-5 w-5" strokeWidth={2.25} />}
                 </button>
               </div>
             </div>
@@ -466,6 +457,19 @@ export default function RouteCockpitMobile({
         )}
       </AnimatePresence>
 
+      {navigationActive && (routeSnapshot?.mode ?? 'driving') === 'driving' && (
+        <div
+          className="aegis-nav-speed-chip"
+          data-hidden={navigationSpeedKmh === null ? 'true' : 'false'}
+          aria-label={`Velocidad ${navigationSpeedKmh === null ? 'no disponible' : `${Math.round(navigationSpeedKmh)} kilómetros por hora`}. ${gpsQualityLabel}`}
+        >
+          <span className="text-[22px] font-bold leading-none tabular-nums text-[color:var(--text-primary)]">
+            {navigationSpeedKmh === null ? '—' : Math.round(navigationSpeedKmh)}
+          </span>
+          <span className="mt-0.5 text-[9px] font-medium uppercase tracking-[0.08em] text-[color:var(--text-muted)]">km/h</span>
+        </div>
+      )}
+
       <motion.section
         initial={{ opacity: 0, y: 18 }}
         animate={{ opacity: 1, y: 0 }}
@@ -473,62 +477,30 @@ export default function RouteCockpitMobile({
         transition={{ type: 'spring', stiffness: 360, damping: 32 }}
         className={`pointer-events-auto fixed left-2.5 right-2.5 z-[360] ${navigationActive ? 'bottom-[max(0.6rem,env(safe-area-inset-bottom))]' : 'bottom-[calc(4.4rem+env(safe-area-inset-bottom))]'}`}
       >
-        <div className="mx-auto max-w-[34rem] overflow-hidden rounded-[1.35rem] border border-white/10 bg-[rgba(5,14,24,0.9)] shadow-[0_14px_38px_rgba(0,0,0,0.34)] backdrop-blur-xl">
+        <div className="aegis-nav-sheet mx-auto max-w-[34rem] overflow-hidden rounded-[1.5rem] border border-[color:var(--border-secondary)] bg-[color:var(--bg-panel)] shadow-[0_16px_40px_rgba(0,0,0,0.4)] backdrop-blur-xl">
           {navigationActive ? (
             <>
-              <div className="h-1 bg-white/8">
+              <div className="aegis-nav-progress h-0.5 bg-white/8">
                 <motion.div
-                  className="h-full rounded-r-full bg-cyan-300 shadow-[0_0_14px_rgba(34,211,238,0.65)]"
+                  className="h-full rounded-r-full bg-[color:var(--cyan-primary)]"
                   animate={{ width: `${progressPercent}%` }}
                   transition={{ type: 'spring', stiffness: 140, damping: 24 }}
                 />
               </div>
-              <div className="flex items-center gap-2 px-3 py-2.5">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-[23px] font-bold leading-none tracking-[-0.04em] text-white tabular-nums">{routeEtaLabel}</span>
-                    <span className="text-[8px] font-mono uppercase tracking-[0.16em] text-cyan-200/60">llegada</span>
+              <div className="aegis-nav-trip flex items-center gap-2 px-3 py-3">
+                <div className="grid min-w-0 flex-1 grid-cols-3 gap-1 text-center">
+                  <div>
+                    <div className="text-[20px] font-bold leading-none tracking-[-0.03em] text-[color:var(--text-primary)] tabular-nums">{routeEtaLabel}</div>
+                    <div className="mt-1 text-[10px] font-medium text-[color:var(--text-muted)]">Llegada</div>
                   </div>
-                  <div className="mt-1 flex items-center gap-1.5 text-[10px] font-medium text-white/62">
-                    <span>{distanceLabel}</span>
-                    <span className="h-1 w-1 rounded-full bg-white/25" />
-                    <span>{durationLabel}</span>
-                    <span className="h-1 w-1 rounded-full bg-white/25" />
-                    <span className="inline-flex items-center gap-1"><ModeIcon className="h-3.5 w-3.5" />{modeMeta?.label}</span>
+                  <div>
+                    <div className="text-[20px] font-bold leading-none tracking-[-0.03em] text-[color:var(--text-primary)] tabular-nums">{durationLabel}</div>
+                    <div className="mt-1 text-[10px] font-medium text-[color:var(--text-muted)]">Restante</div>
                   </div>
-                  <div className="mt-1 flex items-center gap-1.5 overflow-hidden whitespace-nowrap text-[9px] font-medium text-cyan-100/52">
-                    <span>{gpsQualityLabel}</span>
-                    {navigationRerouting && <><span>·</span><span className="text-amber-200">Buscando mejor ruta</span></>}
-                    {navigationSimulationActive && <><span>·</span><span className="text-violet-200">Modo prueba</span></>}
-                    {trafficInsight?.status === 'live' && (
-                      <span className={`truncate ${trafficInsight.level === 'heavy' ? 'text-rose-200' : trafficInsight.level === 'moderate' ? 'text-amber-200' : 'text-cyan-100/58'}`}>
-                        · {trafficLabel}
-                      </span>
-                    )}
-                    {activeRouteOption && routeOptions.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={cycleRouteOption}
-                        disabled={routeOptions.length < 2 || navigationRerouting}
-                        className="hidden items-center gap-1 text-cyan-100/78 transition-colors active:text-cyan-100 min-[410px]:inline-flex"
-                        aria-label={routeOptions.length > 1 ? `Cambiar ruta. Seleccionada ${routeChoiceLabel}` : `Ruta seleccionada: ${routeChoiceLabel}`}
-                      >
-                        {activeRouteRecommended ? <Sparkles className="h-3 w-3 text-amber-200" /> : <Route className="h-3 w-3" />}
-                        <span>{routeChoiceLabel}</span>
-                        <span className="text-cyan-200">({activeRouteIndex + 1}/{routeOptions.length})</span>
-                      </button>
-                    )}
+                  <div>
+                    <div className="text-[20px] font-bold leading-none tracking-[-0.03em] text-[color:var(--text-primary)] tabular-nums">{distanceLabel}</div>
+                    <div className="mt-1 text-[10px] font-medium text-[color:var(--text-muted)]">{modeMeta?.label ?? 'Ruta'}</div>
                   </div>
-                </div>
-                <div
-                  className={`flex h-14 w-[3.65rem] shrink-0 flex-col items-center justify-center rounded-2xl border text-center ${gpsWarning ? 'border-amber-200/28 bg-amber-200/[0.08]' : 'border-cyan-200/22 bg-cyan-300/[0.08]'}`}
-                  aria-label={`Velocidad ${navigationSpeedKmh === null ? 'no disponible' : `${Math.round(navigationSpeedKmh)} kilómetros por hora`}. ${gpsQualityLabel}`}
-                >
-                  <span className="text-[23px] font-bold leading-none tracking-[-0.05em] text-white tabular-nums">{navigationSpeedKmh === null ? '—' : Math.round(navigationSpeedKmh)}</span>
-                  <span className="mt-0.5 text-[7px] font-mono uppercase tracking-[0.14em] text-cyan-100/70">km/h</span>
-                  <span className={`mt-0.5 max-w-[3.2rem] truncate text-[6px] font-medium ${gpsWarning ? 'text-amber-200' : 'text-cyan-100/44'}`}>
-                    {gpsSignalStatus === 'acquiring' ? 'GPS…' : gpsAccuracyMeters === null ? 'GPS' : `±${Math.round(gpsAccuracyMeters)}m`}
-                  </span>
                 </div>
                 <button
                   type="button"
@@ -536,17 +508,17 @@ export default function RouteCockpitMobile({
                     setReportFeedback(null);
                     setReportComposerOpen((open) => !open);
                   }}
-                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-transform active:scale-95 ${reportComposerOpen ? 'border-amber-200/45 bg-amber-200/18 text-amber-100' : 'border-amber-200/20 bg-amber-200/[0.08] text-amber-200'}`}
+                  className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition-transform active:scale-95 ${reportComposerOpen ? 'border-amber-200/45 bg-amber-200/18 text-amber-100' : 'border-[color:var(--border-secondary)] bg-white/[0.04] text-amber-200'}`}
                   aria-label="Reportar incidencia"
                   aria-expanded={reportComposerOpen}
                 >
-                  <TriangleAlert className="h-[18px] w-[18px]" />
+                  <TriangleAlert className="h-[18px] w-[18px]" strokeWidth={2.25} />
                 </button>
                 {navigationSimulationActive ? (
                   <button
                     type="button"
                     onClick={onToggleSimulation}
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-violet-300/40 bg-violet-300/18 text-violet-100 transition-transform active:scale-95"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-violet-300/40 bg-violet-300/18 text-violet-100 transition-transform active:scale-95"
                     aria-label="Detener simulación GPS"
                   >
                     <FlaskConical className="h-[18px] w-[18px]" />
@@ -555,21 +527,21 @@ export default function RouteCockpitMobile({
                   <button
                     type="button"
                     onClick={onResumeNavigationCamera}
-                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-transform active:scale-95 ${
+                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition-transform active:scale-95 ${
                       navigationCameraFollowing
-                        ? 'border-cyan-200/22 bg-cyan-300/12 text-cyan-100'
+                        ? 'border-[color:var(--border-cyan)] bg-[color:var(--cyan-primary)]/15 text-[color:var(--cyan-primary)]'
                         : 'border-amber-200/35 bg-amber-200/12 text-amber-100'
                     }`}
                     aria-label={navigationCameraFollowing ? 'Seguimiento GPS activo' : 'Volver a seguir mi posición'}
                     aria-pressed={navigationCameraFollowing}
                   >
-                    <Navigation2 className={`h-[18px] w-[18px] ${navigationCameraFollowing ? 'fill-cyan-200/20' : ''}`} />
+                    <Navigation2 className={`h-[18px] w-[18px] ${navigationCameraFollowing ? 'fill-cyan-200/20' : ''}`} strokeWidth={2.25} />
                   </button>
                 )}
                 <button
                   type="button"
                   onClick={handleNavigationFollow}
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-cyan-300 text-slate-950 shadow-[0_8px_24px_rgba(34,211,238,0.22)] transition-transform active:scale-95"
+                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[color:var(--cyan-primary)] text-[color:var(--bg-void)] shadow-[0_8px_24px_rgba(118,228,234,0.28)] transition-transform active:scale-95"
                   aria-label="Pausar navegación"
                 >
                   <Pause className="h-5 w-5 fill-current" />
@@ -577,11 +549,12 @@ export default function RouteCockpitMobile({
                 <button
                   type="button"
                   onClick={onClearNavigationState}
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/12 bg-white/[0.06] text-white/78 transition-transform active:scale-95"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[color:var(--border-secondary)] bg-white/[0.05] text-[color:var(--text-secondary)] transition-transform active:scale-95"
                   aria-label="Finalizar navegación"
                 >
-                  <X className="h-5 w-5" />
+                  <X className="h-5 w-5" strokeWidth={2.3} />
                 </button>
+              </div>
               </div>
             </>
           ) : (
