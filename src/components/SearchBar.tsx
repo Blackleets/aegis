@@ -222,7 +222,10 @@ function SearchBar({ onLocate, onRoute, defaultOpen = false, variant = 'default'
   useEffect(() => {
     if (!open || !isMobileNav) return;
     if (geoState === 'ready' || geoState === 'locating' || geoState === 'denied') return;
-    void requestCurrentLocation();
+    const timer = window.setTimeout(() => {
+      void requestCurrentLocation();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [open, isMobileNav, geoState, requestCurrentLocation]);
 
 
