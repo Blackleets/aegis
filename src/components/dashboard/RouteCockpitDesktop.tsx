@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { type RouteRiskSummary, type RouteSnapshot, type RouteStep, formatCoordinateLabel, formatRouteDistance, formatRouteDuration, formatRouteModeLabel } from '@/lib/routing-shell';
+import { buildJourneyBoard } from '@/lib/route-journey-board';
 
 type GpsSignalStatus = 'idle' | 'acquiring' | 'live' | 'degraded' | 'denied' | 'unavailable';
 
@@ -85,6 +86,17 @@ export default function RouteCockpitDesktop({
   const gpsQualityLabel = useMemo(
     () => getGpsQualityLabel(gpsStatus, gpsAccuracyMeters),
     [gpsAccuracyMeters, gpsStatus],
+  );
+
+  const journeyBoard = useMemo(
+    () => buildJourneyBoard({
+      options: routeSnapshot.alternatives,
+      activeRouteId: routeSnapshot.activeRouteId,
+      activeRemainingDurationSeconds: navigationActive
+        ? Math.max(30, Math.round((remainingRouteDistance / Math.max(1, routeSnapshot.distanceMeters)) * routeSnapshot.durationSeconds))
+        : null,
+    }),
+    [navigationActive, remainingRouteDistance, routeSnapshot],
   );
 
   return (
@@ -184,16 +196,29 @@ export default function RouteCockpitDesktop({
             </button>
           </div>
         </div>
-        {routeSnapshot.alternatives.length > 1 && (
-          <div className="mt-3 flex flex-wrap gap-2">
-            {routeSnapshot.alternatives.map((option) => (
+        {journeyBoard.length > 1 && (
+          <div className="mt-3 space-y-1.5" aria-label="Comparar rutas">
+            <p className="text-[7px] font-mono uppercase tracking-[0.16em] text-cyan-300/70">Compara rutas</p>
+            {journeyBoard.map((card) => (
               <button
-                key={option.id}
+                key={card.id}
                 type="button"
-                onClick={() => onSelectRouteOption(option.id)}
-                className={`rounded-full border px-2.5 py-1 text-[8px] font-mono uppercase tracking-[0.18em] transition-colors ${routeSnapshot.activeRouteId === option.id ? 'border-cyan-400/35 bg-cyan-400/14 text-cyan-200' : 'border-white/10 bg-white/[0.03] text-[var(--text-secondary)] hover:text-white'}`}
+                onClick={() => onSelectRouteOption(card.id)}
+                className={`flex w-full items-start justify-between gap-2 rounded-xl border px-2.5 py-2 text-left ${
+                  card.selected
+                    ? 'border-cyan-300/35 bg-cyan-300/12'
+                    : card.recommended
+                      ? 'border-amber-200/30 bg-amber-200/10'
+                      : 'border-white/10 bg-white/[0.03]'
+                }`}
+                aria-pressed={card.selected}
               >
-                {option.label} · {formatRouteDuration(option.durationSeconds)}{option.id !== routeSnapshot.activeRouteId ? ` · ${option.durationSeconds >= routeSnapshot.durationSeconds ? '+' : '-'}${formatRouteDuration(Math.abs(option.durationSeconds - routeSnapshot.durationSeconds))}` : ''}
+                <span className="min-w-0">
+                  <span className="text-[7px] font-mono uppercase tracking-[0.12em] text-white/45">{card.badgeLabel}</span>
+                  <span className="mt-0.5 block text-[11px] font-semibold text-white">{card.durationLabel} · {card.etaLabel}</span>
+                  <span className="mt-0.5 block truncate text-[8px] text-white/50">{card.tradeoff}</span>
+                </span>
+                <span className="shrink-0 text-[9px] tabular-nums text-cyan-100/70">{card.distanceLabel}</span>
               </button>
             ))}
           </div>

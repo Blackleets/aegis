@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   ArrowDownLeft,
@@ -34,9 +34,12 @@ import {
   TrafficCone,
 } from 'lucide-react';
 import { type RouteRiskSummary, type RouteSnapshot, type RouteStep, formatRouteDistance, formatRouteDuration, formatStepDistance, localizeRouteInstruction } from '@/lib/routing-shell';
+import { buildJourneyBoard, buildLiveArrivalLabel } from '@/lib/route-journey-board';
 import { requestNavigationNotificationPermission } from '@/lib/navigation-notifications';
 import { formatRouteAlertAge } from '@/lib/route-alert-freshness';
-import { getRouteAlertGuidance } from '@/lib/route-alert-guidance';
+import { buildRouteAlertVoiceMessage, getRouteAlertGuidance } from '@/lib/route-alert-guidance';
+import { buildLiveRouteIncidentCockpitModel } from '@/lib/live-route-incident-cockpit';
+import { useLiveRouteIncidents } from '@/hooks/useLiveRouteIncidents';
 import {
   COMMUNITY_INCIDENTS_CHANGED_EVENT,
   createBrowserCommunityIncidentService,
@@ -189,6 +192,16 @@ export default function RouteCockpitMobile({
   const [reportComposerOpen, setReportComposerOpen] = useState(false);
   const [reportFeedback, setReportFeedback] = useState<string | null>(null);
   const [communityVoteBusy, setCommunityVoteBusy] = useState(false);
+  const destinationCoordinate = routeSnapshot
+    ? { lat: routeSnapshot.destination.lat, lng: routeSnapshot.destination.lng }
+    : null;
+  const liveRouteIncidents = useLiveRouteIncidents({
+    enabled: navigationActive,
+    route: routeSnapshot?.coordinates ?? [],
+    currentLocation,
+    destination: destinationCoordinate,
+  });
+  const liveIncidentCockpit = buildLiveRouteIncidentCockpitModel(liveRouteIncidents);
   const destinationLabel = routeSnapshot?.destination.label ?? 'Preparando ruta';
   const distanceLabel = routeSnapshot ? formatRouteDistance(remainingRouteDistance || routeSnapshot.distanceMeters) : '--';
   const durationLabel = routeSnapshot ? formatRouteDuration(routeSnapshot.durationSeconds) : 'Calculando…';
@@ -238,16 +251,66 @@ export default function RouteCockpitMobile({
   const progressPercent = routeSnapshot
     ? Math.round(Math.max(0, Math.min(1, (routeSnapshot.distanceMeters - remainingRouteDistance) / routeSnapshot.distanceMeters)) * 100)
     : 0;
-  const proximityAlert = nearbyEarthquakeAlert
+  const trafficDelaySeconds = trafficInsight?.status === 'live' ? Math.max(0, trafficInsight.delaySeconds ?? 0) : 0;
+  const journeyBoard = routeSnapshot
+    ? buildJourneyBoard({
+        options: routeSnapshot.alternatives,
+        activeRouteId: routeSnapshot.activeRouteId,
+        recommendedRouteId,
+        recommendationReason: routeRecommendationLabel,
+        trafficDelaySecondsByRouteId: trafficDelaySeconds > 0
+          ? { [routeSnapshot.activeRouteId]: trafficDelaySeconds }
+          : undefined,
+        activeRemainingDurationSeconds: navigationActive
+          ? Math.max(30, Math.round((remainingRouteDistance / Math.max(1, routeSnapshot.distanceMeters)) * routeSnapshot.durationSeconds))
+          : null,
+      })
+    : [];
+  const liveArrivalLabel = routeSnapshot
+    ? (navigationActive
+        ? buildLiveArrivalLabel({
+            remainingDurationSeconds: Math.max(30, Math.round((remainingRouteDistance / Math.max(1, routeSnapshot.distanceMeters)) * routeSnapshot.durationSeconds)),
+            trafficDelaySeconds,
+          })
+        : routeEtaLabel)
+    : routeEtaLabel;
+  const recommendedSwitch = Boolean(
+    recommendedRouteId
+    && routeSnapshot
+    && recommendedRouteId !== routeSnapshot.activeRouteId
+    && routeRecommendationLabel,
+  );
+
+  const liveIncidentDistanceMeters = liveRouteIncidents.incident?.distanceAheadMeters ?? null;
+  const proximityAlert = liveIncidentCockpit && liveIncidentDistanceMeters !== null
+    ? {
+        id: liveIncidentCockpit.incidentId,
+        eyebrow: liveIncidentCockpit.eyebrow,
+        title: liveIncidentCockpit.title,
+        detail: liveIncidentCockpit.detail,
+        action: liveIncidentCockpit.action,
+        confidence: liveIncidentCockpit.confidence,
+        distanceMeters: liveIncidentDistanceMeters,
+        severity: liveIncidentCockpit.severity,
+        critical: liveIncidentCockpit.critical,
+        dismiss: () => liveRouteIncidents.dismissIncident(liveIncidentCockpit.incidentId),
+        channel: 'traffic' as const,
+      }
+    : nearbyEarthquakeAlert
     ? {
         id: nearbyEarthquakeAlert.id,
         eyebrow: `Terremoto · USGS · ${formatRouteAlertAge(nearbyEarthquakeAlert.time)}`,
         title: `M${nearbyEarthquakeAlert.magnitude} a ${formatStepDistance(nearbyEarthquakeAlert.distanceMeters)}`,
         detail: nearbyEarthquakeAlert.place,
+        action: nearbyEarthquakeAlert.magnitude >= 5
+          ? 'Reduce y evita zonas inestables si puedes'
+          : 'Mantén precaución en la zona',
+        confidence: 'high' as const,
         distanceMeters: nearbyEarthquakeAlert.distanceMeters,
         severity: nearbyEarthquakeAlert.magnitude >= 5 ? 'critical' as const : 'warning' as const,
         critical: nearbyEarthquakeAlert.magnitude >= 5,
         dismiss: onDismissNearbyEarthquake,
+        channel: 'earthquake' as const,
       }
     : nearbyContextAlert
       ? {
@@ -255,10 +318,15 @@ export default function RouteCockpitMobile({
           eyebrow: `Incidencia en ruta · ${nearbyContextAlert.source}`,
           title: `${nearbyContextAlert.title} a ${formatStepDistance(nearbyContextAlert.distanceMeters)}`,
           detail: `${nearbyContextAlert.detail} · ${formatRouteAlertAge(nearbyContextAlert.observedAt)}`,
+          action: nearbyContextAlert.severity === 'critical'
+            ? 'Reduce y prepárate para desviar'
+            : 'Mantén vigilancia en la zona',
+          confidence: 'medium' as const,
           distanceMeters: nearbyContextAlert.distanceMeters,
           severity: nearbyContextAlert.severity,
           critical: nearbyContextAlert.severity !== 'info',
           dismiss: onDismissNearbyContext,
+          channel: 'context' as const,
         }
       : null;
   const proximityGuidance = proximityAlert
@@ -268,6 +336,33 @@ export default function RouteCockpitMobile({
         severity: proximityAlert.severity,
       })
     : null;
+
+  const spokenIncidentIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!navigationActive || !navigationVoiceEnabled || !proximityAlert || !proximityGuidance) return;
+    if (!proximityGuidance.shouldSpeak) return;
+    if (spokenIncidentIdRef.current === proximityAlert.id) return;
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    spokenIncidentIdRef.current = proximityAlert.id;
+    const message = buildRouteAlertVoiceMessage({
+      title: proximityAlert.title,
+      distanceMeters: proximityAlert.distanceMeters,
+      guidance: proximityGuidance,
+    });
+    const action = 'action' in proximityAlert && typeof proximityAlert.action === 'string'
+      ? proximityAlert.action
+      : '';
+    const utterance = new SpeechSynthesisUtterance(action ? `${message} ${action}.` : message);
+    utterance.lang = 'es-ES';
+    utterance.rate = 1.05;
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utterance);
+  }, [navigationActive, navigationVoiceEnabled, proximityAlert, proximityGuidance]);
+
+  useEffect(() => {
+    if (!navigationActive) spokenIncidentIdRef.current = null;
+  }, [navigationActive]);
+
 
   const handleNavigationFollow = () => {
     if (!navigationActive) void requestNavigationNotificationPermission();
@@ -427,6 +522,12 @@ export default function RouteCockpitMobile({
                     </div>
                     <p className="mt-0.5 truncate text-[13px] font-bold text-white">{proximityAlert.title}</p>
                     <p className="truncate text-[9px] text-white/48">{proximityAlert.detail}</p>
+                    <p className={`mt-0.5 truncate text-[10px] font-semibold ${proximityAlert.critical ? 'text-orange-100' : 'text-cyan-100'}`}>
+                      {proximityAlert.action}
+                      <span className="ml-1.5 font-mono text-[8px] uppercase tracking-[0.12em] text-white/35">
+                        · conf {proximityAlert.confidence}
+                      </span>
+                    </p>
                   </div>
                   <button type="button" onClick={proximityAlert.dismiss} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white/60" aria-label="Cerrar incidencia próxima">
                     <X className="h-4 w-4" />
@@ -476,6 +577,20 @@ export default function RouteCockpitMobile({
         <div className="mx-auto max-w-[34rem] overflow-hidden rounded-[1.35rem] border border-white/10 bg-[rgba(5,14,24,0.9)] shadow-[0_14px_38px_rgba(0,0,0,0.34)] backdrop-blur-xl">
           {navigationActive ? (
             <>
+              {recommendedSwitch && recommendedRouteId && (
+                <button
+                  type="button"
+                  onClick={() => onSelectRouteOption(recommendedRouteId)}
+                  className="flex w-full items-center justify-between gap-2 border-b border-amber-200/15 bg-amber-200/[0.08] px-3 py-2 text-left"
+                  aria-label="Cambiar a la ruta recomendada"
+                >
+                  <span className="min-w-0">
+                    <span className="block text-[8px] font-mono uppercase tracking-[0.14em] text-amber-200">Mejor ruta disponible</span>
+                    <span className="mt-0.5 block truncate text-[11px] font-semibold text-white">{routeRecommendationLabel}</span>
+                  </span>
+                  <span className="shrink-0 rounded-full bg-amber-200 px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.08em] text-slate-950">Cambiar</span>
+                </button>
+              )}
               <div className="h-1 bg-white/8">
                 <motion.div
                   className="h-full rounded-r-full bg-cyan-300 shadow-[0_0_14px_rgba(34,211,238,0.65)]"
@@ -486,7 +601,7 @@ export default function RouteCockpitMobile({
               <div className="flex items-center gap-2 px-3 py-2.5">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-baseline gap-2">
-                    <span className="text-[23px] font-bold leading-none tracking-[-0.04em] text-white tabular-nums">{routeEtaLabel}</span>
+                    <span className="text-[23px] font-bold leading-none tracking-[-0.04em] text-white tabular-nums">{liveArrivalLabel}</span>
                     <span className="text-[8px] font-mono uppercase tracking-[0.16em] text-cyan-200/60">llegada</span>
                   </div>
                   <div className="mt-1 flex items-center gap-1.5 text-[10px] font-medium text-white/62">
@@ -623,6 +738,36 @@ export default function RouteCockpitMobile({
                   <Search className="h-[18px] w-[18px]" />
                 </button>
               </div>
+              {journeyBoard.length > 1 && (
+                <div className="px-3 pt-3" aria-label="Comparar rutas">
+                  <p className="px-1 text-[8px] font-mono uppercase tracking-[0.16em] text-cyan-200/70">Compara rutas · estilo Citymapper</p>
+                  <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+                    {journeyBoard.map((card) => (
+                      <button
+                        key={card.id}
+                        type="button"
+                        onClick={() => onSelectRouteOption(card.id)}
+                        className={`min-w-[9.5rem] shrink-0 rounded-2xl border px-3 py-2.5 text-left transition-colors ${
+                          card.selected
+                            ? 'border-cyan-200/40 bg-cyan-300/15'
+                            : card.recommended
+                              ? 'border-amber-200/30 bg-amber-200/10'
+                              : 'border-white/10 bg-white/[0.04]'
+                        }`}
+                        aria-pressed={card.selected}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[8px] font-mono uppercase tracking-[0.12em] text-white/45">{card.badgeLabel}</span>
+                          <span className="text-[10px] font-bold tabular-nums text-white">{card.etaLabel}</span>
+                        </div>
+                        <p className="mt-1 text-[12px] font-bold text-white">{card.durationLabel}</p>
+                        <p className="mt-0.5 text-[9px] text-white/55">{card.distanceLabel}</p>
+                        <p className="mt-1 line-clamp-2 text-[8px] leading-snug text-cyan-100/70">{card.tradeoff}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="flex items-center gap-2 p-3 pt-4">
                 <button
                   type="button"
