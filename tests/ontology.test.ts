@@ -87,7 +87,8 @@ describe('ontology adapters', () => {
     ]);
     expect(cases).toHaveLength(1);
     const graph = operationalCaseToOntologyGraph(cases[0]);
-    expect(listEntityKinds(graph)).toEqual(['Case', 'Event', 'Evidence', 'Location']);
+    // news → Event, earthquake → Event (no generic Evidence in this fixture)
+    expect(listEntityKinds(graph)).toEqual(['Case', 'Event', 'Location']);
     expect(graph.entities.some((entity) => entity.kind === 'Case')).toBe(true);
     expect(graph.relationships.some((rel) => rel.type === 'corroborates')).toBe(true);
     expect(graph.relationships.some((rel) => rel.type === 'located_at')).toBe(true);
