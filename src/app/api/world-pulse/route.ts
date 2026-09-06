@@ -4,6 +4,7 @@ import {
   earthquakeToPulseEvent,
   eonetToPulseEvent,
   fireToPulseEvent,
+  gdacsToPulseEvent,
   type WorldPulseSourceInput,
 } from '@/lib/world-pulse';
 
@@ -98,12 +99,42 @@ function parseFirmsCsv(text: string) {
 }
 
 export async function GET() {
+  type GdacsFeature = {
+    properties?: {
+      eventid?: string | number;
+      eventtype?: string;
+      name?: string;
+      alertlevel?: string;
+      fromdate?: string;
+      description?: string;
+      url?: { report?: string } | string;
+    };
+    geometry?: { coordinates?: number[] };
+  };
+
+  const [usgsSettled, eonetSettled, firmsSettled, gdacsSettled] = await Promise.allSettled([
+    fetchJson<{ features?: UsgsFeature[] }>(
+      'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_day.geojson',
+      10_000,
+    ),
+    fetchJson<{ events?: EonetEvent[] }>(
+      'https://eonet.gsfc.nasa.gov/api/v3/events?status=open&limit=30',
+      12_000,
+    ),
+    fetchText(
+      'https://firms.modaps.eosdis.nasa.gov/data/active_fire/suomi-npp-viirs-c2/csv/SUOMI_VIIRS_C2_Global_24h.csv',
+      15_000,
+    ),
+    // Free multi-hazard alerts (Orange/Red only) — fail-closed if shape unexpected
+    fetchJson<{ features?: GdacsFeature[] }>(
+      'https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH?alertlevel=Orange;Red&limit=40',
+      10_000,
+    ),
+  ]);
+
   const inputs: WorldPulseSourceInput[] = [];
 
-  const usgs = await fetchJson<{ features?: UsgsFeature[] }>(
-    'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_day.geojson',
-    10_000,
-  );
+  const usgs = usgsSettled.status === 'fulfilled' ? usgsSettled.value : null;
   if (!usgs) {
     inputs.push({ name: 'USGS', status: 'error', events: [] });
   } else {
@@ -132,10 +163,7 @@ export async function GET() {
     inputs.push({ name: 'USGS', status: events.length ? 'ok' : 'empty', events });
   }
 
-  const eonet = await fetchJson<{ events?: EonetEvent[] }>(
-    'https://eonet.gsfc.nasa.gov/api/v3/events?status=open&limit=30',
-    12_000,
-  );
+  const eonet = eonetSettled.status === 'fulfilled' ? eonetSettled.value : null;
   if (!eonet) {
     inputs.push({ name: 'NASA EONET', status: 'error', events: [] });
   } else {
@@ -164,10 +192,7 @@ export async function GET() {
     inputs.push({ name: 'NASA EONET', status: events.length ? 'ok' : 'empty', events });
   }
 
-  const firmsCsv = await fetchText(
-    'https://firms.modaps.eosdis.nasa.gov/data/active_fire/suomi-npp-viirs-c2/csv/SUOMI_VIIRS_C2_Global_24h.csv',
-    15_000,
-  );
+  const firmsCsv = firmsSettled.status === 'fulfilled' ? firmsSettled.value : null;
   if (!firmsCsv || !firmsCsv.includes('latitude')) {
     inputs.push({ name: 'NASA FIRMS', status: 'error', events: [] });
   } else {
@@ -180,7 +205,39 @@ export async function GET() {
     inputs.push({ name: 'NASA FIRMS', status: events.length ? 'ok' : 'empty', events });
   }
 
-  const snapshot = buildWorldPulseSnapshot(inputs, { limit: 24 });
+  const gdacs = gdacsSettled.status === 'fulfilled' ? gdacsSettled.value : null;
+  if (!gdacs || !Array.isArray(gdacs.features)) {
+    inputs.push({ name: 'GDACS', status: gdacs ? 'empty' : 'error', events: [] });
+  } else {
+    const events = gdacs.features.flatMap((feature) => {
+      const props = feature.properties || {};
+      const coords = feature.geometry?.coordinates || [];
+      const lng = Number(coords[0]);
+      const lat = Number(coords[1]);
+      const rawId = props.eventid;
+      const id = rawId === undefined || rawId === null ? '' : String(rawId);
+      const url = typeof props.url === 'string'
+        ? props.url
+        : props.url && typeof props.url === 'object'
+          ? props.url.report || null
+          : null;
+      const mapped = gdacsToPulseEvent({
+        id,
+        name: props.name || '',
+        eventType: props.eventtype,
+        alertLevel: props.alertlevel,
+        lat,
+        lng,
+        fromDate: props.fromdate || null,
+        description: props.description || null,
+        url,
+      });
+      return mapped ? [mapped] : [];
+    });
+    inputs.push({ name: 'GDACS', status: events.length ? 'ok' : 'empty', events });
+  }
+
+  const snapshot = buildWorldPulseSnapshot(inputs, { limit: 28 });
 
   return NextResponse.json({
     status: snapshot.status,
@@ -197,12 +254,11 @@ export async function GET() {
       observed_at: new Date(event.observedAt).toISOString(),
       source: event.source,
       source_url: event.sourceUrl || null,
-      score: event.score,
     })),
   }, {
     status: snapshot.status === 'unavailable' ? 503 : 200,
     headers: {
-      'Cache-Control': 'public, s-maxage=120, stale-while-revalidate=300',
+      'Cache-Control': 'public, s-maxage=90, stale-while-revalidate=180',
     },
   });
 }
