@@ -4,6 +4,7 @@ import "./globals.css";
 import "./navigation-mobile.css";
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { MOBILE_NOTIFICATION_GUARD_SCRIPT } from '@/lib/notification-compatibility';
+import { APPEARANCE_BOOTSTRAP_SCRIPT } from '@/lib/appearance-preferences';
 
 const SITE_URL = "https://aegis.blackleets.dev";
 const SITE_NAME = "AEGIS";
@@ -139,7 +140,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es" dir="ltr">
+    <html lang="es" dir="ltr" data-theme="dark" data-appearance="dark">
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
@@ -149,6 +150,10 @@ export default function RootLayout({
         <script
           id="aegis-mobile-notification-guard"
           dangerouslySetInnerHTML={{ __html: MOBILE_NOTIFICATION_GUARD_SCRIPT }}
+        />
+        <script
+          id="aegis-appearance-bootstrap"
+          dangerouslySetInnerHTML={{ __html: APPEARANCE_BOOTSTRAP_SCRIPT }}
         />
         <script
           type="application/ld+json"
