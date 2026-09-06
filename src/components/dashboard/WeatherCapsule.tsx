@@ -47,7 +47,7 @@ export default function WeatherCapsule({ weather, status, navigationActive }: We
 
   if (!weather) {
     return (
-      <div className="pointer-events-none fixed left-4 top-[calc(env(safe-area-inset-top)+4.75rem)] z-[390] grid h-11 w-11 place-items-center rounded-[15px] border border-white/10 bg-[rgba(4,13,22,0.76)] text-[8px] font-mono text-white/55 backdrop-blur-xl">
+      <div className="pointer-events-none fixed left-4 top-[calc(env(safe-area-inset-top)+4.75rem)] z-[390] grid h-11 w-11 place-items-center rounded-[15px] border border-[color:var(--border-secondary)] bg-[color:var(--bg-panel)] text-[8px] font-mono text-[color:var(--text-muted)] backdrop-blur-xl">
         …
       </div>
     );
@@ -65,23 +65,23 @@ export default function WeatherCapsule({ weather, status, navigationActive }: We
         type="button"
         onClick={() => setExpanded((value) => !value)}
         className={`pointer-events-auto flex h-11 min-w-11 items-center justify-center gap-1.5 rounded-[15px] border px-2.5 shadow-[0_12px_30px_rgba(0,0,0,0.34)] backdrop-blur-xl transition-all active:scale-95 ${
-          expanded ? 'border-cyan-200/28 bg-[rgba(6,27,38,0.94)]' : 'border-white/12 bg-[rgba(4,13,22,0.82)]'
+          expanded ? 'border-[color:var(--border-cyan)] bg-[color:var(--bg-panel-solid)]' : 'border-[color:var(--border-secondary)] bg-[color:var(--bg-panel)]'
         }`}
         aria-label={`${weather.place}, ${Math.round(weather.temperatureC)} grados, ${weather.condition}. ${expanded ? 'Ocultar detalle' : 'Ver detalle'}`}
         aria-expanded={expanded}
         title={`Datos reales de Open-Meteo · actualizados ${weather.observedAt}`}
       >
         <Icon className={`h-[18px] w-[18px] shrink-0 ${rainSoon ? 'text-cyan-200' : weather.isDay ? 'text-amber-200' : 'text-indigo-200'}`} />
-        <span className="text-[13px] font-semibold tabular-nums text-white">{Math.round(weather.temperatureC)}°</span>
+        <span className="text-[13px] font-semibold tabular-nums text-[color:var(--text-primary)]">{Math.round(weather.temperatureC)}°</span>
       </button>
 
       {expanded && (
-        <div className="pointer-events-auto min-w-[9.5rem] max-w-[calc(100vw-6rem)] rounded-[17px] border border-white/12 bg-[rgba(4,13,22,0.94)] px-3 py-2 shadow-[0_14px_38px_rgba(0,0,0,0.38)] backdrop-blur-xl" role="status">
+        <div className="pointer-events-auto min-w-[9.5rem] max-w-[calc(100vw-6rem)] rounded-[17px] border border-[color:var(--border-secondary)] bg-[color:var(--bg-panel-solid)] px-3 py-2 shadow-[0_14px_38px_rgba(0,0,0,0.38)] backdrop-blur-xl" role="status">
           <div className="flex items-baseline gap-1.5 whitespace-nowrap">
-            <span className="max-w-[9rem] truncate text-[11px] font-semibold text-white/92">{weather.place}</span>
-            <span className="text-[9px] tabular-nums text-white/48">{localTime(weather.timezone)}</span>
+            <span className="max-w-[9rem] truncate text-[11px] font-semibold text-[color:var(--text-primary)]">{weather.place}</span>
+            <span className="text-[9px] tabular-nums text-[color:var(--text-muted)]">{localTime(weather.timezone)}</span>
           </div>
-          <div className="mt-0.5 flex items-center gap-1.5 whitespace-nowrap text-[9px] text-white/62">
+          <div className="mt-0.5 flex items-center gap-1.5 whitespace-nowrap text-[9px] text-[color:var(--text-secondary)]">
             <span>{detail}</span>
             {typeof weather.windKmh === 'number' && (
               <>

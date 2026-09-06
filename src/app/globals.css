@@ -168,6 +168,77 @@ html, body {
     0 0 60px rgba(118, 228, 234, 0.05);
 }
 
+
+/* ── Ambient sky wash: real day/night from Open-Meteo — no fake particles ── */
+.ambient-sky {
+  position: fixed;
+  z-index: 18;
+  inset: 0;
+  pointer-events: none;
+  contain: strict;
+  opacity: 0.55;
+  transition: opacity 0.6s ease, background 0.9s ease;
+  mix-blend-mode: soft-light;
+}
+
+.ambient-sky--soft { opacity: 0.28; }
+.ambient-sky--medium { opacity: 0.55; }
+.ambient-sky--navigation { opacity: 0.14; mix-blend-mode: normal; }
+
+.ambient-sky--dawn {
+  background:
+    radial-gradient(ellipse 90% 55% at 50% -10%, rgba(255, 186, 140, 0.42), transparent 55%),
+    linear-gradient(180deg, rgba(88, 120, 168, 0.22) 0%, transparent 42%, rgba(8, 14, 24, 0.12) 100%);
+}
+
+.ambient-sky--day {
+  background:
+    radial-gradient(ellipse 80% 45% at 70% -5%, rgba(180, 220, 255, 0.2), transparent 50%),
+    linear-gradient(180deg, rgba(120, 170, 210, 0.1) 0%, transparent 38%);
+}
+
+.ambient-sky--golden {
+  background:
+    radial-gradient(ellipse 95% 50% at 78% 0%, rgba(255, 168, 72, 0.38), transparent 52%),
+    linear-gradient(185deg, rgba(255, 140, 70, 0.16) 0%, transparent 40%, rgba(20, 12, 8, 0.1) 100%);
+}
+
+.ambient-sky--dusk {
+  background:
+    radial-gradient(ellipse 90% 55% at 55% -8%, rgba(196, 110, 150, 0.32), transparent 55%),
+    linear-gradient(180deg, rgba(60, 50, 90, 0.28) 0%, transparent 45%, rgba(6, 10, 18, 0.2) 100%);
+}
+
+.ambient-sky--night {
+  background:
+    radial-gradient(ellipse 70% 40% at 30% 0%, rgba(70, 90, 150, 0.22), transparent 50%),
+    linear-gradient(180deg, rgba(4, 10, 22, 0.35) 0%, transparent 48%, rgba(2, 6, 14, 0.18) 100%);
+}
+
+html[data-theme="light"] .ambient-sky--day {
+  background:
+    radial-gradient(ellipse 80% 45% at 70% -5%, rgba(140, 190, 240, 0.18), transparent 50%),
+    linear-gradient(180deg, rgba(180, 210, 235, 0.12) 0%, transparent 40%);
+  mix-blend-mode: multiply;
+  opacity: 0.35;
+}
+
+html[data-theme="light"] .ambient-sky--night,
+html[data-theme="light"] .ambient-sky--dusk {
+  mix-blend-mode: multiply;
+}
+
+@media (max-width: 767px) {
+  .ambient-sky { opacity: 0.4; }
+  .ambient-sky--medium { opacity: 0.4; }
+  .ambient-sky--soft { opacity: 0.22; }
+  .ambient-sky--navigation { opacity: 0.1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ambient-sky { transition: none; }
+}
+
 /* ── Live weather atmosphere: compositor-only, pointer-free map depth ── */
 .weather-atmosphere {
   position: fixed;
