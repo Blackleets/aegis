@@ -1,0 +1,690 @@
+'use client';
+
+import { useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import {
+  ArrowDownLeft,
+  ArrowDownRight,
+  ArrowLeft,
+  ArrowRight,
+  ArrowUp,
+  Bike,
+  CarFront,
+  ChevronLeft,
+  ChevronRight,
+  CircleStop,
+  Flag,
+  Footprints,
+  Navigation2,
+  Pause,
+  Play,
+  Route,
+  RotateCcw,
+  Search,
+  ShieldAlert,
+  Signpost,
+  FlaskConical,
+  Volume2,
+  VolumeX,
+  X,
+  Sparkles,
+  Gauge,
+  TriangleAlert,
+  Construction,
+  TrafficCone,
+} from 'lucide-react';
+import { type RouteRiskSummary, type RouteSnapshot, type RouteStep, formatRouteDistance, formatRouteDuration, formatStepDistance, localizeRouteInstruction } from '@/lib/routing-shell';
+import { requestNavigationNotificationPermission } from '@/lib/navigation-notifications';
+import { formatRouteAlertAge } from '@/lib/route-alert-freshness';
+import { getRouteAlertGuidance } from '@/lib/route-alert-guidance';
+import { buildLiveRouteIncidentCockpitModel } from '@/lib/live-route-incident-cockpit';
+import { useLiveRouteIncidents } from '@/hooks/useLiveRouteIncidents';
+import {
+  COMMUNITY_INCIDENTS_CHANGED_EVENT,
+  createBrowserCommunityIncidentService,
+  getOrCreateCommunityReporterId,
+} from '@/lib/browser-community-incidents';
+import type { CommunityIncidentKind } from '@/lib/community-incidents';
+
+type NearbyEarthquakeAlert = {
+  id: string;
+  magnitude: number;
+  place: string;
+  distanceMeters: number;
+  depth?: number;
+  time: number;
+  source: 'USGS';
+};
+
+type NearbyContextAlert = {
+  id: string;
+  kind: 'traffic-camera' | 'wildfire' | 'volcano' | 'severe-weather';
+  title: string;
+  detail: string;
+  distanceMeters: number;
+  source: string;
+  severity: 'info' | 'warning' | 'critical';
+  observedAt: number | null;
+};
+
+type TrafficInsight = {
+  status: 'loading' | 'live' | 'unavailable';
+  configured?: boolean;
+  source: string;
+  delaySeconds?: number;
+  trafficLengthMeters?: number;
+  level?: 'clear' | 'light' | 'moderate' | 'heavy';
+};
+
+type RouteCockpitMobileProps = {
+  routeLoading: boolean;
+  routeSnapshot: RouteSnapshot | null;
+  navigationActive: boolean;
+  mobileVectorStatusLabel: string;
+  routeEtaLabel: string;
+  routeProgressLabel: string;
+  remainingRouteDistance: number;
+  routeRiskSummary: RouteRiskSummary | null;
+  currentRouteStep: RouteStep | null;
+  nextRouteStep: RouteStep | null;
+  currentStepDistanceMeters: number | null;
+  gpsAccuracyMeters: number | null;
+  gpsSignalStatus: 'idle' | 'acquiring' | 'live' | 'degraded' | 'denied' | 'unavailable';
+  navigationSpeedKmh: number | null;
+  navigationRerouting: boolean;
+  navigationSimulationActive: boolean;
+  navigationArrived: boolean;
+  navigationVoiceEnabled: boolean;
+  onToggleNavigationFollow: () => void;
+  onClearNavigationState: () => void;
+  onOpenSearch: () => void;
+  onToggleSimulation: () => void;
+  onToggleVoice: () => void;
+  onSelectRouteOption: (routeId: string) => void;
+  nearbyEarthquakeAlert: NearbyEarthquakeAlert | null;
+  onDismissNearbyEarthquake: () => void;
+  nearbyContextAlert: NearbyContextAlert | null;
+  onDismissNearbyContext: () => void;
+  recommendedRouteId: string | null;
+  routeRecommendationLabel: string | null;
+  trafficInsight: TrafficInsight | null;
+  currentLocation: { lat: number; lng: number } | null;
+  navigationCameraFollowing: boolean;
+  onResumeNavigationCamera: () => void;
+  weatherSummary: string | null;
+};
+
+const LOCAL_REPORT_OPTIONS: Array<{
+  kind: CommunityIncidentKind;
+  label: string;
+  Icon: typeof TriangleAlert;
+}> = [
+  { kind: 'accident', label: 'Accidente', Icon: TriangleAlert },
+  { kind: 'camera', label: 'Cámara', Icon: Construction },
+  { kind: 'fire', label: 'Incendio', Icon: ShieldAlert },
+  { kind: 'flood', label: 'Inundación', Icon: ShieldAlert },
+  { kind: 'road_closure', label: 'Cierre', Icon: TrafficCone },
+  { kind: 'road_hazard', label: 'Peligro', Icon: ShieldAlert },
+];
+
+function getModeMeta(mode: RouteSnapshot['mode']) {
+  if (mode === 'walking') return { label: 'A pie', Icon: Footprints };
+  if (mode === 'cycling') return { label: 'Bici', Icon: Bike };
+  return { label: 'Coche', Icon: CarFront };
+}
+
+function renderManeuverIcon(step: RouteStep | null) {
+  const type = step?.maneuver.type.toLowerCase() ?? '';
+  const modifier = step?.maneuver.modifier?.toLowerCase() ?? '';
+  const iconClass = 'h-10 w-10';
+  const strokeWidth = 2.7;
+
+  if (type.includes('arrive')) return <Flag className={iconClass} strokeWidth={strokeWidth} />;
+  if (type.includes('roundabout') || type.includes('rotary')) return <RotateCcw className={iconClass} strokeWidth={strokeWidth} />;
+  if (modifier.includes('sharp left')) return <ArrowDownLeft className={iconClass} strokeWidth={strokeWidth} />;
+  if (modifier.includes('sharp right')) return <ArrowDownRight className={iconClass} strokeWidth={strokeWidth} />;
+  if (modifier.includes('slight left')) return <ChevronLeft className={iconClass} strokeWidth={strokeWidth} />;
+  if (modifier.includes('slight right')) return <ChevronRight className={iconClass} strokeWidth={strokeWidth} />;
+  if (modifier.includes('left')) return <ArrowLeft className={iconClass} strokeWidth={strokeWidth} />;
+  if (modifier.includes('right')) return <ArrowRight className={iconClass} strokeWidth={strokeWidth} />;
+  if (type.includes('merge') || type.includes('fork')) return <Signpost className={iconClass} strokeWidth={strokeWidth} />;
+  return <ArrowUp className={iconClass} strokeWidth={strokeWidth} />;
+}
+
+export default function RouteCockpitMobile({
+  routeLoading,
+  routeSnapshot,
+  navigationActive,
+  mobileVectorStatusLabel,
+  routeEtaLabel,
+  routeProgressLabel,
+  remainingRouteDistance,
+  routeRiskSummary,
+  currentRouteStep,
+  nextRouteStep,
+  currentStepDistanceMeters,
+  gpsAccuracyMeters,
+  gpsSignalStatus,
+  navigationSpeedKmh,
+  navigationRerouting,
+  navigationSimulationActive,
+  navigationArrived,
+  navigationVoiceEnabled,
+  onToggleNavigationFollow,
+  onClearNavigationState,
+  onOpenSearch,
+  onToggleSimulation,
+  onToggleVoice,
+  onSelectRouteOption,
+  nearbyEarthquakeAlert,
+  onDismissNearbyEarthquake,
+  nearbyContextAlert,
+  onDismissNearbyContext,
+  recommendedRouteId,
+  routeRecommendationLabel,
+  trafficInsight,
+  currentLocation,
+  navigationCameraFollowing,
+  onResumeNavigationCamera,
+  weatherSummary,
+}: RouteCockpitMobileProps) {
+  const [reportComposerOpen, setReportComposerOpen] = useState(false);
+  const [reportFeedback, setReportFeedback] = useState<string | null>(null);
+  const [communityVoteBusy, setCommunityVoteBusy] = useState(false);
+  const destinationCoordinate = routeSnapshot
+    ? { lat: routeSnapshot.destination.lat, lng: routeSnapshot.destination.lng }
+    : null;
+  const liveRouteIncidents = useLiveRouteIncidents({
+    enabled: navigationActive,
+    route: routeSnapshot?.coordinates ?? [],
+    currentLocation,
+    destination: destinationCoordinate,
+  });
+  const liveIncidentCockpit = buildLiveRouteIncidentCockpitModel(liveRouteIncidents);
+  const destinationLabel = routeSnapshot?.destination.label ?? 'Preparando ruta';
+  const distanceLabel = routeSnapshot ? formatRouteDistance(remainingRouteDistance || routeSnapshot.distanceMeters) : '--';
+  const durationLabel = routeSnapshot ? formatRouteDuration(routeSnapshot.durationSeconds) : 'Calculando…';
+  const modeMeta = routeSnapshot ? getModeMeta(routeSnapshot.mode) : null;
+  const ModeIcon = modeMeta?.Icon ?? Navigation2;
+  const stepInstruction = currentRouteStep ? localizeRouteInstruction(currentRouteStep.instruction) : 'Sigue la ruta';
+  const stepDistance = currentStepDistanceMeters !== null ? formatStepDistance(currentStepDistanceMeters) : null;
+  const statusLabel = routeLoading ? 'Calculando ruta…' : navigationArrived ? 'Has llegado' : navigationRerouting ? 'Recalculando…' : navigationSimulationActive ? 'Simulación GPS' : navigationActive ? 'Copiloto activo' : 'Ruta lista';
+  const nextInstruction = nextRouteStep ? localizeRouteInstruction(nextRouteStep.instruction) : null;
+  const gpsQualityLabel = gpsSignalStatus === 'acquiring'
+    ? 'Buscando GPS…'
+    : gpsSignalStatus === 'denied'
+      ? 'GPS sin permiso'
+      : gpsSignalStatus === 'unavailable'
+        ? 'GPS sin señal'
+        : gpsSignalStatus === 'degraded'
+          ? 'GPS débil'
+          : gpsAccuracyMeters === null
+            ? 'GPS'
+            : gpsAccuracyMeters <= 15
+              ? 'GPS preciso'
+              : `GPS ±${Math.round(gpsAccuracyMeters)} m`;
+  const gpsWarning = gpsSignalStatus === 'degraded' || gpsSignalStatus === 'denied' || gpsSignalStatus === 'unavailable';
+  const routeOptions = routeSnapshot?.alternatives ?? [];
+  const activeRouteIndex = routeSnapshot ? Math.max(0, routeOptions.findIndex((option) => option.id === routeSnapshot.activeRouteId)) : 0;
+  const activeRouteOption = routeOptions[activeRouteIndex] ?? null;
+  const routeChoiceLabel = activeRouteOption?.label || `Ruta ${activeRouteIndex + 1}`;
+  const activeRouteRecommended = activeRouteOption?.id === recommendedRouteId;
+  const cycleRouteOption = () => {
+    if (routeOptions.length < 2) return;
+    onSelectRouteOption(routeOptions[(activeRouteIndex + 1) % routeOptions.length].id);
+  };
+  const trafficDelayMinutes = trafficInsight?.status === 'live' ? Math.max(0, Math.round((trafficInsight.delaySeconds ?? 0) / 60)) : null;
+  const trafficLabel = trafficInsight?.status === 'loading'
+    ? 'Analizando tráfico…'
+    : trafficInsight?.status === 'live'
+      ? trafficInsight.level === 'heavy'
+        ? `Tráfico intenso · +${trafficDelayMinutes} min`
+        : trafficInsight.level === 'moderate'
+          ? `Tráfico moderado · +${trafficDelayMinutes} min`
+          : trafficInsight.level === 'light'
+            ? `Tráfico ligero · +${trafficDelayMinutes} min`
+            : 'Tráfico fluido'
+      : trafficInsight?.configured === false
+        ? 'Tráfico live pendiente de configurar'
+        : 'Tráfico live no disponible';
+  const progressPercent = routeSnapshot
+    ? Math.round(Math.max(0, Math.min(1, (routeSnapshot.distanceMeters - remainingRouteDistance) / routeSnapshot.distanceMeters)) * 100)
+    : 0;
+  const liveIncidentDistanceMeters = liveRouteIncidents.incident?.distanceAheadMeters ?? null;
+  const proximityAlert = liveIncidentCockpit && liveIncidentDistanceMeters !== null
+    ? {
+        id: liveIncidentCockpit.incidentId,
+        eyebrow: liveIncidentCockpit.eyebrow,
+        title: liveIncidentCockpit.title,
+        detail: liveIncidentCockpit.detail,
+        action: liveIncidentCockpit.action,
+        confidence: liveIncidentCockpit.confidence,
+        distanceMeters: liveIncidentDistanceMeters,
+        severity: liveIncidentCockpit.severity,
+        critical: liveIncidentCockpit.critical,
+        dismiss: () => liveRouteIncidents.dismissIncident(liveIncidentCockpit.incidentId),
+        channel: 'traffic' as const,
+      }
+    : nearbyEarthquakeAlert
+    ? {
+        id: nearbyEarthquakeAlert.id,
+        eyebrow: `Terremoto · USGS · ${formatRouteAlertAge(nearbyEarthquakeAlert.time)}`,
+        title: `M${nearbyEarthquakeAlert.magnitude} a ${formatStepDistance(nearbyEarthquakeAlert.distanceMeters)}`,
+        detail: nearbyEarthquakeAlert.place,
+        action: nearbyEarthquakeAlert.magnitude >= 5
+          ? 'Reduce y evita zonas inestables si puedes'
+          : 'Mantén precaución en la zona',
+        confidence: 'high' as const,
+        distanceMeters: nearbyEarthquakeAlert.distanceMeters,
+        severity: nearbyEarthquakeAlert.magnitude >= 5 ? 'critical' as const : 'warning' as const,
+        critical: nearbyEarthquakeAlert.magnitude >= 5,
+        dismiss: onDismissNearbyEarthquake,
+        channel: 'earthquake' as const,
+      }
+    : nearbyContextAlert
+      ? {
+          id: nearbyContextAlert.id,
+          eyebrow: `Incidencia en ruta · ${nearbyContextAlert.source}`,
+          title: `${nearbyContextAlert.title} a ${formatStepDistance(nearbyContextAlert.distanceMeters)}`,
+          detail: `${nearbyContextAlert.detail} · ${formatRouteAlertAge(nearbyContextAlert.observedAt)}`,
+          action: nearbyContextAlert.severity === 'critical'
+            ? 'Reduce y prepárate para desviar'
+            : 'Mantén vigilancia en la zona',
+          confidence: 'medium' as const,
+          distanceMeters: nearbyContextAlert.distanceMeters,
+          severity: nearbyContextAlert.severity,
+          critical: nearbyContextAlert.severity !== 'info',
+          dismiss: onDismissNearbyContext,
+          channel: 'context' as const,
+        }
+      : null;
+  const proximityGuidance = proximityAlert
+    ? getRouteAlertGuidance({
+        distanceMeters: proximityAlert.distanceMeters,
+        speedKmh: navigationSpeedKmh,
+        severity: proximityAlert.severity,
+      })
+    : null;
+
+  const handleNavigationFollow = () => {
+    if (!navigationActive) void requestNavigationNotificationPermission();
+    onToggleNavigationFollow();
+  };
+
+  const saveLocalReport = async (kind: CommunityIncidentKind) => {
+    if (!currentLocation || typeof window === 'undefined') {
+      setReportFeedback('Esperando una ubicación GPS válida');
+      return;
+    }
+
+    const reporterId = getOrCreateCommunityReporterId(
+      window.localStorage,
+      () => window.crypto.randomUUID(),
+    );
+    const incident = await createBrowserCommunityIncidentService(window.localStorage).report({
+      kind,
+      location: {
+        latitude: currentLocation.lat,
+        longitude: currentLocation.lng,
+      },
+      reporterId,
+      reportedAt: new Date().toISOString(),
+    });
+    window.dispatchEvent(new Event(COMMUNITY_INCIDENTS_CHANGED_EVENT));
+    setReportFeedback(incident.reportCount > 1 ? 'Incidencia cercana actualizada' : 'Guardado solo en este dispositivo');
+    window.setTimeout(() => setReportComposerOpen(false), 900);
+  };
+
+  const voteOnLocalIncident = async (vote: 'confirm' | 'reject') => {
+    if (!proximityAlert?.id.startsWith('community-') || typeof window === 'undefined') return;
+    setCommunityVoteBusy(true);
+    try {
+      const reporterId = getOrCreateCommunityReporterId(window.localStorage, () => window.crypto.randomUUID());
+      await createBrowserCommunityIncidentService(window.localStorage).vote(proximityAlert.id, reporterId, vote, new Date().toISOString());
+      window.dispatchEvent(new Event(COMMUNITY_INCIDENTS_CHANGED_EVENT));
+      setReportFeedback(vote === 'confirm' ? 'Confirmación local guardada' : 'Rechazo local guardado');
+    } catch (error) {
+      setReportFeedback(error instanceof Error && error.message.includes('own incident') ? 'No puedes confirmar tu propio reporte' : 'No se pudo actualizar la incidencia');
+    } finally {
+      setCommunityVoteBusy(false);
+    }
+  };
+
+  return (
+    <>
+      <AnimatePresence>
+        {navigationActive && reportComposerOpen && (
+          <motion.aside
+            initial={{ opacity: 0, y: 12, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.98 }}
+            className="pointer-events-auto fixed bottom-[6.15rem] left-2.5 right-2.5 z-[365] mx-auto max-w-[34rem] overflow-hidden rounded-[1.35rem] border border-amber-200/18 bg-[rgba(13,18,24,0.96)] p-3 shadow-[0_18px_45px_rgba(0,0,0,0.42)] backdrop-blur-xl"
+            aria-label="Reportar incidencia"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-amber-200">¿Qué ocurre aquí?</p>
+                <p className="mt-1 text-[9px] leading-relaxed text-white/48">Se guarda solo en este dispositivo y caduca según el tipo de incidencia. Aún no se comparte con otros usuarios.</p>
+              </div>
+              <button type="button" onClick={() => setReportComposerOpen(false)} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white/60" aria-label="Cerrar reporte">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              {LOCAL_REPORT_OPTIONS.map(({ kind, label, Icon }) => (
+                <button
+                  key={kind}
+                  type="button"
+                  onClick={() => void saveLocalReport(kind)}
+                  className="flex min-h-[4.5rem] flex-col items-center justify-center gap-1.5 rounded-2xl border border-white/10 bg-white/[0.05] px-1 text-[9px] font-semibold text-white/78 transition-colors active:bg-amber-200/15"
+                >
+                  <Icon className="h-5 w-5 text-amber-200" />
+                  {label}
+                </button>
+              ))}
+            </div>
+            {reportFeedback && <p className="mt-2 text-center text-[9px] font-medium text-amber-100" aria-live="polite">{reportFeedback}</p>}
+          </motion.aside>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence mode="wait">
+        {navigationActive && currentRouteStep && !routeLoading && (
+          <motion.section
+            key={currentRouteStep.index}
+            initial={{ opacity: 0, y: -12, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.99 }}
+            transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+            className="pointer-events-auto fixed left-2.5 right-2.5 top-[max(0.6rem,env(safe-area-inset-top))] z-[362]"
+            aria-live="polite"
+          >
+            <div className="mx-auto max-w-[34rem] overflow-hidden rounded-[1.35rem] border border-white/10 bg-[rgba(5,14,24,0.9)] shadow-[0_14px_38px_rgba(0,0,0,0.34)] backdrop-blur-xl">
+              <div className="flex items-center gap-2.5 p-2.5 pr-2">
+                <div className="relative flex h-[3.75rem] w-[3.75rem] shrink-0 items-center justify-center rounded-[1rem] bg-cyan-300 text-slate-950 shadow-[0_6px_20px_rgba(34,211,238,0.2)] [&_svg]:h-8 [&_svg]:w-8">
+                  {renderManeuverIcon(currentRouteStep)}
+                  <span className="absolute -bottom-1.5 rounded-full border-2 border-[#07111d] bg-white px-2 py-0.5 text-[10px] font-bold tabular-nums text-slate-950">
+                    {stepDistance}
+                  </span>
+                </div>
+
+                <div className="min-w-0 flex-1 py-0.5">
+                  <div className="mb-1 flex items-center gap-1.5 text-[9px] font-medium text-cyan-100/70">
+                    <span className="inline-flex items-center gap-1.5 text-cyan-100">
+                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
+                      {statusLabel}
+                    </span>
+                    {routeRiskSummary?.level === 'high' && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-300/12 px-2 py-1 text-amber-200">
+                        <ShieldAlert className="h-3 w-3" /> Precaución
+                      </span>
+                    )}
+                    {routeRiskSummary?.level !== 'high' && weatherSummary && (
+                      <span className="truncate rounded-full bg-white/[0.06] px-2 py-1 text-white/68">
+                        {weatherSummary}
+                      </span>
+                    )}
+                  </div>
+                  <h2 className="line-clamp-2 text-[16px] font-bold leading-[1.16] tracking-[-0.02em] text-white">{stepInstruction}</h2>
+                  {nextInstruction && (
+                    <p className="mt-1 truncate text-[9px] text-cyan-100/52">Después · {nextInstruction}</p>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={onToggleVoice}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-white/76 transition-colors active:bg-white/15"
+                  aria-label={navigationVoiceEnabled ? 'Silenciar instrucciones' : 'Activar instrucciones por voz'}
+                >
+                  {navigationVoiceEnabled ? <Volume2 className="h-[18px] w-[18px]" /> : <VolumeX className="h-[18px] w-[18px]" />}
+                </button>
+              </div>
+            </div>
+            <AnimatePresence>
+              {proximityAlert && (
+                <motion.aside
+                  key={proximityAlert.id}
+                  initial={{ opacity: 0, y: -8, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -6, scale: 0.98 }}
+                  className={`mx-auto mt-2 max-w-[32rem] rounded-[1.1rem] border px-3 py-2 shadow-[0_12px_32px_rgba(0,0,0,0.34)] backdrop-blur-xl ${proximityAlert.critical ? 'border-orange-300/24 bg-[rgba(45,22,10,0.92)]' : 'border-cyan-300/18 bg-[rgba(5,24,31,0.92)]'}`}
+                  aria-label="Incidencia próxima en la ruta"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${proximityAlert.critical ? 'bg-orange-300 text-slate-950' : 'bg-cyan-300 text-slate-950'}`}><ShieldAlert className="h-[18px] w-[18px]" /></div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <p className={`min-w-0 truncate text-[8px] font-semibold uppercase tracking-[0.13em] ${proximityAlert.critical ? 'text-orange-200' : 'text-cyan-200'}`}>{proximityAlert.eyebrow}</p>
+                      {proximityGuidance && (
+                        <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.08em] ${proximityGuidance.phase === 'now' ? 'bg-rose-400 text-white' : proximityAlert.critical ? 'bg-orange-300/16 text-orange-100' : 'bg-cyan-300/14 text-cyan-100'}`}>
+                          {proximityGuidance.label}
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-0.5 truncate text-[13px] font-bold text-white">{proximityAlert.title}</p>
+                    <p className="truncate text-[9px] text-white/48">{proximityAlert.detail}</p>
+                    <p className={`mt-0.5 truncate text-[10px] font-semibold ${proximityAlert.critical ? 'text-orange-100' : 'text-cyan-100'}`}>
+                      {proximityAlert.action}
+                      <span className="ml-1.5 font-mono text-[8px] uppercase tracking-[0.12em] text-white/35">
+                        · conf {proximityAlert.confidence}
+                      </span>
+                    </p>
+                  </div>
+                  <button type="button" onClick={proximityAlert.dismiss} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white/60" aria-label="Cerrar incidencia próxima">
+                    <X className="h-4 w-4" />
+                  </button>
+                  </div>
+                  {proximityAlert.id.startsWith('community-') && (
+                    <>
+                      <div className="mt-2 flex gap-2 border-t border-white/10 pt-2">
+                        <button
+                          type="button"
+                          disabled={communityVoteBusy}
+                          onClick={() => void voteOnLocalIncident('confirm')}
+                          className="min-h-11 flex-1 rounded-xl bg-emerald-300/15 text-[9px] font-bold text-emerald-100 disabled:opacity-50"
+                        >
+                          Sigue ahí
+                        </button>
+                        <button
+                          type="button"
+                          disabled={communityVoteBusy}
+                          onClick={() => void voteOnLocalIncident('reject')}
+                          className="min-h-11 flex-1 rounded-xl bg-rose-300/12 text-[9px] font-bold text-rose-100 disabled:opacity-50"
+                        >
+                          Ya no está
+                        </button>
+                      </div>
+                      {reportFeedback && (
+                        <p className="mt-2 text-center text-[9px] font-medium text-amber-100" aria-live="polite">
+                          {reportFeedback}
+                        </p>
+                      )}
+                    </>
+                  )}
+                </motion.aside>
+              )}
+            </AnimatePresence>
+          </motion.section>
+        )}
+      </AnimatePresence>
+
+      <motion.section
+        initial={{ opacity: 0, y: 18 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 18 }}
+        transition={{ type: 'spring', stiffness: 360, damping: 32 }}
+        className={`pointer-events-auto fixed left-2.5 right-2.5 z-[360] ${navigationActive ? 'bottom-[max(0.6rem,env(safe-area-inset-bottom))]' : 'bottom-[calc(4.4rem+env(safe-area-inset-bottom))]'}`}
+      >
+        <div className="mx-auto max-w-[34rem] overflow-hidden rounded-[1.35rem] border border-white/10 bg-[rgba(5,14,24,0.9)] shadow-[0_14px_38px_rgba(0,0,0,0.34)] backdrop-blur-xl">
+          {navigationActive ? (
+            <>
+              <div className="h-1 bg-white/8">
+                <motion.div
+                  className="h-full rounded-r-full bg-cyan-300 shadow-[0_0_14px_rgba(34,211,238,0.65)]"
+                  animate={{ width: `${progressPercent}%` }}
+                  transition={{ type: 'spring', stiffness: 140, damping: 24 }}
+                />
+              </div>
+              <div className="flex items-center gap-2 px-3 py-2.5">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-[23px] font-bold leading-none tracking-[-0.04em] text-white tabular-nums">{routeEtaLabel}</span>
+                    <span className="text-[8px] font-mono uppercase tracking-[0.16em] text-cyan-200/60">llegada</span>
+                  </div>
+                  <div className="mt-1 flex items-center gap-1.5 text-[10px] font-medium text-white/62">
+                    <span>{distanceLabel}</span>
+                    <span className="h-1 w-1 rounded-full bg-white/25" />
+                    <span>{durationLabel}</span>
+                    <span className="h-1 w-1 rounded-full bg-white/25" />
+                    <span className="inline-flex items-center gap-1"><ModeIcon className="h-3.5 w-3.5" />{modeMeta?.label}</span>
+                  </div>
+                  <div className="mt-1 flex items-center gap-1.5 overflow-hidden whitespace-nowrap text-[9px] font-medium text-cyan-100/52">
+                    <span>{gpsQualityLabel}</span>
+                    {navigationRerouting && <><span>·</span><span className="text-amber-200">Buscando mejor ruta</span></>}
+                    {navigationSimulationActive && <><span>·</span><span className="text-violet-200">Modo prueba</span></>}
+                    {trafficInsight?.status === 'live' && (
+                      <span className={`truncate ${trafficInsight.level === 'heavy' ? 'text-rose-200' : trafficInsight.level === 'moderate' ? 'text-amber-200' : 'text-cyan-100/58'}`}>
+                        · {trafficLabel}
+                      </span>
+                    )}
+                    {activeRouteOption && routeOptions.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={cycleRouteOption}
+                        disabled={routeOptions.length < 2 || navigationRerouting}
+                        className="hidden items-center gap-1 text-cyan-100/78 transition-colors active:text-cyan-100 min-[410px]:inline-flex"
+                        aria-label={routeOptions.length > 1 ? `Cambiar ruta. Seleccionada ${routeChoiceLabel}` : `Ruta seleccionada: ${routeChoiceLabel}`}
+                      >
+                        {activeRouteRecommended ? <Sparkles className="h-3 w-3 text-amber-200" /> : <Route className="h-3 w-3" />}
+                        <span>{routeChoiceLabel}</span>
+                        <span className="text-cyan-200">({activeRouteIndex + 1}/{routeOptions.length})</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div
+                  className={`flex h-14 w-[3.65rem] shrink-0 flex-col items-center justify-center rounded-2xl border text-center ${gpsWarning ? 'border-amber-200/28 bg-amber-200/[0.08]' : 'border-cyan-200/22 bg-cyan-300/[0.08]'}`}
+                  aria-label={`Velocidad ${navigationSpeedKmh === null ? 'no disponible' : `${Math.round(navigationSpeedKmh)} kilómetros por hora`}. ${gpsQualityLabel}`}
+                >
+                  <span className="text-[23px] font-bold leading-none tracking-[-0.05em] text-white tabular-nums">{navigationSpeedKmh === null ? '—' : Math.round(navigationSpeedKmh)}</span>
+                  <span className="mt-0.5 text-[7px] font-mono uppercase tracking-[0.14em] text-cyan-100/70">km/h</span>
+                  <span className={`mt-0.5 max-w-[3.2rem] truncate text-[6px] font-medium ${gpsWarning ? 'text-amber-200' : 'text-cyan-100/44'}`}>
+                    {gpsSignalStatus === 'acquiring' ? 'GPS…' : gpsAccuracyMeters === null ? 'GPS' : `±${Math.round(gpsAccuracyMeters)}m`}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setReportFeedback(null);
+                    setReportComposerOpen((open) => !open);
+                  }}
+                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-transform active:scale-95 ${reportComposerOpen ? 'border-amber-200/45 bg-amber-200/18 text-amber-100' : 'border-amber-200/20 bg-amber-200/[0.08] text-amber-200'}`}
+                  aria-label="Reportar incidencia"
+                  aria-expanded={reportComposerOpen}
+                >
+                  <TriangleAlert className="h-[18px] w-[18px]" />
+                </button>
+                {navigationSimulationActive ? (
+                  <button
+                    type="button"
+                    onClick={onToggleSimulation}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-violet-300/40 bg-violet-300/18 text-violet-100 transition-transform active:scale-95"
+                    aria-label="Detener simulación GPS"
+                  >
+                    <FlaskConical className="h-[18px] w-[18px]" />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={onResumeNavigationCamera}
+                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-transform active:scale-95 ${
+                      navigationCameraFollowing
+                        ? 'border-cyan-200/22 bg-cyan-300/12 text-cyan-100'
+                        : 'border-amber-200/35 bg-amber-200/12 text-amber-100'
+                    }`}
+                    aria-label={navigationCameraFollowing ? 'Seguimiento GPS activo' : 'Volver a seguir mi posición'}
+                    aria-pressed={navigationCameraFollowing}
+                  >
+                    <Navigation2 className={`h-[18px] w-[18px] ${navigationCameraFollowing ? 'fill-cyan-200/20' : ''}`} />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={handleNavigationFollow}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-cyan-300 text-slate-950 shadow-[0_8px_24px_rgba(34,211,238,0.22)] transition-transform active:scale-95"
+                  aria-label="Pausar navegación"
+                >
+                  <Pause className="h-5 w-5 fill-current" />
+                </button>
+                <button
+                  type="button"
+                  onClick={onClearNavigationState}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/12 bg-white/[0.06] text-white/78 transition-transform active:scale-95"
+                  aria-label="Finalizar navegación"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex items-start gap-3 px-4 pt-4">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-cyan-300/12 text-cyan-200">
+                  {routeLoading ? <Route className="h-5 w-5 animate-pulse" /> : <Flag className="h-5 w-5" />}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-cyan-200/58">{statusLabel}</p>
+                    {!routeLoading && (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-emerald-300/16 bg-emerald-300/[0.08] px-2 py-1 text-[8px] font-medium text-emerald-200">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                        {gpsAccuracyMeters !== null ? `GPS ±${Math.round(gpsAccuracyMeters)} m` : 'Origen GPS'}
+                      </span>
+                    )}
+                  </div>
+                  <h2 className="mt-1 truncate text-[17px] font-bold text-white">{routeLoading ? 'Buscando la mejor ruta' : destinationLabel}</h2>
+                  {!routeLoading && <p className="mt-1 text-[10px] text-white/44">Desde tu ubicación actual · revisa la ruta antes de iniciar</p>}
+                  {!routeLoading && trafficInsight && (
+                    <div className={`mt-2 inline-flex max-w-full items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[9px] font-medium ${trafficInsight.level === 'heavy' ? 'border-rose-300/18 bg-rose-300/[0.08] text-rose-100' : 'border-cyan-200/14 bg-cyan-200/[0.06] text-cyan-100/76'}`}>
+                      <Gauge className="h-3 w-3 shrink-0" />
+                      <span className="truncate">{trafficLabel}{trafficInsight.status === 'live' ? ' · TomTom live' : ''}</span>
+                    </div>
+                  )}
+                  {!routeLoading && routeRecommendationLabel && (
+                    <div className="mt-2 inline-flex max-w-full items-center gap-1.5 rounded-full border border-amber-200/16 bg-amber-200/[0.07] px-2.5 py-1.5 text-[9px] font-medium text-amber-100/84">
+                      <Sparkles className="h-3 w-3 shrink-0" />
+                      <span className="truncate">AEGIS recomienda · {routeRecommendationLabel}</span>
+                    </div>
+                  )}
+                  <div className="mt-2 flex items-center gap-2 text-[12px] text-white/62">
+                    <span className="font-semibold text-white">{routeEtaLabel}</span>
+                    <span>·</span><span>{distanceLabel}</span><span>·</span><span>{durationLabel}</span>
+                  </div>
+                </div>
+                <button type="button" onClick={onOpenSearch} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-white/72" aria-label="Cambiar destino">
+                  <Search className="h-[18px] w-[18px]" />
+                </button>
+              </div>
+              <div className="flex items-center gap-2 p-3 pt-4">
+                <button
+                  type="button"
+                  onClick={handleNavigationFollow}
+                  disabled={routeLoading}
+                  className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-full bg-cyan-300 px-5 text-[12px] font-bold uppercase tracking-[0.12em] text-slate-950 shadow-[0_8px_26px_rgba(34,211,238,0.2)] disabled:cursor-wait disabled:opacity-60"
+                >
+                  {routeLoading ? <Route className="h-4 w-4 animate-pulse" /> : <Play className="h-4 w-4 fill-current" />}
+                  {routeLoading ? mobileVectorStatusLabel : 'Iniciar navegación'}
+                </button>
+                <button type="button" onClick={onClearNavigationState} className="flex min-h-12 items-center justify-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-4 text-[11px] font-semibold text-white/72">
+                  <CircleStop className="h-4 w-4" /> Salir
+                </button>
+              </div>
+              <span className="sr-only">Progreso {routeProgressLabel}</span>
+            </>
+          )}
+        </div>
+      </motion.section>
+    </>
+  );
+}
