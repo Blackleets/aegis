@@ -233,3 +233,52 @@ export function eonetToPulseEvent(input: {
     sourceUrl: input.source_url || input.link || undefined,
   };
 }
+
+
+export function gdacsToPulseEvent(input: {
+  id: string;
+  name: string;
+  eventType?: string;
+  alertLevel?: string;
+  lat: number;
+  lng: number;
+  fromDate?: string | null;
+  description?: string | null;
+  url?: string | null;
+}): Omit<WorldPulseEvent, 'score'> | null {
+  const id = input.id?.trim();
+  const name = input.name?.trim();
+  if (!id || !name) return null;
+  if (!Number.isFinite(input.lat) || !Number.isFinite(input.lng)) return null;
+
+  const type = (input.eventType || '').toUpperCase();
+  let kind: WorldPulseKind = 'other';
+  if (type === 'EQ') kind = 'earthquake';
+  else if (type === 'TC') kind = 'storm';
+  else if (type === 'FL') kind = 'flood';
+  else if (type === 'VO') kind = 'volcano';
+  else if (type === 'WF') kind = 'wildfire';
+
+  const alert = (input.alertLevel || '').toLowerCase();
+  const severity: WorldPulseSeverity = alert.includes('red')
+    ? 'critical'
+    : alert.includes('orange')
+      ? 'elevated'
+      : alert.includes('green')
+        ? 'watch'
+        : 'info';
+
+  const observedAt = input.fromDate ? Date.parse(input.fromDate) : Date.now();
+  return {
+    id: `gdacs:${id}`,
+    kind,
+    title: name,
+    detail: input.description?.trim() || `GDACS ${input.alertLevel || 'alert'} · ${type || 'event'}`,
+    severity,
+    latitude: input.lat,
+    longitude: input.lng,
+    observedAt: Number.isFinite(observedAt) ? observedAt : Date.now(),
+    source: 'GDACS',
+    sourceUrl: input.url || undefined,
+  };
+}
