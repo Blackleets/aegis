@@ -1,18 +1,20 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronDown, ChevronUp, Clock3, MapPin, Network, ShieldAlert } from 'lucide-react';
+import { ChevronDown, ChevronUp, Clock3, Share2, MapPin, Network, ShieldAlert } from 'lucide-react';
 import type { OperationalCase } from '@/lib/operational-cases';
 
 export default function OperationalCaseCard({
   operationalCase,
   onLocate,
   onInspectOntology,
+  onInspectLinkAnalysis,
   compact = false,
 }: {
   operationalCase: OperationalCase;
   onLocate: (latitude: number, longitude: number) => void;
   onInspectOntology?: (operationalCase: OperationalCase) => void;
+  onInspectLinkAnalysis?: (operationalCase: OperationalCase) => void;
   compact?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -56,15 +58,29 @@ export default function OperationalCaseCard({
         </button>
       </div>
 
-      {onInspectOntology && (
-        <button
-          type="button"
-          onClick={() => onInspectOntology(operationalCase)}
-          className="mt-2 flex min-h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-cyan-200/20 bg-cyan-300/10 px-2 text-[8px] font-semibold uppercase tracking-[0.1em] text-cyan-100"
-        >
-          <Network className="h-3.5 w-3.5" />
-          Ontología
-        </button>
+      {(onInspectOntology || onInspectLinkAnalysis) && (
+        <div className="mt-2 flex gap-2">
+          {onInspectOntology && (
+            <button
+              type="button"
+              onClick={() => onInspectOntology(operationalCase)}
+              className="flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-lg border border-cyan-200/20 bg-cyan-300/10 px-2 text-[8px] font-semibold uppercase tracking-[0.1em] text-cyan-100"
+            >
+              <Network className="h-3.5 w-3.5" />
+              Ontología
+            </button>
+          )}
+          {onInspectLinkAnalysis && (
+            <button
+              type="button"
+              onClick={() => onInspectLinkAnalysis(operationalCase)}
+              className="flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-lg border border-violet-200/20 bg-violet-300/10 px-2 text-[8px] font-semibold uppercase tracking-[0.1em] text-violet-100"
+            >
+              <Share2 className="h-3.5 w-3.5" />
+              Grafo
+            </button>
+          )}
+        </div>
       )}
 
       {expanded && (
