@@ -16,8 +16,8 @@ describe('saved destinations', () => {
   });
 
   it('writes and reads Casa/Trabajo locally', () => {
-    writeSavedDestination('home', { lat: 40.4, lng: -3.7, placeLabel: 'Madrid Centro' });
-    writeSavedDestination('work', { lat: 40.45, lng: -3.69, placeLabel: 'Oficina' });
+    expect(writeSavedDestination('home', { lat: 40.4, lng: -3.7, placeLabel: 'Madrid Centro' })).not.toBeNull();
+    expect(writeSavedDestination('work', { lat: 40.45, lng: -3.69, placeLabel: 'Oficina' })).not.toBeNull();
     const store = readSavedDestinations();
     expect(store.home?.placeLabel).toBe('Madrid Centro');
     expect(store.work?.label).toBe('Trabajo');
@@ -28,7 +28,7 @@ describe('saved destinations', () => {
   });
 
   it('clears a slot', () => {
-    writeSavedDestination('home', { lat: 1, lng: 2, placeLabel: 'A' });
+    expect(writeSavedDestination('home', { lat: 1, lng: 2, placeLabel: 'A' })).not.toBeNull();
     clearSavedDestination('home');
     expect(readSavedDestinations().home).toBeUndefined();
   });

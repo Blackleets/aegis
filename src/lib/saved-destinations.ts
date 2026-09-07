@@ -23,14 +23,22 @@ export function savedDestinationSlotLabel(slot: SavedDestinationSlot) {
   return SLOT_LABEL[slot];
 }
 
-function canUseStorage() {
-  return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
+/** Prefer global localStorage (works in browser + vitest stubGlobal). */
+function getLocalStorage(): Storage | null {
+  try {
+    const ls = (globalThis as { localStorage?: Storage }).localStorage;
+    if (!ls) return null;
+    return ls;
+  } catch {
+    return null;
+  }
 }
 
 export function readSavedDestinations(): Store {
-  if (!canUseStorage()) return {};
+  const ls = getLocalStorage();
+  if (!ls) return {};
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw = ls.getItem(STORAGE_KEY);
     if (!raw) return {};
     const parsed = JSON.parse(raw) as Store;
     const out: Store = {};
@@ -57,7 +65,8 @@ export function writeSavedDestination(
   slot: SavedDestinationSlot,
   place: { lat: number; lng: number; placeLabel: string },
 ): SavedDestination | null {
-  if (!canUseStorage()) return null;
+  const ls = getLocalStorage();
+  if (!ls) return null;
   if (!Number.isFinite(place.lat) || !Number.isFinite(place.lng)) return null;
   const placeLabel = place.placeLabel.trim();
   if (!placeLabel) return null;
@@ -71,7 +80,7 @@ export function writeSavedDestination(
   const store = readSavedDestinations();
   store[slot] = next;
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+    ls.setItem(STORAGE_KEY, JSON.stringify(store));
     return next;
   } catch {
     return null;
@@ -79,11 +88,12 @@ export function writeSavedDestination(
 }
 
 export function clearSavedDestination(slot: SavedDestinationSlot) {
-  if (!canUseStorage()) return;
+  const ls = getLocalStorage();
+  if (!ls) return;
   const store = readSavedDestinations();
   delete store[slot];
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+    ls.setItem(STORAGE_KEY, JSON.stringify(store));
   } catch {
     // ignore quota / private mode
   }
