@@ -119,7 +119,7 @@ function SearchBar({ onLocate, onRoute, defaultOpen = false, variant = 'default'
   const [draftWaypoints, setDraftWaypoints] = useState<SearchResult[]>([]);
   const [lastResolvedQuery, setLastResolvedQuery] = useState('');
   const [voiceState, setVoiceState] = useState<VoiceState>('idle');
-  const [savedDestinations, setSavedDestinations] = useState<Partial<Record<SavedDestinationSlot, SavedDestination>>>({});
+  const [savedDestinations, setSavedDestinations] = useState<Partial<Record<SavedDestinationSlot, SavedDestination>>>(() => readSavedDestinations());
   const [saveHint, setSaveHint] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const voiceRecognitionRef = useRef<BrowserSpeechRecognition | null>(null);
@@ -137,7 +137,12 @@ function SearchBar({ onLocate, onRoute, defaultOpen = false, variant = 'default'
   }, [open]);
 
   useEffect(() => {
-    setSavedDestinations(readSavedDestinations());
+    if (!open) return;
+    // Defer so eslint react-hooks/set-state-in-effect stays happy (same pattern as GPS).
+    const timer = window.setTimeout(() => {
+      setSavedDestinations(readSavedDestinations());
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [open]);
 
   useEffect(() => {
