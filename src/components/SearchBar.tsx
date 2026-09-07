@@ -1,7 +1,15 @@
 'use client';
 
 import { memo, useState, useRef, useEffect, useCallback } from 'react';
-import { Search, X, MapPin, Navigation, LocateFixed, Car, PersonStanding, Bike, Plus, Flag, GitCommitHorizontal, Mic, MicOff, CircleDot } from 'lucide-react';
+import { Search, X, MapPin, Navigation, LocateFixed, Car, PersonStanding, Bike, Plus, Flag, GitCommitHorizontal, Mic, MicOff, CircleDot, Home, Briefcase } from 'lucide-react';
+import {
+  clearSavedDestination,
+  readSavedDestinations,
+  savedDestinationSlotLabel,
+  writeSavedDestination,
+  type SavedDestination,
+  type SavedDestinationSlot,
+} from '@/lib/saved-destinations';
 
 /* ═══════════════════════════════════════════════════════════════
    AEGIS — Search / Locate Bar
@@ -111,6 +119,8 @@ function SearchBar({ onLocate, onRoute, defaultOpen = false, variant = 'default'
   const [draftWaypoints, setDraftWaypoints] = useState<SearchResult[]>([]);
   const [lastResolvedQuery, setLastResolvedQuery] = useState('');
   const [voiceState, setVoiceState] = useState<VoiceState>('idle');
+  const [savedDestinations, setSavedDestinations] = useState<Partial<Record<SavedDestinationSlot, SavedDestination>>>(() => readSavedDestinations());
+  const [saveHint, setSaveHint] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const voiceRecognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const handledAutoVoiceTokenRef = useRef(0);
@@ -124,6 +134,15 @@ function SearchBar({ onLocate, onRoute, defaultOpen = false, variant = 'default'
 
   useEffect(() => {
     if (open) inputRef.current?.focus();
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    // Defer so eslint react-hooks/set-state-in-effect stays happy (same pattern as GPS).
+    const timer = window.setTimeout(() => {
+      setSavedDestinations(readSavedDestinations());
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [open]);
 
   useEffect(() => {
@@ -383,6 +402,38 @@ function SearchBar({ onLocate, onRoute, defaultOpen = false, variant = 'default'
     }
   };
 
+  const routeToSaved = async (slot: SavedDestinationSlot) => {
+    const saved = savedDestinations[slot];
+    if (!saved) {
+      setSaveHint(`Busca un sitio y guárdalo como ${savedDestinationSlotLabel(slot)}`);
+      return;
+    }
+    const result: SearchResult = {
+      label: `${savedDestinationSlotLabel(slot)} · ${saved.placeLabel}`,
+      lat: saved.lat,
+      lng: saved.lng,
+      zoom: 14,
+      kind: `saved_${slot}`,
+    };
+    if (onRoute) await handleRoute(result);
+    else handleSelect(result);
+  };
+
+  const saveResultAs = (slot: SavedDestinationSlot, result: SearchResult) => {
+    const written = writeSavedDestination(slot, {
+      lat: result.lat,
+      lng: result.lng,
+      placeLabel: result.label,
+    });
+    if (!written) {
+      setSaveHint('No se pudo guardar en este dispositivo');
+      return;
+    }
+    setSavedDestinations(readSavedDestinations());
+    setSaveHint(`${savedDestinationSlotLabel(slot)} guardada`);
+    window.setTimeout(() => setSaveHint(null), 2400);
+  };
+
   if (!open) {
     return (
       <button
@@ -489,6 +540,47 @@ function SearchBar({ onLocate, onRoute, defaultOpen = false, variant = 'default'
               </button>
             ) : null}
           </div>
+        </div>
+      )}
+
+      {isMobileNav && (
+        <div className="flex flex-wrap items-center gap-2">
+          {(['home', 'work'] as const).map((slot) => {
+            const saved = savedDestinations[slot];
+            const Icon = slot === 'home' ? Home : Briefcase;
+            return (
+              <button
+                key={slot}
+                type="button"
+                onClick={() => void routeToSaved(slot)}
+                onContextMenu={(event) => {
+                  event.preventDefault();
+                  if (saved) {
+                    clearSavedDestination(slot);
+                    setSavedDestinations(readSavedDestinations());
+                    setSaveHint(`${savedDestinationSlotLabel(slot)} eliminada`);
+                  }
+                }}
+                className={`inline-flex min-h-11 items-center gap-2 rounded-full border px-3.5 py-2 text-[13px] font-semibold transition-colors active:scale-[0.98] ${
+                  saved
+                    ? 'border-sky-400/40 bg-sky-500/15 text-sky-50'
+                    : 'border-white/12 bg-white/[0.04] text-white/55'
+                }`}
+                aria-label={saved ? `Ir a ${savedDestinationSlotLabel(slot)}: ${saved.placeLabel}` : `Configurar ${savedDestinationSlotLabel(slot)}`}
+              >
+                <Icon className="h-4 w-4" strokeWidth={2.3} />
+                <span>{savedDestinationSlotLabel(slot)}</span>
+                {saved ? (
+                  <span className="max-w-[7rem] truncate text-[11px] font-medium text-white/45">{saved.placeLabel}</span>
+                ) : (
+                  <span className="text-[11px] font-medium text-white/35">Fijar</span>
+                )}
+              </button>
+            );
+          })}
+          {saveHint && (
+            <span className="w-full text-[11px] text-cyan-100/70" role="status">{saveHint}</span>
+          )}
         </div>
       )}
 
@@ -756,6 +848,26 @@ function SearchBar({ onLocate, onRoute, defaultOpen = false, variant = 'default'
                         <Flag className="h-3 w-3" />
                         {routingLabel === r.label ? (isMobileNav ? 'Abriendo…' : 'Routing...') : (isMobileNav ? 'Abrir ruta' : `Build ${ROUTE_MODE_META[routeMode].label}`)}
                       </button>
+                    )}
+                    {isMobileNav && (
+                      <div className="flex gap-1">
+                        <button
+                          type="button"
+                          onClick={() => saveResultAs('home', r)}
+                          className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-[7px] font-semibold uppercase tracking-[0.12em] text-white/70"
+                          aria-label="Guardar como Casa"
+                        >
+                          <Home className="h-3 w-3" /> Casa
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => saveResultAs('work', r)}
+                          className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-[7px] font-semibold uppercase tracking-[0.12em] text-white/70"
+                          aria-label="Guardar como Trabajo"
+                        >
+                          <Briefcase className="h-3 w-3" /> Trabajo
+                        </button>
+                      </div>
                     )}
                     {!isMobileNav && (
                       <button
