@@ -21,3 +21,11 @@ export {
   operationalCaseToOntologyGraph,
   operationalSignalToEntities,
 } from './adapters';
+
+export {
+  ontologyGraphToLinkGraph,
+  type LinkGraphData,
+  type LinkGraphLink,
+  type LinkGraphNode,
+} from './link-graph';
+
