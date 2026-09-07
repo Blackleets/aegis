@@ -23,9 +23,12 @@ export {
 } from './adapters';
 
 export {
+  linkGraphLegendKinds,
+  linkGraphLegendRels,
+  ontologyEntityKindColor,
+  ontologyEntityKindLabel,
   ontologyGraphToLinkGraph,
-  type LinkGraphData,
-  type LinkGraphLink,
-  type LinkGraphNode,
+  ontologyRelationshipTypeColor,
+  ontologyRelationshipTypeLabel,
 } from './link-graph';
-
+export type { LinkGraphData, LinkGraphLink, LinkGraphNode } from './link-graph';

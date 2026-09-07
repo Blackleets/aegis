@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { ontologyGraphToLinkGraph } from '../src/lib/ontology/link-graph';
+import {
+  linkGraphLegendKinds,
+  linkGraphLegendRels,
+  ontologyEntityKindLabel,
+  ontologyGraphToLinkGraph,
+  ontologyRelationshipTypeLabel,
+} from '../src/lib/ontology/link-graph';
 import type { OntologyGraph } from '../src/lib/ontology/types';
 
 const baseTime = Date.parse('2026-07-29T20:00:00.000Z');
@@ -125,5 +131,20 @@ describe('ontologyGraphToLinkGraph', () => {
       claims: [],
     };
     expect(ontologyGraphToLinkGraph(danglingOnly)).toEqual({ nodes: [], links: [] });
+  });
+});
+
+describe('link graph clarity helpers', () => {
+  it('exposes Spanish labels for kinds and relationships', () => {
+    expect(ontologyEntityKindLabel('Case')).toBe('Caso');
+    expect(ontologyEntityKindLabel('Location')).toBe('Lugar');
+    expect(ontologyRelationshipTypeLabel('located_at')).toBe('ubicado en');
+    expect(ontologyRelationshipTypeLabel('corroborates')).toBe('corrobora');
+  });
+
+  it('builds stable legends only for kinds/rels present', () => {
+    const data = ontologyGraphToLinkGraph(sampleGraph());
+    expect(linkGraphLegendKinds(data.nodes)).toEqual(['Case', 'Event', 'Location']);
+    expect(linkGraphLegendRels(data.links)).toEqual(['contains', 'located_at']);
   });
 });
