@@ -10,6 +10,11 @@ import { scoreCctvDelivery } from '@/lib/cctv-feed';
 import { getLiveMotionFrame } from '@/lib/map-live-motion';
 import { getNavigationCameraTarget, getVectorCameraPreset, shouldUpdateNavigationCamera, smoothNavigationBearing, type VectorNavigationMode } from '@/lib/vector-navigation';
 import { getGpsPulseFrame } from '@/lib/gps-position-visual';
+import {
+  shouldShowWorldPulseMapPins,
+  worldPulsePinsToGeoJSON,
+  type WorldPulseMapPin,
+} from '@/lib/world-pulse-map-pins';
 
 type Coordinates = [number, number];
 type EntityProperties = Record<string, unknown>;
@@ -81,6 +86,9 @@ interface AegisMapProps {
   navigationMode?: VectorNavigationMode;
   ambientMotionEnabled?: boolean;
   nearbyPlaces?: NearbyPlace[];
+  /** Soft World Pulse pins — rendered only when projection === mercator. */
+  worldPulsePins?: WorldPulseMapPin[];
+  onWorldPulsePinClick?: (lat: number, lng: number) => void;
 }
 
 function computeSolarTerminator(): [number, number][] {
@@ -250,7 +258,7 @@ function takeTopEntities<T>(items: T[] | undefined, limit: number, score: (item:
   return [...items].sort((a, b) => score(b) - score(a)).slice(0, limit);
 }
 
-function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightClick, onViewStateChange, flyToLocation, projection = 'globe', mapStyle = 'dark', sweepData, scanTargets = [], currentLocation = null, gpsAccuracyMeters = null, routeDestination = null, routePath = [], navigationActive = false, navigationCameraFollowing = true, onNavigationCameraRelease, navigationBearing = null, navigationMode = 'driving', ambientMotionEnabled = true, nearbyPlaces = [] }: AegisMapProps) {
+function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightClick, onViewStateChange, flyToLocation, projection = 'globe', mapStyle = 'dark', sweepData, scanTargets = [], currentLocation = null, gpsAccuracyMeters = null, routeDestination = null, routePath = [], navigationActive = false, navigationCameraFollowing = true, onNavigationCameraRelease, navigationBearing = null, navigationMode = 'driving', ambientMotionEnabled = true, nearbyPlaces = [], worldPulsePins = [], onWorldPulsePinClick }: AegisMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const popupRef = useRef<maplibregl.Popup | null>(null);
@@ -270,6 +278,8 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
   const seenEarthquakeIdsRef = useRef<Set<string> | null>(null);
   const earthquakePulsesRef = useRef<EarthquakePulse[]>([]);
   const earthquakePulseFrameRef = useRef<number | null>(null);
+  const onWorldPulsePinClickRef = useRef(onWorldPulsePinClick);
+  onWorldPulsePinClickRef.current = onWorldPulsePinClick;
   const isOverviewMode = projection === 'globe' && adaptiveZoom <= GLOBE_OVERVIEW_ZOOM;
 
 
@@ -469,7 +479,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       createDot(map, 'dot-cctv', '#39FF14', 10);
 
       // Sources
-      const sources = ['flights','military','jets','private-fl','flight-trails','military-trails','jet-trails','private-trails','satellites','earthquakes','earthquake-pulses','gdelt','gdelt-hotspots','gps-jamming','day-night','cctv','fires','weather','infrastructure','maritime','maritime-choke','maritime-ships','live-news','sigint-news','conflict-zones', 'war-alerts-targets', 'war-alerts-lines', 'balloons', 'radiation', 'ip-sweep-devices', 'ip-sweep-pulse', 'ip-sweep-connections', 'scan-targets', 'sdk-entities', 'sdk-links', 'nearby-places', 'user-route', 'route-markers'];
+      const sources = ['flights','military','jets','private-fl','flight-trails','military-trails','jet-trails','private-trails','satellites','earthquakes','earthquake-pulses','gdelt','gdelt-hotspots','gps-jamming','day-night','cctv','fires','weather','infrastructure','maritime','maritime-choke','maritime-ships','live-news','sigint-news','conflict-zones', 'war-alerts-targets', 'war-alerts-lines', 'balloons', 'radiation', 'ip-sweep-devices', 'ip-sweep-pulse', 'ip-sweep-connections', 'scan-targets', 'sdk-entities', 'sdk-links', 'nearby-places', 'user-route', 'route-markers', 'world-pulse'];
       sources.forEach((sourceId) => map.addSource(sourceId, sourceId === 'earthquakes'
         ? { type: 'geojson', data: EMPTY_FC, cluster: true, clusterRadius: 44, clusterMaxZoom: 5 }
         : { type: 'geojson', data: EMPTY_FC }));
@@ -771,6 +781,23 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       map.addLayer({ id: 'fires-heat', type: 'circle', source: 'fires', paint: {
         'circle-radius': ['interpolate',['linear'],['zoom'], 1,2, 5,4, 10,8],
         'circle-color': '#FF6B00', 'circle-opacity': 0.5, 'circle-blur': 0.5,
+      }});
+
+      // World Pulse soft pins — 2D (mercator) only; layout starts hidden until effect enables.
+      map.addLayer({ id: 'world-pulse-glow', type: 'circle', source: 'world-pulse', layout: { visibility: 'none' }, paint: {
+        'circle-radius': ['interpolate', ['linear'], ['zoom'], 1, 10, 4, 16, 8, 24],
+        'circle-color': ['get', 'color'],
+        'circle-opacity': 0.14,
+        'circle-blur': 0.85,
+      }});
+      map.addLayer({ id: 'world-pulse-core', type: 'circle', source: 'world-pulse', layout: { visibility: 'none' }, paint: {
+        'circle-radius': ['interpolate', ['linear'], ['zoom'], 1, 3.2, 4, 4.5, 8, 6.5],
+        'circle-color': ['get', 'color'],
+        'circle-opacity': 0.72,
+        'circle-blur': 0.28,
+        'circle-stroke-width': 1,
+        'circle-stroke-color': '#FFFFFF',
+        'circle-stroke-opacity': 0.28,
       }});
 
       // CCTV — outer glow ring
@@ -1287,6 +1314,16 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       onEntityClick?.({ type: 'fire', lat: coords[1], lng: coords[0], brightness: p.brightness });
     });
 
+    // World Pulse soft pins — fly only (same as panel onLocate); no noisy popups.
+    ['world-pulse-glow', 'world-pulse-core'].forEach((layerId) => {
+      map.on('click', layerId, (e) => {
+        if (!e.features?.length) return;
+        const coords = e.features[0].geometry.coordinates as Coordinates;
+        onWorldPulsePinClickRef.current?.(coords[1], coords[0]);
+      });
+    });
+
+
     const openGdeltPopup = (coords: Coordinates, props: EntityProperties) => {
       const severityColor = props.severity === 'critical' ? '#FF1744' : props.severity === 'high' ? '#FF6B00' : props.severity === 'elevated' ? '#FFD500' : '#64B5F6';
       popup(coords, `<div style="${pStyle}border:1px solid rgba(255,61,61,0.3);">
@@ -1373,7 +1410,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
     });
 
     // ── Generic hover for clickables ──
-    ['conflict-icons','cctv-dots','eq-clusters','eq-circles','sat-dots','fires-heat','gdelt-dots','gdelt-hotspot-core','gdelt-hotspot-halo','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots','sigint-news-dots','balloon-dots','rad-dots','ship-dots','sweep-device-dots','scan-targets-dots','sdk-sea','sdk-sea-glow','sdk-air','sdk-air-glow','sdk-intel','sdk-intel-glow'].forEach(layer => {
+    ['conflict-icons','cctv-dots','eq-clusters','eq-circles','sat-dots','fires-heat','gdelt-dots','gdelt-hotspot-core','gdelt-hotspot-halo','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots','sigint-news-dots','balloon-dots','rad-dots','ship-dots','sweep-device-dots','scan-targets-dots','sdk-sea','sdk-sea-glow','sdk-air','sdk-air-glow','sdk-intel','sdk-intel-glow','world-pulse-glow','world-pulse-core'].forEach(layer => {
       map.on('mouseenter', layer, () => { map.getCanvas().style.cursor = 'pointer'; });
       map.on('mouseleave', layer, () => { map.getCanvas().style.cursor = ''; });
     });
@@ -2450,6 +2487,15 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       properties: { ...place },
     })));
   }, [mapReady, nearbyPlaces, setGeo]);
+
+  // World Pulse soft pins: mercator/2D only — never mutate globe layers or textures.
+  useEffect(() => {
+    if (!mapReady) return;
+    const show = shouldShowWorldPulseMapPins(projection, true, worldPulsePins.length);
+    const fc = show ? worldPulsePinsToGeoJSON(worldPulsePins) : { type: 'FeatureCollection' as const, features: [] };
+    setGeo('world-pulse', fc.features as GeoJsonFeature[]);
+    setVis(['world-pulse-glow', 'world-pulse-core'], show);
+  }, [mapReady, projection, setGeo, setVis, worldPulsePins]);
 
   useEffect(() => {
     if (!mapReady || !mapRef.current || !currentLocation) return;

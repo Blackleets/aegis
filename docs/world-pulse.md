@@ -18,3 +18,12 @@ Missing or malformed upstream → `error`/`empty` for that source. Never invents
 - Auto-refresh every 3 minutes
 - Kind filters (does not touch map layers)
 - “Ver en mapa” only flies the camera — does **not** mutate Earth/globe layer state
+
+## Soft 2D map pins
+
+- Optional toggle in the World Pulse panel (default on when the panel has events)
+- Cap: top **25** by severity (then score) — see `selectWorldPulseMapPins`
+- Rendered **only** when map projection is `mercator` (2D). Globe / Earth / Three.js / SolarSystemMode paths stay untouched
+- Soft glow markers using AEGIS severity tokens (rose critical, amber elevated, cyan watch)
+- Pin click uses the same locate/fly behavior as panel rows (`onLocate`)
+- Fail-closed: no coords / no identity → no pin; empty feed → no pins
