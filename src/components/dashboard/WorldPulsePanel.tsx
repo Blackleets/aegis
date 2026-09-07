@@ -1,10 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ExternalLink, MapPin, RadioTower, RefreshCw } from 'lucide-react';
 import {
   selectWorldPulseMapPins,
-  type WorldPulseMapPin,
+  type WorldPulseMapPinInput,
 } from '@/lib/world-pulse-map-pins';
 
 type PulseSeverity = 'info' | 'watch' | 'elevated' | 'critical';
@@ -59,22 +59,51 @@ function relativeTime(iso: string) {
   return `hace ${Math.round(hours / 24)} d`;
 }
 
+function toPinInputs(events: PulseEvent[]): WorldPulseMapPinInput[] {
+  return events.map((event) => ({
+    id: event.id,
+    lat: event.lat,
+    lng: event.lng,
+    severity: event.severity,
+    title: event.title,
+    kind: event.kind,
+  }));
+}
+
+function filterEventsByKind(events: PulseEvent[], kind: (typeof KIND_FILTERS)[number]) {
+  if (kind === 'all') return events;
+  return events.filter((event) => event.kind === kind);
+}
+
 export default function WorldPulsePanel({
   onLocate,
   autoTourCritical = false,
-  onMapPinsChange,
+  mapPinsEnabled = true,
+  onMapPinsEnabledChange,
+  onMapPinSourceChange,
 }: {
   onLocate: (lat: number, lng: number) => void;
   /** When true, slowly cycles critical events via fly-to only — never mutates map layers. */
   autoTourCritical?: boolean;
-  /** Soft 2D pins for AegisMap mercator only — parent must not forward these to globe layers. */
-  onMapPinsChange?: (pins: WorldPulseMapPin[]) => void;
+  /** Controlled Pins toggle — owned by dashboard so mobile drawer unmount keeps mercator pins. */
+  mapPinsEnabled?: boolean;
+  onMapPinsEnabledChange?: (enabled: boolean) => void;
+  /** Filtered pin inputs for page-level selectWorldPulseMapPins (mercator only). */
+  onMapPinSourceChange?: (inputs: WorldPulseMapPinInput[]) => void;
 }) {
   const [payload, setPayload] = useState<PulsePayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [kindFilter, setKindFilter] = useState<(typeof KIND_FILTERS)[number]>('all');
-  const [mapPinsEnabled, setMapPinsEnabled] = useState(true);
+  const kindFilterRef = useRef(kindFilter);
+
+  useEffect(() => {
+    kindFilterRef.current = kindFilter;
+  }, [kindFilter]);
+
+  const publishPinSource = useCallback((events: PulseEvent[], kind: (typeof KIND_FILTERS)[number]) => {
+    onMapPinSourceChange?.(toPinInputs(filterEventsByKind(events, kind)));
+  }, [onMapPinSourceChange]);
 
   const refresh = useCallback(async (options?: { showSpinner?: boolean }) => {
     const showSpinner = options?.showSpinner === true;
@@ -89,13 +118,15 @@ export default function WorldPulsePanel({
       } else {
         setPayload(json);
       }
+      publishPinSource(json.events ?? [], kindFilterRef.current);
     } catch {
       setError('No se pudo cargar World Pulse');
       setPayload(null);
+      // Fail-closed: keep last published pins on transient fetch errors (do not clear).
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [publishPinSource]);
 
   useEffect(() => {
     let cancelled = false;
@@ -110,10 +141,12 @@ export default function WorldPulsePanel({
         } else {
           setPayload(json);
         }
+        publishPinSource(json.events ?? [], kindFilterRef.current);
       } catch {
         if (!cancelled) {
           setError('No se pudo cargar World Pulse');
           setPayload(null);
+          // Fail-closed: do not clear durable page pin source on boot error.
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -127,12 +160,11 @@ export default function WorldPulsePanel({
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [refresh]);
+  }, [refresh, publishPinSource]);
 
   const events = useMemo(() => {
     const all = payload?.events ?? [];
-    if (kindFilter === 'all') return all;
-    return all.filter((event) => event.kind === kindFilter);
+    return filterEventsByKind(all, kindFilter);
   }, [kindFilter, payload?.events]);
 
   const criticalEvents = useMemo(
@@ -140,7 +172,8 @@ export default function WorldPulsePanel({
     [payload?.events],
   );
 
-  const mapPins = useMemo(
+  // Local pin count for the toggle label only — durable selection lives on the page.
+  const mapPinCount = useMemo(
     () => selectWorldPulseMapPins(
       events.map((event) => ({
         id: event.id,
@@ -151,13 +184,9 @@ export default function WorldPulsePanel({
         kind: event.kind,
       })),
       { enabled: mapPinsEnabled },
-    ),
+    ).length,
     [events, mapPinsEnabled],
   );
-
-  useEffect(() => {
-    onMapPinsChange?.(mapPins);
-  }, [mapPins, onMapPinsChange]);
 
   useEffect(() => {
     if (!autoTourCritical || criticalEvents.length === 0) return;
@@ -195,7 +224,7 @@ export default function WorldPulsePanel({
         <div className="flex items-center gap-1.5">
           <button
             type="button"
-            onClick={() => setMapPinsEnabled((value) => !value)}
+            onClick={() => onMapPinsEnabledChange?.(!mapPinsEnabled)}
             className={`flex min-h-9 items-center justify-center gap-1.5 rounded-lg border px-2.5 text-[8px] font-semibold uppercase tracking-[0.08em] ${
               mapPinsEnabled
                 ? 'border-cyan-300/30 bg-cyan-300/12 text-cyan-100'
@@ -206,7 +235,7 @@ export default function WorldPulsePanel({
             title="Pins suaves solo en vista 2D (mercator)"
           >
             <MapPin className="h-3.5 w-3.5" />
-            {mapPinsEnabled ? `Pins ${mapPins.length}` : 'Pins off'}
+            {mapPinsEnabled ? `Pins ${mapPinCount}` : 'Pins off'}
           </button>
           <button
             type="button"
@@ -227,7 +256,10 @@ export default function WorldPulsePanel({
             <button
               key={kind}
               type="button"
-              onClick={() => setKindFilter(kind)}
+              onClick={() => {
+                setKindFilter(kind);
+                publishPinSource(payload?.events ?? [], kind);
+              }}
               className={`shrink-0 rounded-full border px-2.5 py-1 text-[8px] font-semibold uppercase tracking-[0.08em] ${
                 active
                   ? 'border-cyan-300/35 bg-cyan-300/15 text-cyan-100'

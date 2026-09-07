@@ -16,7 +16,7 @@ import KeyboardShortcuts from '@/components/KeyboardShortcuts';
 import GlobalStatusBar from '@/components/GlobalStatusBar';
 import LiveAlerts from '@/components/LiveAlerts';
 import WorldPulsePanel from '@/components/dashboard/WorldPulsePanel';
-import type { WorldPulseMapPin } from '@/lib/world-pulse-map-pins';
+import { useWorldPulseMapPins } from '@/hooks/useWorldPulseMapPins';
 import AiAnalyst from '@/components/AiAnalyst';
 import SolarSystemMode, { type CelestialBodyId } from '@/components/SolarSystemMode';
 import ModeDock from '@/components/dashboard/ModeDock';
@@ -508,7 +508,12 @@ export default function Dashboard() {
   const [backendStatus, setBackendStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
   const [mapView, setMapView] = useState<MapView>({ zoom: 2.5, latitude: 20 });
   const [flyToLocation, setFlyToLocation] = useState<FlyToLocation | null>(null);
-  const [worldPulsePins, setWorldPulsePins] = useState<WorldPulseMapPin[]>([]);
+  const {
+    worldPulsePins,
+    mapPinsEnabled: worldPulsePinsEnabled,
+    onMapPinsEnabledChange: setWorldPulsePinsEnabled,
+    onMapPinSourceChange: handleWorldPulsePinSourceChange,
+  } = useWorldPulseMapPins();
   const [routeSnapshot, setRouteSnapshot] = useState<RouteSnapshot | null>(null);
   const [userLocation, setUserLocation] = useState<Coordinate | null>(null);
   const [routeLoading, setRouteLoading] = useState(false);
@@ -2535,7 +2540,12 @@ export default function Dashboard() {
         sharePanel={<SharePanel mapView={mapView} activeLayers={activeLayers} mouseCoords={null} />}
         alertsContent={(
           <>
-            <WorldPulsePanel onLocate={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })} onMapPinsChange={setWorldPulsePins} />
+            <WorldPulsePanel
+              onLocate={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })}
+              mapPinsEnabled={worldPulsePinsEnabled}
+              onMapPinsEnabledChange={setWorldPulsePinsEnabled}
+              onMapPinSourceChange={handleWorldPulsePinSourceChange}
+            />
             <LiveAlerts data={dataWithSdk} onLocate={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })} onWatchFeed={(url, name) => { setLiveFeedUrl(url); setLiveFeedName(name); }} />
           </>
         )}
@@ -2683,7 +2693,12 @@ export default function Dashboard() {
                 />
                 <RouteAlertPreferencesPanel value={routeAlertPreferences} onChange={setRouteAlertPreferences} />
                 <>
-                  <WorldPulsePanel onLocate={(lat, lng) => { setFlyToLocation({ lat, lng, ts: Date.now() }); setMobilePanel(null); }} />
+                  <WorldPulsePanel
+                    onLocate={(lat, lng) => { setFlyToLocation({ lat, lng, ts: Date.now() }); setMobilePanel(null); }}
+                    mapPinsEnabled={worldPulsePinsEnabled}
+                    onMapPinsEnabledChange={setWorldPulsePinsEnabled}
+                    onMapPinSourceChange={handleWorldPulsePinSourceChange}
+                  />
                   <LiveAlerts data={dataWithSdk} onLocate={(lat, lng) => { setFlyToLocation({ lat, lng, ts: Date.now() }); setMobilePanel(null); }} onWatchFeed={(url, name) => { setLiveFeedUrl(url); setLiveFeedName(name); }} />
                 </>
               </>
