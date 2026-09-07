@@ -82,21 +82,21 @@ export function selectWorldPulseMapPins(
   const limit = Math.max(0, options.limit ?? WORLD_PULSE_MAP_PIN_LIMIT);
   if (limit === 0) return [];
 
-  const scored: Array<WorldPulseMapPin & { _rank: number; _score: number }> = [];
+  const scored: Array<{ pin: WorldPulseMapPin; rank: number; score: number }> = [];
   for (const raw of events) {
     const pin = sanitizeWorldPulseMapPin(raw);
     if (!pin) continue;
     const score = Number.isFinite(raw.score) ? Number(raw.score) : 0;
     scored.push({
-      ...pin,
-      _rank: SEVERITY_RANK[pin.severity],
-      _score: score,
+      pin,
+      rank: SEVERITY_RANK[pin.severity],
+      score,
     });
   }
 
-  scored.sort((a, b) => b._rank - a._rank || b._score - a._score || a.id.localeCompare(b.id));
+  scored.sort((a, b) => b.rank - a.rank || b.score - a.score || a.pin.id.localeCompare(b.pin.id));
 
-  return scored.slice(0, limit).map(({ _rank: _r, _score: _s, ...pin }) => pin);
+  return scored.slice(0, limit).map((row) => row.pin);
 }
 
 /** Pins render only on the 2D (mercator) map path — never on globe. */

@@ -279,7 +279,9 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
   const earthquakePulsesRef = useRef<EarthquakePulse[]>([]);
   const earthquakePulseFrameRef = useRef<number | null>(null);
   const onWorldPulsePinClickRef = useRef(onWorldPulsePinClick);
-  onWorldPulsePinClickRef.current = onWorldPulsePinClick;
+  useEffect(() => {
+    onWorldPulsePinClickRef.current = onWorldPulsePinClick;
+  }, [onWorldPulsePinClick]);
   const isOverviewMode = projection === 'globe' && adaptiveZoom <= GLOBE_OVERVIEW_ZOOM;
 
 
