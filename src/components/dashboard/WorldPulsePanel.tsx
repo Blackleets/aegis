@@ -57,8 +57,11 @@ function relativeTime(iso: string) {
 
 export default function WorldPulsePanel({
   onLocate,
+  autoTourCritical = false,
 }: {
   onLocate: (lat: number, lng: number) => void;
+  /** When true, slowly cycles critical events via fly-to only — never mutates map layers. */
+  autoTourCritical?: boolean;
 }) {
   const [payload, setPayload] = useState<PulsePayload | null>(null);
   const [loading, setLoading] = useState(true);
@@ -124,6 +127,24 @@ export default function WorldPulsePanel({
     return all.filter((event) => event.kind === kindFilter);
   }, [kindFilter, payload?.events]);
 
+  const criticalEvents = useMemo(
+    () => (payload?.events ?? []).filter((event) => event.severity === 'critical'),
+    [payload?.events],
+  );
+
+  useEffect(() => {
+    if (!autoTourCritical || criticalEvents.length === 0) return;
+    let index = 0;
+    const tick = () => {
+      const event = criticalEvents[index % criticalEvents.length];
+      if (event) onLocate(event.lat, event.lng);
+      index += 1;
+    };
+    tick();
+    const timer = window.setInterval(tick, 12_000);
+    return () => window.clearInterval(timer);
+  }, [autoTourCritical, criticalEvents, onLocate]);
+
   const sourceLabel = (payload?.sources || [])
     .map((source) => `${source.name}:${source.status}`)
     .join(' · ');
@@ -175,6 +196,20 @@ export default function WorldPulsePanel({
           );
         })}
       </div>
+
+      {criticalEvents.length > 0 && (
+        <div className="mt-2 rounded-xl border border-rose-300/20 bg-rose-300/[0.07] px-3 py-2" role="status">
+          <p className="text-[8px] font-mono uppercase tracking-[0.14em] text-rose-100/80">Críticos ahora · {criticalEvents.length}</p>
+          <p className="mt-1 truncate text-[11px] font-semibold text-rose-50">{criticalEvents[0]?.title}</p>
+          <button
+            type="button"
+            onClick={() => onLocate(criticalEvents[0].lat, criticalEvents[0].lng)}
+            className="mt-2 min-h-9 w-full rounded-lg border border-rose-200/20 bg-black/20 text-[9px] font-semibold uppercase tracking-[0.1em] text-rose-50"
+          >
+            Centrar en el más grave
+          </button>
+        </div>
+      )}
 
       {error && (
         <p className="mt-2 rounded-xl border border-amber-200/15 bg-amber-200/[0.05] px-3 py-2 text-[9px] text-amber-100/80">
