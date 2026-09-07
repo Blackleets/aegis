@@ -555,7 +555,6 @@ export default function RouteCockpitMobile({
                   <X className="h-5 w-5" strokeWidth={2.3} />
                 </button>
               </div>
-              </div>
             </>
           ) : (
             <>
