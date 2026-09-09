@@ -15,8 +15,8 @@ export function navigationDistanceMeters(a: NavigationCoordinate, b: NavigationC
 
 export function shouldUpdateNavigationCamera(previous: NavigationCoordinate | null, current: NavigationCoordinate, elapsedMs: number) {
   if (!previous) return true;
-  if (elapsedMs < 1_100) return false;
-  return navigationDistanceMeters(previous, current) >= 8;
+  if (elapsedMs < 380) return false;
+  return navigationDistanceMeters(previous, current) >= 2.4;
 }
 
 export function smoothNavigationBearing(previous: number | null, next: number, factor = 0.32) {
@@ -63,27 +63,27 @@ export function getNextSimulationIndex(currentIndex: number, coordinateCount: nu
 export function getVectorCameraPreset(mode: VectorNavigationMode, isMobile: boolean) {
   if (mode === 'walking') {
     return {
-      zoom: isMobile ? 18.2 : 17.4,
-      pitch: isMobile ? 62 : 56,
-      lookAheadMeters: isMobile ? 38 : 65,
-      durationMs: isMobile ? 500 : 620,
+      zoom: isMobile ? 18.55 : 17.8,
+      pitch: isMobile ? 68 : 62,
+      lookAheadMeters: isMobile ? 28 : 48,
+      durationMs: isMobile ? 420 : 520,
     };
   }
 
   if (mode === 'cycling') {
     return {
-      zoom: isMobile ? 17.8 : 16.8,
-      pitch: isMobile ? 66 : 58,
-      lookAheadMeters: isMobile ? 58 : 95,
-      durationMs: isMobile ? 520 : 660,
+      zoom: isMobile ? 18.05 : 17.2,
+      pitch: isMobile ? 70 : 64,
+      lookAheadMeters: isMobile ? 52 : 82,
+      durationMs: isMobile ? 440 : 560,
     };
   }
 
   return {
-    zoom: isMobile ? 16.7 : 16.2,
-    pitch: isMobile ? 54 : 52,
-    lookAheadMeters: isMobile ? 95 : 135,
-    durationMs: isMobile ? 760 : 720,
+    zoom: isMobile ? 17.55 : 16.9,
+    pitch: isMobile ? 72 : 64,
+    lookAheadMeters: isMobile ? 118 : 160,
+    durationMs: isMobile ? 480 : 560,
   };
 }
 
@@ -114,7 +114,6 @@ export function getNavigationCameraTarget(
     lng: ((lng2 * 180 / Math.PI + 540) % 360) - 180,
   };
 }
-
 
 export function shouldAcceptNavigationFix({
   previous,
@@ -191,7 +190,6 @@ export function stabilizeNavigationCoordinate(
   const jumpMeters = navigationDistanceMeters(previous, next);
   const accuracy = gpsAccuracyMeters ?? 35;
 
-  // Reject implausible one-sample jumps while stationary or moving slowly.
   if ((speedKmh ?? 0) < 12 && jumpMeters > Math.max(90, accuracy * 2.5)) {
     return previous;
   }
