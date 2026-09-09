@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { getArrivalThresholdMeters, getNavigationCameraPadding, getNavigationCameraTarget, getNextSimulationIndex, getVectorCameraPreset, NAVIGATION_MAP_MAX_PITCH, resolveNavigationBearing, shouldAcceptNavigationFix, shouldRerouteNavigation, shouldUpdateNavigationCamera, smoothNavigationBearing, snapNavigationToRoute, stabilizeNavigationCoordinate } from '../src/lib/vector-navigation';
+import { getArrivalThresholdMeters, getNavigationCameraPadding, getNavigationCameraTarget, getNextSimulationIndex, getVectorCameraPreset, NAVIGATION_MAP_MAX_PITCH, resolveNavigationBearing, shouldAcceptNavigationFix, shouldForceNavigationCamera, shouldRerouteNavigation, shouldUpdateNavigationCamera, smoothNavigationBearing, snapNavigationToRoute, stabilizeNavigationCoordinate } from '../src/lib/vector-navigation';
 
 describe('vector navigation camera', () => {
   it('uses a closer camera for walking than driving', () => {
@@ -22,6 +22,22 @@ describe('vector navigation camera', () => {
     expect(shouldUpdateNavigationCamera(previous, { lat: 40.41681, lng: -3.70381 }, 2_000)).toBe(false);
     expect(shouldUpdateNavigationCamera(previous, { lat: 40.417, lng: -3.7038 }, 200)).toBe(false);
     expect(shouldUpdateNavigationCamera(previous, { lat: 40.417, lng: -3.7038 }, 2_000)).toBe(true);
+  });
+
+  it('re-locks the street camera when VECTOR is still looking top-down', () => {
+    const preset = getVectorCameraPreset('driving', true);
+    expect(shouldForceNavigationCamera({
+      currentPitch: 0,
+      targetPitch: preset.pitch,
+      currentZoom: 15.2,
+      targetZoom: preset.zoom,
+    })).toBe(true);
+    expect(shouldForceNavigationCamera({
+      currentPitch: preset.pitch,
+      targetPitch: preset.pitch,
+      currentZoom: preset.zoom,
+      targetZoom: preset.zoom,
+    })).toBe(false);
   });
 
   it('smooths bearing changes across north without spinning the long way', () => {

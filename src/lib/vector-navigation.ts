@@ -19,6 +19,21 @@ export function shouldUpdateNavigationCamera(previous: NavigationCoordinate | nu
   return navigationDistanceMeters(previous, current) >= 1.6;
 }
 
+export function shouldForceNavigationCamera({
+  currentPitch,
+  targetPitch,
+  currentZoom,
+  targetZoom,
+}: {
+  currentPitch: number;
+  targetPitch: number;
+  currentZoom: number;
+  targetZoom: number;
+}) {
+  if (!Number.isFinite(currentPitch) || !Number.isFinite(currentZoom)) return true;
+  return Math.abs(currentPitch - targetPitch) >= 8 || Math.abs(currentZoom - targetZoom) >= 0.55;
+}
+
 export function smoothNavigationBearing(previous: number | null, next: number, factor = 0.32) {
   if (!Number.isFinite(next)) return previous ?? 0;
   if (previous === null || !Number.isFinite(previous)) return ((next % 360) + 360) % 360;
