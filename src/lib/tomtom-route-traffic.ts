@@ -29,6 +29,35 @@ export function buildTrafficCacheKey(fromLat: number, fromLng: number, toLat: nu
   return [fromLat, fromLng, toLat, toLng].map((value) => value.toFixed(4)).join(':');
 }
 
+export function applyLiveTrafficToDurationSeconds(
+  baseDurationSeconds: number,
+  traffic: { status?: string; delaySeconds?: number } | null | undefined,
+) {
+  const base = Math.max(0, baseDurationSeconds);
+  if (!traffic || traffic.status !== 'live') return base;
+  return base + Math.max(0, traffic.delaySeconds ?? 0);
+}
+
+export function formatTomTomTrafficLabel(traffic: {
+  status?: string;
+  configured?: boolean;
+  level?: TrafficLevel;
+  delaySeconds?: number;
+} | null | undefined) {
+  if (!traffic) return null;
+  if (traffic.status === 'loading') return 'Analizando tráfico TomTom…';
+  if (traffic.status !== 'live') {
+    return traffic.configured === false
+      ? 'Tráfico TomTom no configurado'
+      : 'Tráfico TomTom no disponible';
+  }
+  const delayMinutes = Math.max(0, Math.round((traffic.delaySeconds ?? 0) / 60));
+  if (traffic.level === 'heavy') return `Tráfico intenso · +${delayMinutes} min · TomTom`;
+  if (traffic.level === 'moderate') return `Tráfico moderado · +${delayMinutes} min · TomTom`;
+  if (traffic.level === 'light') return `Tráfico ligero · +${delayMinutes} min · TomTom`;
+  return 'Tráfico fluido · TomTom';
+}
+
 export function classifyTrafficDelay(delaySeconds: number): TrafficLevel {
   if (delaySeconds >= 900) return 'heavy';
   if (delaySeconds >= 300) return 'moderate';
