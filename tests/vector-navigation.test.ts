@@ -10,14 +10,14 @@ describe('vector navigation camera', () => {
   it('keeps driving navigation at street-level zoom on mobile', () => {
     const preset = getVectorCameraPreset('driving', true);
     expect(preset.zoom).toBeGreaterThanOrEqual(16.5);
-    expect(preset.pitch).toBeGreaterThanOrEqual(50);
-    expect(preset.lookAheadMeters).toBeLessThan(100);
+    expect(preset.pitch).toBeGreaterThanOrEqual(68);
+    expect(preset.lookAheadMeters).toBeLessThan(160);
   });
 
   it('ignores stationary GPS jitter and rate-limits camera updates', () => {
     const previous = { lat: 40.4168, lng: -3.7038 };
     expect(shouldUpdateNavigationCamera(previous, { lat: 40.41681, lng: -3.70381 }, 2_000)).toBe(false);
-    expect(shouldUpdateNavigationCamera(previous, { lat: 40.417, lng: -3.7038 }, 500)).toBe(false);
+    expect(shouldUpdateNavigationCamera(previous, { lat: 40.417, lng: -3.7038 }, 200)).toBe(false);
     expect(shouldUpdateNavigationCamera(previous, { lat: 40.417, lng: -3.7038 }, 2_000)).toBe(true);
   });
 

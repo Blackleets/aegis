@@ -6,28 +6,32 @@ export function buildNavigationPuckImageData() {
   const ctx = canvas.getContext('2d')!;
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
-  ctx.translate(64, 64);
+  ctx.translate(64, 68);
+
   ctx.beginPath();
-  ctx.moveTo(0, -46);
-  ctx.lineTo(28, 34);
-  ctx.lineTo(0, 18);
-  ctx.lineTo(-28, 34);
+  ctx.moveTo(0, -50);
+  ctx.lineTo(30, 32);
+  ctx.quadraticCurveTo(0, 18, -30, 32);
   ctx.closePath();
-  ctx.shadowColor = 'rgba(2, 8, 16, 0.55)';
-  ctx.shadowBlur = 12;
-  ctx.strokeStyle = '#041018';
-  ctx.lineWidth = 10;
+
+  ctx.shadowColor = 'rgba(2, 8, 16, 0.62)';
+  ctx.shadowBlur = 14;
+  ctx.strokeStyle = '#031018';
+  ctx.lineWidth = 11;
   ctx.stroke();
+
   ctx.shadowBlur = 0;
-  ctx.fillStyle = '#76E4EA';
+  ctx.fillStyle = '#7DE8EE';
   ctx.fill();
-  ctx.strokeStyle = '#F5FBFF';
-  ctx.lineWidth = 3;
+  ctx.strokeStyle = '#F7FCFF';
+  ctx.lineWidth = 3.5;
   ctx.stroke();
+
   ctx.beginPath();
-  ctx.arc(0, 6, 5.5, 0, Math.PI * 2);
+  ctx.arc(0, 8, 6, 0, Math.PI * 2);
   ctx.fillStyle = '#041018';
   ctx.fill();
+
   return {
     width: size,
     height: size,

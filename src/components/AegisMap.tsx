@@ -10,6 +10,8 @@ import { scoreCctvDelivery } from '@/lib/cctv-feed';
 import { getLiveMotionFrame } from '@/lib/map-live-motion';
 import { getNavigationCameraTarget, getVectorCameraPreset, shouldUpdateNavigationCamera, smoothNavigationBearing, type VectorNavigationMode } from '@/lib/vector-navigation';
 import { getGpsPulseFrame } from '@/lib/gps-position-visual';
+import { buildNavigationPuckImageData } from '@/lib/navigation-puck-icon';
+import { clearNavigationTerrain, ensureNavigationTerrain } from '@/lib/navigation-terrain';
 
 type Coordinates = [number, number];
 type EntityProperties = Record<string, unknown>;
@@ -297,38 +299,12 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
   }, []);
 
   const createNavigationArrow = useCallback((map: maplibregl.Map) => {
-    if (map.hasImage('vector-position-arrow')) return;
-    const size = 96;
-    const canvas = document.createElement('canvas');
-    canvas.width = size;
-    canvas.height = size;
-    const ctx = canvas.getContext('2d')!;
-    ctx.lineJoin = 'round';
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(48, 9);
-    ctx.lineTo(78, 78);
-    ctx.lineTo(49, 65);
-    ctx.lineTo(27, 84);
-    ctx.lineTo(18, 75);
-    ctx.lineTo(31, 51);
-    ctx.closePath();
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.55)';
-    ctx.shadowBlur = 10;
-    ctx.strokeStyle = '#06131f';
-    ctx.lineWidth = 14;
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-    ctx.strokeStyle = '#F0FDFA';
-    ctx.lineWidth = 8;
-    ctx.stroke();
-    ctx.fillStyle = '#34D399';
-    ctx.fill();
-    map.addImage('vector-position-arrow', {
-      width: size,
-      height: size,
-      data: new Uint8Array(ctx.getImageData(0, 0, size, size).data),
-    }, { pixelRatio: 2 });
+    const image = buildNavigationPuckImageData();
+    if (map.hasImage('vector-position-arrow')) {
+      map.updateImage('vector-position-arrow', image);
+      return;
+    }
+    map.addImage('vector-position-arrow', image, { pixelRatio: 2 });
   }, []);
 
   const createPlaceIcon = useCallback((map: maplibregl.Map, category: keyof typeof NEARBY_PLACE_META) => {
@@ -481,7 +457,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
           type: 'line',
           source: 'carto',
           'source-layer': 'building',
-          minzoom: 13.8,
+          minzoom: 13,
           layout: { visibility: 'none' },
           paint: {
             'line-color': 'rgba(103, 200, 224, 0.24)',
@@ -496,7 +472,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
           type: 'fill-extrusion',
           source: 'carto',
           'source-layer': 'building',
-          minzoom: 13.8,
+          minzoom: 13,
           layout: { visibility: 'none' },
           paint: {
             'fill-extrusion-color': [
@@ -510,13 +486,19 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
             ],
             'fill-extrusion-height': [
               'interpolate', ['linear'], ['zoom'],
-              14, 0,
-              15.2, ['*', 0.74, [
+              13.2, ['*', 0.45, [
                   'coalesce',
                   ['to-number', ['get', 'render_height']],
                   ['to-number', ['get', 'height']],
-                  ['*', ['to-number', ['get', 'levels']], 3],
-                  7,
+                  ['*', ['to-number', ['get', 'levels']], 3.4],
+                  10,
+                ]],
+              15.4, ['*', 1.12, [
+                  'coalesce',
+                  ['to-number', ['get', 'render_height']],
+                  ['to-number', ['get', 'height']],
+                  ['*', ['to-number', ['get', 'levels']], 3.4],
+                  12,
                 ]],
             ],
             'fill-extrusion-base': [
@@ -598,21 +580,21 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
 
       // User route overlay (additive only — high contrast, does not affect Earth logic)
       map.addLayer({ id: 'user-route-glow', type: 'line', source: 'user-route', paint: {
-        'line-color': ['match', ['get', 'mode'], 'follow', '#22D3EE', '#22D3EE'],
-        'line-width': ['interpolate', ['linear'], ['zoom'], 2, 8, 5, 12, 10, 18, 15, 24],
-        'line-opacity': ['interpolate', ['linear'], ['zoom'], 2, 0.22, 8, 0.32, 15, 0.42],
-        'line-blur': 1.4,
+        'line-color': '#22D3EE',
+        'line-width': ['interpolate', ['linear'], ['zoom'], 2, 10, 10, 20, 15, 28, 18, 36],
+        'line-opacity': ['interpolate', ['linear'], ['zoom'], 2, 0.28, 12, 0.4, 18, 0.48],
+        'line-blur': 1.6,
       }});
       map.addLayer({ id: 'user-route-casing', type: 'line', source: 'user-route', paint: {
         'line-color': 'rgba(3, 15, 32, 0.98)',
-        'line-width': ['interpolate', ['linear'], ['zoom'], 2, 5.2, 5, 7.2, 10, 11, 15, 14.5],
+        'line-width': ['interpolate', ['linear'], ['zoom'], 2, 6, 10, 13, 15, 18, 18, 24],
         'line-opacity': 0.96,
         'line-blur': 0.05,
       }});
       map.addLayer({ id: 'user-route-line', type: 'line', source: 'user-route', paint: {
-        'line-color': ['match', ['get', 'mode'], 'follow', '#38BDF8', '#22D3EE'],
-        'line-width': ['interpolate', ['linear'], ['zoom'], 2, 2.9, 5, 4.5, 10, 7.2, 15, 9.5],
-        'line-opacity': 0.96,
+        'line-color': '#67E8F9',
+        'line-width': ['interpolate', ['linear'], ['zoom'], 2, 3.4, 10, 8.5, 15, 12, 18, 16],
+        'line-opacity': 1,
         'line-blur': 0,
       }});
       map.addLayer({
@@ -635,10 +617,10 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
           'text-opacity': ['interpolate', ['linear'], ['zoom'], 3.2, 0.45, 6, 0.92],
         },
       });
-      map.addLayer({ id: 'route-markers-glow', type: 'circle', source: 'route-markers', paint: {
+      map.addLayer({ id: 'route-markers-glow', type: 'circle', source: 'route-markers', filter: ['==', ['get', 'role'], 'destination'], paint: {
         'circle-radius': ['interpolate', ['linear'], ['zoom'], 2, 13, 6, 18, 10, 25, 15, 32],
-        'circle-color': ['match', ['get', 'role'], 'origin', '#34D399', '#F97316'],
-        'circle-opacity': 0.24,
+        'circle-color': '#F97316',
+        'circle-opacity': 0.22,
         'circle-blur': 0.95,
       }});
       map.addLayer({
@@ -647,12 +629,12 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
         source: 'route-markers',
         filter: ['==', ['get', 'role'], 'origin'],
         paint: {
-          'circle-radius': 14,
-          'circle-color': '#22D3EE',
-          'circle-opacity': 0.08,
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 16, 16, 22, 18, 28],
+          'circle-color': '#76E4EA',
+          'circle-opacity': 0.1,
           'circle-stroke-width': 1,
-          'circle-stroke-color': '#67E8F9',
-          'circle-stroke-opacity': 0.24,
+          'circle-stroke-color': '#76E4EA',
+          'circle-stroke-opacity': 0.28,
         },
       });
       map.addLayer({
@@ -661,10 +643,10 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
         source: 'route-markers',
         filter: ['==', ['get', 'role'], 'origin'],
         paint: {
-          'circle-radius': 10,
-          'circle-color': '#22D3EE',
-          'circle-opacity': 0.5,
-          'circle-blur': 0.25,
+          'circle-radius': 8,
+          'circle-color': '#76E4EA',
+          'circle-opacity': 0.16,
+          'circle-blur': 0.4,
         },
       });
       map.addLayer({
@@ -673,12 +655,10 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
         source: 'route-markers',
         filter: ['==', ['get', 'role'], 'origin'],
         paint: {
-          'circle-radius': ['interpolate', ['linear'], ['zoom'], 2, 4.5, 10, 7, 16, 9],
-          'circle-color': '#22D3EE',
-          'circle-opacity': 1,
-          'circle-stroke-width': 2.5,
-          'circle-stroke-color': '#ECFEFF',
-          'circle-stroke-opacity': 0.95,
+          'circle-radius': 2.4,
+          'circle-color': '#041018',
+          'circle-opacity': 0.85,
+          'circle-stroke-width': 0,
         },
       });
       map.addLayer({ id: 'route-markers-rings', type: 'circle', source: 'route-markers', paint: {
@@ -704,7 +684,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
         filter: ['==', ['get', 'role'], 'origin'],
         layout: {
           'icon-image': 'vector-position-arrow',
-          'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.72, 16, 0.92, 18, 1.08],
+          'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.46, 16, 0.54, 18, 0.62],
           'icon-rotate': ['coalesce', ['to-number', ['get', 'bearing']], 0],
           'icon-rotation-alignment': 'map',
           'icon-pitch-alignment': 'map',
@@ -2473,7 +2453,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
           map.setPaintProperty('route-position-accuracy', 'circle-stroke-color', frame.color);
         }
         if (map.getLayer('route-position-core')) {
-          map.setPaintProperty('route-position-core', 'circle-color', frame.color);
+          map.setPaintProperty('route-position-core', 'circle-color', '#041018');
         }
       }
       animationFrame = requestAnimationFrame(animate);
@@ -2503,7 +2483,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       pitch: cameraPreset.pitch,
       bearing: nextBearing,
       padding: isMobileNavigation
-        ? { top: 112, bottom: 86, left: 18, right: 18 }
+        ? { top: 132, bottom: 118, left: 12, right: 12 }
         : { top: 108, bottom: 156, left: 64, right: 64 },
       duration: cameraPreset.durationMs,
       essential: true,
@@ -2519,6 +2499,11 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
     }
     if (map.getLayer('vector-building-footprints')) {
       map.setLayoutProperty('vector-building-footprints', 'visibility', buildingsVisible ? 'visible' : 'none');
+    }
+    if (buildingsVisible) {
+      ensureNavigationTerrain(map);
+    } else {
+      clearNavigationTerrain(map);
     }
 
     // The navigation camera owns pitch. A second pitch-only easeTo here would

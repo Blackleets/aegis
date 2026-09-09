@@ -31,7 +31,7 @@ export function ensureNavigationTerrain(map: maplibregl.Map) {
   }
 
   try {
-    map.setTerrain({ source: TERRAIN_SOURCE, exaggeration: 1.45 });
+    map.setTerrain({ source: TERRAIN_SOURCE, exaggeration: 1.8 });
   } catch {
     // Older MapLibre builds without terrain stay on extrusion-only 3D.
   }

@@ -362,7 +362,11 @@ export default function RouteCockpitMobile({
             className="pointer-events-auto fixed left-2.5 right-2.5 top-[max(0.6rem,env(safe-area-inset-top))] z-[362]"
             aria-live="polite"
           >
-            <div className="mx-auto max-w-[34rem] overflow-hidden rounded-[1.35rem] border border-white/10 bg-[rgba(5,14,24,0.9)] shadow-[0_14px_38px_rgba(0,0,0,0.34)] backdrop-blur-xl">
+            <div className="mx-auto max-w-[34rem] overflow-hidden rounded-[1.2rem] border border-cyan-200/14 bg-[rgba(5,12,20,0.92)] shadow-[0_16px_40px_rgba(0,0,0,0.4)] backdrop-blur-xl">
+              <div className="flex items-center justify-between border-b border-white/6 px-3 py-1">
+                <p className="text-[8px] font-mono font-semibold uppercase tracking-[0.22em] text-cyan-200/70">AEGIS NAV</p>
+                <p className="truncate text-[8px] font-mono uppercase tracking-[0.14em] text-white/40">{statusLabel}</p>
+              </div>
               <div className="flex items-center gap-2.5 p-2.5 pr-2">
                 <div className="relative flex h-[3.75rem] w-[3.75rem] shrink-0 items-center justify-center rounded-[1rem] bg-cyan-300 text-slate-950 shadow-[0_6px_20px_rgba(34,211,238,0.2)] [&_svg]:h-8 [&_svg]:w-8">
                   {renderManeuverIcon(currentRouteStep)}
@@ -375,7 +379,7 @@ export default function RouteCockpitMobile({
                   <div className="mb-1 flex items-center gap-1.5 text-[9px] font-medium text-cyan-100/70">
                     <span className="inline-flex items-center gap-1.5 text-cyan-100">
                       <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
-                      {statusLabel}
+                      {stepDistance ?? 'Sigue'}
                     </span>
                     {routeRiskSummary?.level === 'high' && (
                       <span className="inline-flex items-center gap-1 rounded-full bg-amber-300/12 px-2 py-1 text-amber-200">
