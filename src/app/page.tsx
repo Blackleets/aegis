@@ -39,6 +39,7 @@ import { useRealtimePresence } from '@/hooks/useRealtimePresence';
 import { useNavigationWakeLock } from '@/hooks/useNavigationWakeLock';
 import type { NearbyPlace } from '@/lib/nearby-places';
 import { DEFAULT_LOCALE, getDashboardCopy, isLocale, type Locale } from '@/lib/i18n';
+import { applyLiveTrafficToDurationSeconds } from '@/lib/tomtom-route-traffic';
 import { type ActiveLayers, type BoundingBox, type Coordinate, type FlyToLocation, type MapView, type RouteOption, type RouteRiskSummary, type RouteSnapshot, type RouteStep, computeBearing, countSignalsNearRoute, distanceMetersBetween, distanceToRoutePath, formatEtaLabel, formatProgressLabel, getClosestStepIndex, getYouTubeWatchUrl, localizeRouteInstruction } from '@/lib/routing-shell';
 import { filterGpsWithKalman, type GpsKalmanState } from '@/lib/gps-kalman';
 import { getArrivalThresholdMeters, getNextSimulationIndex, resolveNavigationBearing, shouldAcceptNavigationFix, shouldRerouteNavigation, snapNavigationToRoute, stabilizeNavigationCoordinate } from '@/lib/vector-navigation';
@@ -2056,7 +2057,7 @@ export default function Dashboard() {
     ? formatProgressLabel(completedRouteDistance, routeSnapshot.distanceMeters)
     : '0%';
   const routeEtaLabel = routeSnapshot
-    ? formatEtaLabel(Math.max(0, routeSnapshot.durationSeconds))
+    ? formatEtaLabel(applyLiveTrafficToDurationSeconds(Math.max(0, routeSnapshot.durationSeconds), trafficInsight))
     : '--:--';
   const routeRiskSummary = useMemo<RouteRiskSummary | null>(() => {
     if (!routeSnapshot || routeSnapshot.coordinates.length < 2) return null;
