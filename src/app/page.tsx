@@ -40,6 +40,7 @@ import { useNavigationWakeLock } from '@/hooks/useNavigationWakeLock';
 import type { NearbyPlace } from '@/lib/nearby-places';
 import { DEFAULT_LOCALE, getDashboardCopy, isLocale, type Locale } from '@/lib/i18n';
 import { type ActiveLayers, type BoundingBox, type Coordinate, type FlyToLocation, type MapView, type RouteOption, type RouteRiskSummary, type RouteSnapshot, type RouteStep, computeBearing, countSignalsNearRoute, distanceMetersBetween, distanceToRoutePath, formatEtaLabel, formatProgressLabel, getClosestStepIndex, getYouTubeWatchUrl, localizeRouteInstruction } from '@/lib/routing-shell';
+import { filterGpsWithKalman, type GpsKalmanState } from '@/lib/gps-kalman';
 import { getArrivalThresholdMeters, getNextSimulationIndex, resolveNavigationBearing, shouldAcceptNavigationFix, shouldRerouteNavigation, snapNavigationToRoute, stabilizeNavigationCoordinate } from '@/lib/vector-navigation';
 import { recommendRoute } from '@/lib/route-intelligence';
 import { chooseRouteAlertChannel } from '@/lib/route-alert-priority';
@@ -573,6 +574,7 @@ export default function Dashboard() {
   const lastNavigationLocationRef = useRef<Coordinate | null>(null);
   const lastNavigationBearingRef = useRef<number | null>(null);
   const lastAcceptedGpsAtRef = useRef(0);
+  const gpsKalmanRef = useRef<GpsKalmanState | null>(null);
   const offRouteSinceRef = useRef<number | null>(null);
   const offRouteFixCountRef = useRef(0);
   const lastRerouteAtRef = useRef(0);
@@ -877,6 +879,7 @@ export default function Dashboard() {
       setNavigationBearing(initialBearing);
       setCurrentRouteStepIndex(0);
       lastNavigationLocationRef.current = origin;
+      gpsKalmanRef.current = null;
       setRouteSnapshot({
         origin,
         destination,
@@ -1427,7 +1430,14 @@ export default function Dashboard() {
         }
         lastAcceptedGpsAtRef.current = now;
 
-        const stabilizedLocation = stabilizeNavigationCoordinate(previous, rawLocation, accuracy, speedKmh);
+        const kalman = filterGpsWithKalman({
+          state: gpsKalmanRef.current,
+          measurement: rawLocation,
+          accuracyMeters: accuracy,
+          elapsedMs,
+        });
+        gpsKalmanRef.current = kalman.state;
+        const stabilizedLocation = stabilizeNavigationCoordinate(previous, kalman.coordinate, accuracy, speedKmh);
         const routeMatch = snapNavigationToRoute(stabilizedLocation, routeSnapshot.coordinates, accuracy);
         const nextLocation = routeMatch.coordinate;
 
@@ -1587,6 +1597,7 @@ export default function Dashboard() {
     lastNavigationLocationRef.current = null;
     lastNavigationBearingRef.current = null;
     lastAcceptedGpsAtRef.current = 0;
+    gpsKalmanRef.current = null;
     const previousMapState = preNavigationMapStateRef.current;
     if (previousMapState) {
       setMapProjection(previousMapState.projection);
