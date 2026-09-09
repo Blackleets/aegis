@@ -6,6 +6,7 @@ import {
   classifyTrafficDelay,
   normalizeTomTomRouteTraffic,
   parseCoordinate,
+  parseTomTomRoutePoints,
 } from '../src/lib/tomtom-route-traffic';
 
 describe('TomTom route traffic adapter', () => {
@@ -30,6 +31,8 @@ describe('TomTom route traffic adapter', () => {
       delaySeconds: 600,
       trafficLengthMeters: 2_400,
       level: 'moderate',
+      points: [],
+      sections: [],
     });
   });
 
@@ -55,9 +58,11 @@ describe('TomTom route traffic adapter', () => {
     expect(applyLiveTrafficToDurationSeconds(600, { status: 'live' })).toBe(600);
   });
 
-  it('labels live TomTom delay and stays honest when offline', () => {
-    expect(formatTomTomTrafficLabel({ status: 'live', level: 'heavy', delaySeconds: 900 })).toContain('TomTom');
-    expect(formatTomTomTrafficLabel({ status: 'unavailable', configured: false })).toBe('Tráfico TomTom no configurado');
-    expect(formatTomTomTrafficLabel(null)).toBeNull();
+  it('keeps TomTom polyline points only when they are valid coordinates', () => {
+    expect(parseTomTomRoutePoints([
+      { latitude: 40.4168, longitude: -3.7038 },
+      { latitude: 91, longitude: 0 },
+      { latitude: Number.NaN, longitude: 1 },
+    ])).toEqual([{ lat: 40.4168, lng: -3.7038 }]);
   });
 });

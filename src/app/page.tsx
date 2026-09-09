@@ -40,6 +40,7 @@ import { useNavigationWakeLock } from '@/hooks/useNavigationWakeLock';
 import type { NearbyPlace } from '@/lib/nearby-places';
 import { DEFAULT_LOCALE, getDashboardCopy, isLocale, type Locale } from '@/lib/i18n';
 import { applyLiveTrafficToDurationSeconds } from '@/lib/tomtom-route-traffic';
+import { paintRouteWithLiveTraffic, parseTomTomTrafficSections } from '@/lib/route-traffic-paint';
 import { type ActiveLayers, type BoundingBox, type Coordinate, type FlyToLocation, type MapView, type RouteOption, type RouteRiskSummary, type RouteSnapshot, type RouteStep, computeBearing, countSignalsNearRoute, distanceMetersBetween, distanceToRoutePath, formatEtaLabel, formatProgressLabel, getClosestStepIndex, getYouTubeWatchUrl, localizeRouteInstruction } from '@/lib/routing-shell';
 import { filterGpsWithKalman, type GpsKalmanState } from '@/lib/gps-kalman';
 import { getArrivalThresholdMeters, getNextSimulationIndex, resolveNavigationBearing, shouldAcceptNavigationFix, shouldRerouteNavigation, snapNavigationToRoute, stabilizeNavigationCoordinate } from '@/lib/vector-navigation';
@@ -398,6 +399,14 @@ interface TrafficInsight {
   freeFlowTimeSeconds?: number | null;
   level?: 'clear' | 'light' | 'moderate' | 'heavy';
   checkedAt?: string;
+  points?: Array<{ lat: number; lng: number }>;
+  sections?: Array<{
+    startPointIndex?: number;
+    endPointIndex?: number;
+    sectionType?: string;
+    simpleCategory?: string;
+    magnitudeOfDelay?: number;
+  }>;
 }
 
 type RegionDossier = RegionDossierData;
@@ -2059,6 +2068,13 @@ export default function Dashboard() {
   const routeEtaLabel = routeSnapshot
     ? formatEtaLabel(applyLiveTrafficToDurationSeconds(Math.max(0, routeSnapshot.durationSeconds), trafficInsight))
     : '--:--';
+  const routeTrafficSegments = useMemo(() => paintRouteWithLiveTraffic({
+    route: routeSnapshot?.coordinates ?? [],
+    live: trafficInsight?.status === 'live',
+    overallLevel: trafficInsight?.level ?? 'clear',
+    tomtomPoints: trafficInsight?.status === 'live' ? trafficInsight.points ?? null : null,
+    sections: trafficInsight?.status === 'live' ? parseTomTomTrafficSections(trafficInsight.sections) : null,
+  }), [routeSnapshot?.coordinates, trafficInsight]);
   const routeRiskSummary = useMemo<RouteRiskSummary | null>(() => {
     if (!routeSnapshot || routeSnapshot.coordinates.length < 2) return null;
 
@@ -2226,6 +2242,7 @@ export default function Dashboard() {
           gpsAccuracyMeters={gpsAccuracyMeters}
           routeDestination={routeSnapshot?.destination ? { lat: routeSnapshot.destination.lat, lng: routeSnapshot.destination.lng } : null}
           routePath={routeSnapshot?.coordinates ?? []}
+          routeTrafficSegments={routeTrafficSegments}
           navigationActive={navigationActive}
           navigationCameraFollowing={navigationCameraFollowing}
           onNavigationCameraRelease={releaseNavigationCamera}

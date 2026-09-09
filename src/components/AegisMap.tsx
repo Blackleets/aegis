@@ -8,10 +8,11 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { findNewEarthquakes, getEarthquakeSeverity, isRecentEarthquake } from '@/lib/earthquakes';
 import { scoreCctvDelivery } from '@/lib/cctv-feed';
 import { getLiveMotionFrame } from '@/lib/map-live-motion';
-import { getNavigationCameraTarget, getVectorCameraPreset, shouldUpdateNavigationCamera, smoothNavigationBearing, type VectorNavigationMode } from '@/lib/vector-navigation';
+import { getNavigationCameraPadding, getNavigationCameraTarget, getVectorCameraPreset, NAVIGATION_MAP_MAX_PITCH, NAVIGATION_MAP_MAX_ZOOM, shouldUpdateNavigationCamera, smoothNavigationBearing, type VectorNavigationMode } from '@/lib/vector-navigation';
 import { getGpsPulseFrame } from '@/lib/gps-position-visual';
-import { buildNavigationPuckImageData } from '@/lib/navigation-puck-icon';
-import { clearNavigationTerrain, ensureNavigationTerrain } from '@/lib/navigation-terrain';
+import { buildNavigationPuckImageData, NAVIGATION_PUCK_IMAGE_ID, NAVIGATION_PUCK_PIXEL_RATIO } from '@/lib/navigation-puck-icon';
+import { applyNavigationAtmosphere, clearNavigationTerrain, ensureNavigationTerrain } from '@/lib/navigation-terrain';
+import { TRAFFIC_GLOW_COLOR, TRAFFIC_LINE_COLOR, type PaintedTrafficSegment } from '@/lib/route-traffic-paint';
 
 type Coordinates = [number, number];
 type EntityProperties = Record<string, unknown>;
@@ -83,6 +84,7 @@ interface AegisMapProps {
   navigationMode?: VectorNavigationMode;
   ambientMotionEnabled?: boolean;
   nearbyPlaces?: NearbyPlace[];
+  routeTrafficSegments?: PaintedTrafficSegment[];
 }
 
 function computeSolarTerminator(): [number, number][] {
@@ -252,7 +254,7 @@ function takeTopEntities<T>(items: T[] | undefined, limit: number, score: (item:
   return [...items].sort((a, b) => score(b) - score(a)).slice(0, limit);
 }
 
-function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightClick, onViewStateChange, flyToLocation, projection = 'globe', mapStyle = 'dark', sweepData, scanTargets = [], currentLocation = null, gpsAccuracyMeters = null, routeDestination = null, routePath = [], navigationActive = false, navigationCameraFollowing = true, onNavigationCameraRelease, navigationBearing = null, navigationMode = 'driving', ambientMotionEnabled = true, nearbyPlaces = [] }: AegisMapProps) {
+function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightClick, onViewStateChange, flyToLocation, projection = 'globe', mapStyle = 'dark', sweepData, scanTargets = [], currentLocation = null, gpsAccuracyMeters = null, routeDestination = null, routePath = [], navigationActive = false, navigationCameraFollowing = true, onNavigationCameraRelease, navigationBearing = null, navigationMode = 'driving', ambientMotionEnabled = true, nearbyPlaces = [], routeTrafficSegments = [] }: AegisMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const popupRef = useRef<maplibregl.Popup | null>(null);
@@ -300,11 +302,11 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
 
   const createNavigationArrow = useCallback((map: maplibregl.Map) => {
     const image = buildNavigationPuckImageData();
-    if (map.hasImage('vector-position-arrow')) {
-      map.updateImage('vector-position-arrow', image);
+    if (map.hasImage(NAVIGATION_PUCK_IMAGE_ID)) {
+      map.updateImage(NAVIGATION_PUCK_IMAGE_ID, image);
       return;
     }
-    map.addImage('vector-position-arrow', image, { pixelRatio: 2 });
+    map.addImage(NAVIGATION_PUCK_IMAGE_ID, image, { pixelRatio: NAVIGATION_PUCK_PIXEL_RATIO });
   }, []);
 
   const createPlaceIcon = useCallback((map: maplibregl.Map, category: keyof typeof NEARBY_PLACE_META) => {
@@ -417,7 +419,8 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       center: [0, isCompactViewport ? 12 : 20],
       zoom: initialProjectionRef.current === 'globe' ? (isCompactViewport ? 1.52 : 2.05) : 3.2,
       minZoom: isCompactViewport ? 1.3 : 1.5,
-      maxZoom: 18,
+      maxZoom: NAVIGATION_MAP_MAX_ZOOM,
+      maxPitch: NAVIGATION_MAP_MAX_PITCH,
       pitch: initialProjectionRef.current === 'globe' ? (isCompactViewport ? 0 : 14) : 0,
       attributionControl: false,
     });
@@ -426,6 +429,8 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       mapRef.current = map;
       try {
         (map as maplibregl.Map & { setProjection?: (projection: { type: 'mercator' | 'globe' }) => void }).setProjection({ type: initialProjectionRef.current });
+        map.setMaxPitch(NAVIGATION_MAP_MAX_PITCH);
+        map.setMaxZoom(NAVIGATION_MAP_MAX_ZOOM);
       } catch {}
 
       applyAegisGlobeStyling(map, initialProjectionRef.current, initialMapStyleRef.current);
@@ -457,12 +462,12 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
           type: 'line',
           source: 'carto',
           'source-layer': 'building',
-          minzoom: 13,
+          minzoom: 12.4,
           layout: { visibility: 'none' },
           paint: {
-            'line-color': 'rgba(103, 200, 224, 0.24)',
-            'line-width': ['interpolate', ['linear'], ['zoom'], 13.8, 0.25, 16, 0.8, 19, 1.15],
-            'line-opacity': ['interpolate', ['linear'], ['zoom'], 13.8, 0.18, 16, 0.48, 19, 0.62],
+            'line-color': 'rgba(103, 200, 224, 0.28)',
+            'line-width': ['interpolate', ['linear'], ['zoom'], 12.8, 0.25, 16, 0.9, 19, 1.3],
+            'line-opacity': ['interpolate', ['linear'], ['zoom'], 12.8, 0.2, 16, 0.52, 19, 0.68],
           },
         }, firstLabelLayer);
       }
@@ -472,33 +477,34 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
           type: 'fill-extrusion',
           source: 'carto',
           'source-layer': 'building',
-          minzoom: 13,
+          minzoom: 12.4,
           layout: { visibility: 'none' },
           paint: {
             'fill-extrusion-color': [
               'interpolate', ['linear'],
               ['coalesce', ['to-number', ['get', 'render_height']], ['to-number', ['get', 'height']], ['*', ['to-number', ['get', 'levels']], 3], 8],
-              0, '#172832',
-              12, '#25414d',
-              35, '#315666',
-              80, '#3d6d7e',
-              160, '#56899a',
+              0, '#101c24',
+              12, '#1a333e',
+              28, '#274b59',
+              60, '#356576',
+              120, '#4d8496',
+              200, '#6aa4b5',
             ],
             'fill-extrusion-height': [
               'interpolate', ['linear'], ['zoom'],
-              13.2, ['*', 0.45, [
+              12.6, ['*', 0.7, [
                   'coalesce',
                   ['to-number', ['get', 'render_height']],
                   ['to-number', ['get', 'height']],
-                  ['*', ['to-number', ['get', 'levels']], 3.4],
-                  10,
+                  ['*', ['to-number', ['get', 'levels']], 3.6],
+                  14,
                 ]],
-              15.4, ['*', 1.12, [
+              15.2, ['*', 1.62, [
                   'coalesce',
                   ['to-number', ['get', 'render_height']],
                   ['to-number', ['get', 'height']],
-                  ['*', ['to-number', ['get', 'levels']], 3.4],
-                  12,
+                  ['*', ['to-number', ['get', 'levels']], 3.6],
+                  16,
                 ]],
             ],
             'fill-extrusion-base': [
@@ -507,7 +513,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
               ['to-number', ['get', 'min_height']],
               0,
             ],
-            'fill-extrusion-opacity': 0.94,
+            'fill-extrusion-opacity': 0.98,
             'fill-extrusion-vertical-gradient': true,
           },
         }, firstLabelLayer);
@@ -579,21 +585,21 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       });
 
       // User route overlay (additive only — high contrast, does not affect Earth logic)
-      map.addLayer({ id: 'user-route-glow', type: 'line', source: 'user-route', paint: {
-        'line-color': '#22D3EE',
-        'line-width': ['interpolate', ['linear'], ['zoom'], 2, 10, 10, 20, 15, 28, 18, 36],
-        'line-opacity': ['interpolate', ['linear'], ['zoom'], 2, 0.28, 12, 0.4, 18, 0.48],
-        'line-blur': 1.6,
+      map.addLayer({ id: 'user-route-glow', type: 'line', source: 'user-route', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: {
+        'line-color': ['match', ['get', 'level'], 'heavy', TRAFFIC_GLOW_COLOR.heavy, 'moderate', TRAFFIC_GLOW_COLOR.moderate, 'light', TRAFFIC_GLOW_COLOR.light, TRAFFIC_GLOW_COLOR.clear],
+        'line-width': ['interpolate', ['linear'], ['zoom'], 2, 10, 10, 22, 15, 32, 18, 44, 20, 52],
+        'line-opacity': ['interpolate', ['linear'], ['zoom'], 2, 0.28, 12, 0.42, 18, 0.52],
+        'line-blur': 1.8,
       }});
-      map.addLayer({ id: 'user-route-casing', type: 'line', source: 'user-route', paint: {
+      map.addLayer({ id: 'user-route-casing', type: 'line', source: 'user-route', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: {
         'line-color': 'rgba(3, 15, 32, 0.98)',
-        'line-width': ['interpolate', ['linear'], ['zoom'], 2, 6, 10, 13, 15, 18, 18, 24],
+        'line-width': ['interpolate', ['linear'], ['zoom'], 2, 6, 10, 14, 15, 20, 18, 28, 20, 34],
         'line-opacity': 0.96,
         'line-blur': 0.05,
       }});
-      map.addLayer({ id: 'user-route-line', type: 'line', source: 'user-route', paint: {
-        'line-color': '#67E8F9',
-        'line-width': ['interpolate', ['linear'], ['zoom'], 2, 3.4, 10, 8.5, 15, 12, 18, 16],
+      map.addLayer({ id: 'user-route-line', type: 'line', source: 'user-route', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: {
+        'line-color': ['match', ['get', 'level'], 'heavy', TRAFFIC_LINE_COLOR.heavy, 'moderate', TRAFFIC_LINE_COLOR.moderate, 'light', TRAFFIC_LINE_COLOR.light, TRAFFIC_LINE_COLOR.clear],
+        'line-width': ['interpolate', ['linear'], ['zoom'], 2, 3.4, 10, 9, 15, 13.5, 18, 18.5, 20, 22],
         'line-opacity': 1,
         'line-blur': 0,
       }});
@@ -683,11 +689,12 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
         source: 'route-markers',
         filter: ['==', ['get', 'role'], 'origin'],
         layout: {
-          'icon-image': 'vector-position-arrow',
-          'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.46, 16, 0.54, 18, 0.62],
+          'icon-image': NAVIGATION_PUCK_IMAGE_ID,
+          'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.82, 16, 1.08, 18, 1.22, 19.5, 1.34],
           'icon-rotate': ['coalesce', ['to-number', ['get', 'bearing']], 0],
           'icon-rotation-alignment': 'map',
-          'icon-pitch-alignment': 'map',
+          'icon-pitch-alignment': 'viewport',
+          'icon-anchor': 'center',
           'icon-allow-overlap': true,
           'icon-ignore-placement': true,
         },
@@ -2385,15 +2392,18 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
     const markerSource = map.getSource('route-markers') as maplibregl.GeoJSONSource;
 
     if (routeSource) {
+      const trafficFeatures = routeTrafficSegments.length > 0
+        ? routeTrafficSegments
+        : routePath.length >= 2
+          ? [{ coordinates: routePath, level: 'clear' as const }]
+          : [];
       routeSource.setData({
         type: 'FeatureCollection',
-        features: routePath.length >= 2
-          ? [{
-              type: 'Feature',
-              geometry: { type: 'LineString', coordinates: routePath },
-              properties: { label: 'AEGIS VECTOR', mode: navigationActive ? 'follow' : 'ready' },
-            }]
-          : [],
+        features: trafficFeatures.map((segment) => ({
+          type: 'Feature',
+          geometry: { type: 'LineString', coordinates: segment.coordinates },
+          properties: { label: 'AEGIS VECTOR', mode: navigationActive ? 'follow' : 'ready', level: segment.level },
+        })),
       });
     }
 
@@ -2420,7 +2430,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       }
       markerSource.setData({ type: 'FeatureCollection', features: markerFeatures });
     }
-  }, [currentLocation, gpsAccuracyMeters, mapReady, navigationActive, navigationBearing, routeDestination, routePath]);
+  }, [currentLocation, gpsAccuracyMeters, mapReady, navigationActive, navigationBearing, routeDestination, routePath, routeTrafficSegments]);
 
   useEffect(() => {
     if (!mapReady) return;
@@ -2482,9 +2492,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
       zoom: cameraPreset.zoom,
       pitch: cameraPreset.pitch,
       bearing: nextBearing,
-      padding: isMobileNavigation
-        ? { top: 132, bottom: 118, left: 12, right: 12 }
-        : { top: 108, bottom: 156, left: 64, right: 64 },
+      padding: getNavigationCameraPadding(isMobileNavigation),
       duration: cameraPreset.durationMs,
       essential: true,
     });
@@ -2500,8 +2508,15 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
     if (map.getLayer('vector-building-footprints')) {
       map.setLayoutProperty('vector-building-footprints', 'visibility', buildingsVisible ? 'visible' : 'none');
     }
+    if (map.getLayer('building')) {
+      map.setLayoutProperty('building', 'visibility', buildingsVisible ? 'none' : 'visible');
+    }
+    if (map.getLayer('building-top')) {
+      map.setLayoutProperty('building-top', 'visibility', buildingsVisible ? 'none' : 'visible');
+    }
     if (buildingsVisible) {
       ensureNavigationTerrain(map);
+      applyNavigationAtmosphere(map);
     } else {
       clearNavigationTerrain(map);
     }
@@ -2624,7 +2639,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
         zoom: cameraPreset.zoom,
         pitch: cameraPreset.pitch,
         bearing: nextBearing,
-        padding: { top: 112, bottom: 86, left: 18, right: 18 },
+        padding: getNavigationCameraPadding(true),
         duration: cameraPreset.durationMs,
         essential: true,
       });
@@ -2660,6 +2675,10 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
     try {
       (map as maplibregl.Map & { setProjection?: (projection: { type: 'mercator' | 'globe' }) => void }).setProjection({ type: projection });
       applyAegisGlobeStyling(map, projection, mapStyle);
+      if (navigationActive) {
+        applyNavigationAtmosphere(map);
+        ensureNavigationTerrain(map);
+      }
       if (projection === 'globe') {
         if (!navigationActive && !currentLocation) {
           const isCompactViewport = window.innerWidth < 768;
@@ -2678,9 +2697,7 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
           zoom: cameraPreset.zoom,
           pitch: cameraPreset.pitch,
           bearing: nextBearing,
-          padding: isMobileNavigation
-            ? { top: 112, bottom: 86, left: 18, right: 18 }
-            : { top: 108, bottom: 156, left: 64, right: 64 },
+          padding: getNavigationCameraPadding(isMobileNavigation),
           duration: 850,
           essential: true,
         });
@@ -2746,7 +2763,17 @@ function AegisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCli
     }
   }, [applyAegisGlobeStyling, mapReady, mapStyle, projection]);
 
-  return <div ref={containerRef} className="absolute inset-0 w-full h-full" />;
+  return (
+    <div className="absolute inset-0 h-full w-full">
+      <div ref={containerRef} className="absolute inset-0 h-full w-full" />
+      {navigationActive && (
+        <div
+          className="pointer-events-none absolute inset-x-0 top-0 h-[30%] bg-gradient-to-b from-[#061018] via-[#071422]/70 to-transparent"
+          aria-hidden="true"
+        />
+      )}
+    </div>
+  );
 }
 
 export default memo(AegisMap);

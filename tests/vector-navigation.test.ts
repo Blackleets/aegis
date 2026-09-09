@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { getArrivalThresholdMeters, getNavigationCameraTarget, getNextSimulationIndex, getVectorCameraPreset, resolveNavigationBearing, shouldAcceptNavigationFix, shouldRerouteNavigation, shouldUpdateNavigationCamera, smoothNavigationBearing, snapNavigationToRoute, stabilizeNavigationCoordinate } from '../src/lib/vector-navigation';
+import { getArrivalThresholdMeters, getNavigationCameraPadding, getNavigationCameraTarget, getNextSimulationIndex, getVectorCameraPreset, NAVIGATION_MAP_MAX_PITCH, resolveNavigationBearing, shouldAcceptNavigationFix, shouldRerouteNavigation, shouldUpdateNavigationCamera, smoothNavigationBearing, snapNavigationToRoute, stabilizeNavigationCoordinate } from '../src/lib/vector-navigation';
 
 describe('vector navigation camera', () => {
   it('uses a closer camera for walking than driving', () => {
@@ -9,9 +9,12 @@ describe('vector navigation camera', () => {
 
   it('keeps driving navigation at street-level zoom on mobile', () => {
     const preset = getVectorCameraPreset('driving', true);
-    expect(preset.zoom).toBeGreaterThanOrEqual(16.5);
-    expect(preset.pitch).toBeGreaterThanOrEqual(68);
-    expect(preset.lookAheadMeters).toBeLessThan(160);
+    expect(preset.zoom).toBeGreaterThanOrEqual(18);
+    expect(preset.pitch).toBeGreaterThanOrEqual(74);
+    expect(preset.lookAheadMeters).toBeLessThan(80);
+    expect(NAVIGATION_MAP_MAX_PITCH).toBeGreaterThan(60);
+    expect(getNavigationCameraPadding(true).bottom).toBeGreaterThan(200);
+    expect(getNavigationCameraPadding(true).bottom).toBeGreaterThan(getNavigationCameraPadding(true).top);
   });
 
   it('ignores stationary GPS jitter and rate-limits camera updates', () => {

@@ -15,8 +15,8 @@ export function navigationDistanceMeters(a: NavigationCoordinate, b: NavigationC
 
 export function shouldUpdateNavigationCamera(previous: NavigationCoordinate | null, current: NavigationCoordinate, elapsedMs: number) {
   if (!previous) return true;
-  if (elapsedMs < 380) return false;
-  return navigationDistanceMeters(previous, current) >= 2.4;
+  if (elapsedMs < 260) return false;
+  return navigationDistanceMeters(previous, current) >= 1.6;
 }
 
 export function smoothNavigationBearing(previous: number | null, next: number, factor = 0.32) {
@@ -60,31 +60,40 @@ export function getNextSimulationIndex(currentIndex: number, coordinateCount: nu
   return Math.min(coordinateCount - 1, currentIndex + stride);
 }
 
+export const NAVIGATION_MAP_MAX_PITCH = 85;
+export const NAVIGATION_MAP_MAX_ZOOM = 20;
+
 export function getVectorCameraPreset(mode: VectorNavigationMode, isMobile: boolean) {
   if (mode === 'walking') {
     return {
-      zoom: isMobile ? 18.55 : 17.8,
-      pitch: isMobile ? 68 : 62,
-      lookAheadMeters: isMobile ? 28 : 48,
-      durationMs: isMobile ? 420 : 520,
+      zoom: isMobile ? 18.9 : 18.2,
+      pitch: isMobile ? 64 : 58,
+      lookAheadMeters: isMobile ? 22 : 36,
+      durationMs: isMobile ? 360 : 480,
     };
   }
 
   if (mode === 'cycling') {
     return {
-      zoom: isMobile ? 18.05 : 17.2,
+      zoom: isMobile ? 18.55 : 17.7,
       pitch: isMobile ? 70 : 64,
-      lookAheadMeters: isMobile ? 52 : 82,
-      durationMs: isMobile ? 440 : 560,
+      lookAheadMeters: isMobile ? 38 : 64,
+      durationMs: isMobile ? 380 : 500,
     };
   }
 
   return {
-    zoom: isMobile ? 17.55 : 16.9,
-    pitch: isMobile ? 72 : 64,
-    lookAheadMeters: isMobile ? 118 : 160,
-    durationMs: isMobile ? 480 : 560,
+    zoom: isMobile ? 18.35 : 17.45,
+    pitch: isMobile ? 76 : 68,
+    lookAheadMeters: isMobile ? 56 : 92,
+    durationMs: isMobile ? 360 : 460,
   };
+}
+
+export function getNavigationCameraPadding(isMobile: boolean) {
+  return isMobile
+    ? { top: 56, bottom: 236, left: 8, right: 8 }
+    : { top: 92, bottom: 172, left: 56, right: 56 };
 }
 
 export function getNavigationCameraTarget(

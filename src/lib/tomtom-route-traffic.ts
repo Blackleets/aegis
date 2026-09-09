@@ -9,6 +9,20 @@ export type TomTomRouteTrafficSummary = {
   arrivalTime?: string;
 };
 
+export type TomTomRoutePoint = {
+  latitude?: number;
+  longitude?: number;
+};
+
+export type TomTomTrafficSection = {
+  startPointIndex?: number;
+  endPointIndex?: number;
+  sectionType?: string;
+  simpleCategory?: string;
+  magnitudeOfDelay?: number;
+  delayInSeconds?: number;
+};
+
 export type NormalizedRouteTraffic = {
   delaySeconds: number;
   trafficLengthMeters: number;
@@ -17,6 +31,8 @@ export type NormalizedRouteTraffic = {
   departureTime: string | null;
   arrivalTime: string | null;
   level: TrafficLevel;
+  points: Array<{ lat: number; lng: number }>;
+  sections: TomTomTrafficSection[];
 };
 
 export function parseCoordinate(value: string | null, min: number, max: number) {
@@ -65,7 +81,25 @@ export function classifyTrafficDelay(delaySeconds: number): TrafficLevel {
   return 'clear';
 }
 
-export function normalizeTomTomRouteTraffic(summary: TomTomRouteTrafficSummary): NormalizedRouteTraffic | null {
+export function parseTomTomRoutePoints(points: TomTomRoutePoint[] | null | undefined) {
+  if (!Array.isArray(points)) return [];
+  const parsed: Array<{ lat: number; lng: number }> = [];
+  for (const point of points) {
+    if (typeof point?.latitude !== 'number' || typeof point?.longitude !== 'number') continue;
+    if (!Number.isFinite(point.latitude) || !Number.isFinite(point.longitude)) continue;
+    if (Math.abs(point.latitude) > 90 || Math.abs(point.longitude) > 180) continue;
+    parsed.push({ lat: point.latitude, lng: point.longitude });
+  }
+  return parsed;
+}
+
+export function normalizeTomTomRouteTraffic(
+  summary: TomTomRouteTrafficSummary,
+  extras?: {
+    points?: TomTomRoutePoint[] | null;
+    sections?: TomTomTrafficSection[] | null;
+  },
+): NormalizedRouteTraffic | null {
   if (typeof summary.travelTimeInSeconds !== 'number' || !Number.isFinite(summary.travelTimeInSeconds)) return null;
 
   const travelTimeSeconds = Math.max(0, summary.travelTimeInSeconds);
@@ -85,5 +119,7 @@ export function normalizeTomTomRouteTraffic(summary: TomTomRouteTrafficSummary):
     departureTime: summary.departureTime ?? null,
     arrivalTime: summary.arrivalTime ?? null,
     level: classifyTrafficDelay(delaySeconds),
+    points: parseTomTomRoutePoints(extras?.points),
+    sections: Array.isArray(extras?.sections) ? extras.sections : [],
   };
 }

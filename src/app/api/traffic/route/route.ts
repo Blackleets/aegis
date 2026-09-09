@@ -5,7 +5,9 @@ import {
   normalizeTomTomRouteTraffic,
   parseCoordinate,
   type NormalizedRouteTraffic,
+  type TomTomRoutePoint,
   type TomTomRouteTrafficSummary,
+  type TomTomTrafficSection,
 } from '@/lib/tomtom-route-traffic';
 
 export const dynamic = 'force-dynamic';
@@ -66,7 +68,8 @@ export async function GET(request: NextRequest) {
   url.searchParams.set('routeType', 'fastest');
   url.searchParams.set('departAt', 'now');
   url.searchParams.set('computeTravelTimeFor', 'all');
-  url.searchParams.set('routeRepresentation', 'summaryOnly');
+  url.searchParams.set('routeRepresentation', 'polyline');
+  url.searchParams.set('sectionType', 'traffic');
 
   try {
     const response = await fetch(url, {
@@ -75,6 +78,28 @@ export async function GET(request: NextRequest) {
     });
 
     if (!response.ok) {
+      if (response.status === 400 && url.searchParams.get('routeRepresentation') === 'polyline') {
+        url.searchParams.set('routeRepresentation', 'summaryOnly');
+        url.searchParams.delete('sectionType');
+        const retry = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(8_000) });
+        if (retry.ok) {
+          const retryPayload = await retry.json() as { routes?: Array<{ summary?: TomTomRouteTrafficSummary }> };
+          const retryNormalized = retryPayload.routes?.[0]?.summary
+            ? normalizeTomTomRouteTraffic(retryPayload.routes[0].summary)
+            : null;
+          if (retryNormalized) {
+            trafficCache.set(cacheKey, { value: retryNormalized, storedAt: now });
+            return json({
+              status: 'live',
+              configured: true,
+              source: 'TomTom Traffic',
+              ...retryNormalized,
+              cached: false,
+              checkedAt: new Date(now).toISOString(),
+            });
+          }
+        }
+      }
       const stale = cached && now - cached.storedAt <= STALE_TTL_MS ? cached : null;
       if (stale) {
         return json({
@@ -102,10 +127,16 @@ export async function GET(request: NextRequest) {
     }
 
     const payload = await response.json() as {
-      routes?: Array<{ summary?: TomTomRouteTrafficSummary }>;
+      routes?: Array<{
+        summary?: TomTomRouteTrafficSummary;
+        legs?: Array<{ points?: TomTomRoutePoint[] }>;
+        sections?: TomTomTrafficSection[];
+      }>;
     };
-    const normalized = payload.routes?.[0]?.summary
-      ? normalizeTomTomRouteTraffic(payload.routes[0].summary)
+    const route = payload.routes?.[0];
+    const points = route?.legs?.flatMap((leg) => leg.points ?? []) ?? [];
+    const normalized = route?.summary
+      ? normalizeTomTomRouteTraffic(route.summary, { points, sections: route.sections ?? [] })
       : null;
 
     if (!normalized) {
