@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { type RouteRiskSummary, type RouteSnapshot, type RouteStep, formatCoordinateLabel, formatRouteDistance, formatRouteDuration, formatRouteModeLabel } from '@/lib/routing-shell';
+import { formatTomTomTrafficLabel } from '@/lib/tomtom-route-traffic';
 
 type GpsSignalStatus = 'idle' | 'acquiring' | 'live' | 'degraded' | 'denied' | 'unavailable';
 
@@ -17,6 +18,12 @@ type RouteCockpitDesktopProps = {
   onToggleNavigationFollow: () => void;
   onClearNavigationState: () => void;
   onSelectRouteOption: (routeId: string) => void;
+  trafficInsight?: {
+    status: 'loading' | 'live' | 'unavailable';
+    configured?: boolean;
+    level?: 'clear' | 'light' | 'moderate' | 'heavy';
+    delaySeconds?: number;
+  } | null;
 };
 
 function getGpsQualityLabel(status: GpsSignalStatus, accuracyMeters: number | null) {
@@ -40,6 +47,7 @@ export default function RouteCockpitDesktop({
   onToggleNavigationFollow,
   onClearNavigationState,
   onSelectRouteOption,
+  trafficInsight = null,
 }: RouteCockpitDesktopProps) {
   const [speedKmh, setSpeedKmh] = useState<number | null>(null);
   const [gpsAccuracyMeters, setGpsAccuracyMeters] = useState<number | null>(null);
@@ -165,61 +173,25 @@ export default function RouteCockpitDesktop({
                   </span>
                 </>
               )}
+              {formatTomTomTrafficLabel(trafficInsight) && (
+                <>
+                  <span>•</span>
+                  <span className={trafficInsight?.level === 'heavy' ? 'text-rose-300' : trafficInsight?.level === 'moderate' ? 'text-amber-300' : 'text-cyan-200'}>
+                    {formatTomTomTrafficLabel(trafficInsight)}
+                  </span>
+                </>
+              )}
             </div>
           </div>
           <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={onToggleNavigationFollow}
-              className="rounded-full border border-cyan-400/25 bg-cyan-400/10 px-3 py-1.5 text-[10px] font-mono uppercase tracking-[0.16em] text-cyan-200 hover:bg-cyan-400/18"
-            >
+            <button type="button" onClick={onToggleNavigationFollow} className="rounded-full border border-cyan-400/25 bg-cyan-400/10 px-3 py-1.5 text-[10px] font-mono uppercase tracking-[0.16em] text-cyan-200 hover:bg-cyan-400/18">
               {navigationActive ? 'Pause Vector' : 'Start Vector'}
             </button>
-            <button
-              type="button"
-              onClick={onClearNavigationState}
-              className="rounded-full border border-white/10 px-3 py-1.5 text-[10px] font-mono uppercase tracking-[0.16em] text-[var(--text-muted)] hover:text-white"
-            >
+            <button type="button" onClick={onClearNavigationState} className="rounded-full border border-white/10 px-3 py-1.5 text-[10px] font-mono uppercase tracking-[0.16em] text-[var(--text-muted)] hover:text-white">
               Clear Route
             </button>
           </div>
         </div>
-        {routeSnapshot.alternatives.length > 1 && (
-          <div className="mt-3 flex flex-wrap gap-2">
-            {routeSnapshot.alternatives.map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                onClick={() => onSelectRouteOption(option.id)}
-                className={`rounded-full border px-2.5 py-1 text-[8px] font-mono uppercase tracking-[0.18em] transition-colors ${routeSnapshot.activeRouteId === option.id ? 'border-cyan-400/35 bg-cyan-400/14 text-cyan-200' : 'border-white/10 bg-white/[0.03] text-[var(--text-secondary)] hover:text-white'}`}
-              >
-                {option.label} · {formatRouteDuration(option.durationSeconds)}{option.id !== routeSnapshot.activeRouteId ? ` · ${option.durationSeconds >= routeSnapshot.durationSeconds ? '+' : '-'}${formatRouteDuration(Math.abs(option.durationSeconds - routeSnapshot.durationSeconds))}` : ''}
-              </button>
-            ))}
-          </div>
-        )}
-        {routeRiskSummary && (
-          <div className="mt-3 rounded-2xl border border-white/8 bg-black/20 px-3 py-2.5">
-            <div className="flex flex-wrap items-center gap-2 text-[8px] font-mono uppercase tracking-[0.18em]">
-              <span className="text-cyan-300">Route Threat Scan</span>
-              <span className="text-[var(--text-secondary)]">{routeRiskSummary.nearbySignals} signals</span>
-              <span className={routeRiskSummary.level === 'high' ? 'text-rose-300' : routeRiskSummary.level === 'elevated' ? 'text-amber-300' : 'text-emerald-300'}>{routeRiskSummary.level}</span>
-            </div>
-            <div className="mt-2 flex flex-wrap gap-2 text-[8px] font-mono uppercase tracking-[0.16em] text-[var(--text-secondary)]">
-              <span>Intel {routeRiskSummary.counts.incidents}</span>
-              <span>Quakes {routeRiskSummary.counts.earthquakes}</span>
-              <span>Weather {routeRiskSummary.counts.weather}</span>
-              <span>Fires {routeRiskSummary.counts.fires}</span>
-              <span>GPS {routeRiskSummary.counts.jamming}</span>
-            </div>
-          </div>
-        )}
-        {currentRouteStep && (
-          <div className="mt-3 rounded-2xl border border-white/8 bg-black/20 px-3 py-2.5">
-            <div className="text-[8px] font-mono uppercase tracking-[0.18em] text-cyan-300">Next Turn</div>
-            <div className="mt-1.5 text-[13px] font-semibold leading-snug text-white">{currentRouteStep.instruction}</div>
-          </div>
-        )}
       </div>
     </motion.div>
   );

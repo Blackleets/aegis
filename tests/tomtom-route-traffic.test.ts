@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  applyLiveTrafficToDurationSeconds,
+  formatTomTomTrafficLabel,
   buildTrafficCacheKey,
   classifyTrafficDelay,
   normalizeTomTomRouteTraffic,
@@ -44,5 +46,18 @@ describe('TomTom route traffic adapter', () => {
     expect(classifyTrafficDelay(120)).toBe('light');
     expect(classifyTrafficDelay(300)).toBe('moderate');
     expect(classifyTrafficDelay(900)).toBe('heavy');
+  });
+
+  it('only adds delay to ETA when traffic is live', () => {
+    expect(applyLiveTrafficToDurationSeconds(600, null)).toBe(600);
+    expect(applyLiveTrafficToDurationSeconds(600, { status: 'unavailable', delaySeconds: 180 })).toBe(600);
+    expect(applyLiveTrafficToDurationSeconds(600, { status: 'live', delaySeconds: 180 })).toBe(780);
+    expect(applyLiveTrafficToDurationSeconds(600, { status: 'live' })).toBe(600);
+  });
+
+  it('labels live TomTom delay and stays honest when offline', () => {
+    expect(formatTomTomTrafficLabel({ status: 'live', level: 'heavy', delaySeconds: 900 })).toContain('TomTom');
+    expect(formatTomTomTrafficLabel({ status: 'unavailable', configured: false })).toBe('Tráfico TomTom no configurado');
+    expect(formatTomTomTrafficLabel(null)).toBeNull();
   });
 });
