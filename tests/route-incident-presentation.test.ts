@@ -38,6 +38,8 @@ describe('route incident presentation', () => {
     expect(result.detail).toContain('A-1');
     expect(result.detail).toContain('+7 min');
     expect(result.critical).toBe(true);
+    expect(result.action).toContain('desvío');
+    expect(result.confidence).toBe('medium');
   });
 
   it('marks fallback information as recent rather than live', () => {
@@ -59,5 +61,10 @@ describe('route incident presentation', () => {
   it('formats nearby incidents in metres', () => {
     const result = presentRouteIncident(incident({ category: 'accident', distanceAheadMeters: 650 }));
     expect(result.title).toBe('Accidente a 650 m');
+    expect(result.action).toContain('Reduce');
+  });
+
+  it('raises confidence when TomTom marks the incident as certain', () => {
+    expect(presentRouteIncident(incident({ probability: 'certain' })).confidence).toBe('high');
   });
 });
