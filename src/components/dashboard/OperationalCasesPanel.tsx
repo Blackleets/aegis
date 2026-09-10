@@ -1,8 +1,10 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import EntityDrawer from '@/components/dashboard/EntityDrawer';
 import OperationalCaseCard from '@/components/dashboard/OperationalCaseCard';
 import type { OperationalCase } from '@/lib/operational-cases';
+import { operationalCaseToOntologyGraph, type OntologyGraph } from '@/lib/ontology';
 
 type CaseFilter = 'all' | 'critical' | 'high-confidence' | 'nearby';
 
@@ -23,6 +25,7 @@ export default function OperationalCasesPanel({
   onLocate: (latitude: number, longitude: number) => void;
 }) {
   const [filter, setFilter] = useState<CaseFilter>('all');
+  const [ontologyGraph, setOntologyGraph] = useState<OntologyGraph | null>(null);
   const visibleCases = useMemo(() => cases.filter((operationalCase) => {
     if (filter === 'critical') return operationalCase.severity === 'critical';
     if (filter === 'high-confidence') return operationalCase.confidence === 'high';
@@ -66,7 +69,13 @@ export default function OperationalCasesPanel({
       </div>
       <div className="mt-2 space-y-2">
         {visibleCases.slice(0, 8).map((operationalCase) => (
-          <OperationalCaseCard key={operationalCase.id} operationalCase={operationalCase} onLocate={onLocate} compact />
+          <OperationalCaseCard
+            key={operationalCase.id}
+            operationalCase={operationalCase}
+            onLocate={onLocate}
+            onInspectOntology={(selected) => setOntologyGraph(operationalCaseToOntologyGraph(selected))}
+            compact
+          />
         ))}
         {visibleCases.length === 0 && (
           <p className="rounded-xl border border-white/7 bg-black/10 px-3 py-4 text-center text-[9px] text-white/45">
@@ -74,6 +83,9 @@ export default function OperationalCasesPanel({
           </p>
         )}
       </div>
+      {ontologyGraph && (
+        <EntityDrawer graph={ontologyGraph} onClose={() => setOntologyGraph(null)} />
+      )}
     </section>
   );
 }
