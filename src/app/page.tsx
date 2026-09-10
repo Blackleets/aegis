@@ -15,6 +15,7 @@ import ViewPresets from '@/components/ViewPresets';
 import KeyboardShortcuts from '@/components/KeyboardShortcuts';
 import GlobalStatusBar from '@/components/GlobalStatusBar';
 import LiveAlerts from '@/components/LiveAlerts';
+import WorldPulsePanel from '@/components/dashboard/WorldPulsePanel';
 import AiAnalyst from '@/components/AiAnalyst';
 import SolarSystemMode, { type CelestialBodyId } from '@/components/SolarSystemMode';
 import ModeDock from '@/components/dashboard/ModeDock';
@@ -2557,7 +2558,12 @@ export default function Dashboard() {
           />
         )}
         sharePanel={<SharePanel mapView={mapView} activeLayers={activeLayers} mouseCoords={null} />}
-        alertsContent={<LiveAlerts data={dataWithSdk} onLocate={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })} onWatchFeed={(url, name) => { setLiveFeedUrl(url); setLiveFeedName(name); }} />}
+        alertsContent={(
+          <>
+            <WorldPulsePanel onLocate={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })} />
+            <LiveAlerts data={dataWithSdk} onLocate={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })} onWatchFeed={(url, name) => { setLiveFeedUrl(url); setLiveFeedName(name); }} />
+          </>
+        )}
         reconContent={<OsintPanel onSweepVisualize={setSweepData} onScanGeolocate={(target: string, payload: OsintGeolocatePayload) => {
           setScanTargets(prev => {
             const existing = prev.filter(t => t.id !== target);
@@ -2701,7 +2707,10 @@ export default function Dashboard() {
                   }}
                 />
                 <RouteAlertPreferencesPanel value={routeAlertPreferences} onChange={setRouteAlertPreferences} />
-                <LiveAlerts data={dataWithSdk} onLocate={(lat, lng) => { setFlyToLocation({ lat, lng, ts: Date.now() }); setMobilePanel(null); }} onWatchFeed={(url, name) => { setLiveFeedUrl(url); setLiveFeedName(name); }} />
+                <>
+                  <WorldPulsePanel onLocate={(lat, lng) => { setFlyToLocation({ lat, lng, ts: Date.now() }); setMobilePanel(null); }} />
+                  <LiveAlerts data={dataWithSdk} onLocate={(lat, lng) => { setFlyToLocation({ lat, lng, ts: Date.now() }); setMobilePanel(null); }} onWatchFeed={(url, name) => { setLiveFeedUrl(url); setLiveFeedName(name); }} />
+                </>
               </>
             )}
             searchContent={(
