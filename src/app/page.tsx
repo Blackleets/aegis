@@ -32,6 +32,7 @@ import MobileCommandDrawer from '@/components/dashboard/MobileCommandDrawer';
 import RouteCockpitDesktop from '@/components/dashboard/RouteCockpitDesktop';
 import RouteCockpitMobile from '@/components/dashboard/RouteCockpitMobile';
 import RouteAlertPreferencesPanel from '@/components/dashboard/RouteAlertPreferencesPanel';
+import AppearanceSettingsPanel from '@/components/dashboard/AppearanceSettingsPanel';
 import SplashScreen from '@/components/dashboard/SplashScreen';
 import TopHudOverlays from '@/components/dashboard/TopHudOverlays';
 import WeatherAtmosphere from '@/components/dashboard/WeatherAtmosphere';
@@ -53,6 +54,8 @@ import { buildRouteAlertVoiceMessage, getRouteAlertGuidance, shouldAnnounceRoute
 import { resolveRouteAlertPosition } from '@/lib/route-alert-position';
 import { formatRouteAlertAge, getAlertObservedAt, isRouteAlertFresh } from '@/lib/route-alert-freshness';
 import { DEFAULT_ROUTE_ALERT_PREFERENCES, parseRouteAlertPreferences, type RouteAlertPreferences } from '@/lib/route-alert-preferences';
+import { APPEARANCE_STORAGE_KEY, DEFAULT_APPEARANCE_PREFERENCES, parseAppearancePreferences, resolveAppearanceTheme, type AppearancePreferences } from '@/lib/appearance-preferences';
+import { resolveOperatorCountryCode } from '@/lib/operator-country';
 import { LIVE_HAZARD_REFRESH_MS, LIVE_TRAFFIC_REFRESH_MS, shouldRefreshNavigationData } from '@/lib/navigation-live-refresh';
 import { isAcceptableLocalRiskFix, shouldMonitorLocalRisks } from '@/lib/local-risk-monitoring';
 import { filterCctvByViewMode, type CctvDeliveryMetadata, type CctvViewMode } from '@/lib/cctv-feed';
@@ -551,6 +554,7 @@ export default function Dashboard() {
   const [dossierLoading, setDossierLoading] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
   const [locale, setLocale] = useState<Locale>(DEFAULT_LOCALE);
+  const [appearancePreferences, setAppearancePreferences] = useState<AppearancePreferences>(DEFAULT_APPEARANCE_PREFERENCES);
   const [activeCamera, setActiveCamera] = useState<ActiveCamera | null>(null);
   const [cctvViewMode, setCctvViewMode] = useState<CctvViewMode>('all');
   const [spaceWeather, setSpaceWeather] = useState<SpaceWeather | null>(null);
@@ -668,6 +672,7 @@ export default function Dashboard() {
     if (typeof window === 'undefined') return;
     const urlState = getInitialUrlState();
     const storedLocale = window.localStorage.getItem('aegis-locale');
+    const storedAppearance = window.localStorage.getItem(APPEARANCE_STORAGE_KEY);
 
     const syncFromUrl = window.requestAnimationFrame(() => {
       setMapView(urlState.mapView);
@@ -676,6 +681,7 @@ export default function Dashboard() {
       setDashboardMode(urlState.dashboardMode);
       setSelectedCelestialBody(urlState.selectedCelestialBody);
       if (isLocale(storedLocale)) setLocale(storedLocale);
+      setAppearancePreferences(parseAppearancePreferences(storedAppearance));
       if (urlState.skipSplash || urlState.dashboardMode !== 'earth') setShowSplash(false);
     });
 
@@ -686,6 +692,22 @@ export default function Dashboard() {
     if (typeof window === 'undefined') return;
     window.localStorage.setItem('aegis-locale', locale);
   }, [locale]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(APPEARANCE_STORAGE_KEY, JSON.stringify(appearancePreferences));
+    const media = window.matchMedia('(prefers-color-scheme: light)');
+    const apply = () => {
+      const resolved = resolveAppearanceTheme(appearancePreferences.mode, media.matches);
+      document.documentElement.dataset.theme = resolved;
+      document.documentElement.dataset.appearance = appearancePreferences.mode;
+      document.documentElement.style.colorScheme = resolved;
+    };
+    apply();
+    if (appearancePreferences.mode !== 'system') return;
+    media.addEventListener('change', apply);
+    return () => media.removeEventListener('change', apply);
+  }, [appearancePreferences]);
 
   // URL state: update URL on view change (debounced)
   const urlTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -2164,6 +2186,10 @@ export default function Dashboard() {
   const showDesktopRails = !isMobile && isEarthOps && selectedCelestialBody === 'earth';
   const showDesktopBottomBar = !isMobile && isEarthOps && selectedCelestialBody === 'earth' && !earthNavigationMode;
   const showAuxiliaryHud = isEarthOps && selectedCelestialBody === 'earth';
+  const operatorCountryCode = resolveOperatorCountryCode(
+    appearancePreferences.countryCode,
+    userLocation ? { lat: userLocation.lat, lng: userLocation.lng } : null,
+  );
   const copy = getDashboardCopy(locale);
 
   const operationalModeLabel = selectedCelestialBody !== 'earth'
@@ -2295,6 +2321,8 @@ export default function Dashboard() {
         collapsed={isMobile && mobileModeDockCollapsed}
         onToggleCollapsed={() => setMobileModeDockCollapsed(prev => !prev)}
         onLocaleChange={setLocale}
+        appearanceMode={appearancePreferences.mode}
+        onAppearanceModeChange={(mode) => setAppearancePreferences((current) => ({ ...current, mode }))}
         onEarthOps={() => {
           setDashboardMode('earth');
           setSelectedCelestialBody('earth');
@@ -2727,6 +2755,11 @@ export default function Dashboard() {
                     setFlyToLocation({ lat, lng, zoom: 8, ts: Date.now() });
                     setMobilePanel(null);
                   }}
+                />
+                <AppearanceSettingsPanel
+                  value={appearancePreferences}
+                  onChange={setAppearancePreferences}
+                  detectedCountryCode={operatorCountryCode}
                 />
                 <RouteAlertPreferencesPanel value={routeAlertPreferences} onChange={setRouteAlertPreferences} />
                 <>
