@@ -1,7 +1,7 @@
 'use client';
 
 import { memo, useState, useRef, useEffect, useCallback } from 'react';
-import { Search, X, MapPin, Navigation, LocateFixed, Car, PersonStanding, Bike, Plus, Flag, GitCommitHorizontal, Mic, MicOff, CircleDot, Home, Briefcase } from 'lucide-react';
+import { Search, X, MapPin, Navigation, LocateFixed, Car, PersonStanding, Bike, Plus, Flag, GitCommitHorizontal, Mic, MicOff, CircleDot, Home, Briefcase, Clock } from 'lucide-react';
 import {
   clearSavedDestination,
   readSavedDestinations,
@@ -10,6 +10,13 @@ import {
   type SavedDestination,
   type SavedDestinationSlot,
 } from '@/lib/saved-destinations';
+import {
+  clearRecentDestinations,
+  pushRecentDestination,
+  readRecentDestinations,
+  removeRecentDestination,
+  type RecentDestination,
+} from '@/lib/recent-destinations';
 
 /* ═══════════════════════════════════════════════════════════════
    AEGIS — Search / Locate Bar
@@ -120,6 +127,7 @@ function SearchBar({ onLocate, onRoute, defaultOpen = false, variant = 'default'
   const [lastResolvedQuery, setLastResolvedQuery] = useState('');
   const [voiceState, setVoiceState] = useState<VoiceState>('idle');
   const [savedDestinations, setSavedDestinations] = useState<Partial<Record<SavedDestinationSlot, SavedDestination>>>(() => readSavedDestinations());
+  const [recentDestinations, setRecentDestinations] = useState<RecentDestination[]>(() => readRecentDestinations());
   const [saveHint, setSaveHint] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const voiceRecognitionRef = useRef<BrowserSpeechRecognition | null>(null);
@@ -141,6 +149,7 @@ function SearchBar({ onLocate, onRoute, defaultOpen = false, variant = 'default'
     // Defer so eslint react-hooks/set-state-in-effect stays happy (same pattern as GPS).
     const timer = window.setTimeout(() => {
       setSavedDestinations(readSavedDestinations());
+      setRecentDestinations(readRecentDestinations());
     }, 0);
     return () => window.clearTimeout(timer);
   }, [open]);
@@ -360,7 +369,19 @@ function SearchBar({ onLocate, onRoute, defaultOpen = false, variant = 'default'
     setDraftWaypoints([]);
   };
 
+  const rememberRecentDestination = (r: SearchResult & { placeId?: string }) => {
+    if (r.kind === 'user_location') return;
+    const written = pushRecentDestination({
+      label: r.label,
+      lat: r.lat,
+      lng: r.lng,
+      placeId: typeof r.placeId === 'string' ? r.placeId : undefined,
+    });
+    if (written) setRecentDestinations(readRecentDestinations());
+  };
+
   const handleSelect = (r: SearchResult) => {
+    rememberRecentDestination(r);
     onLocate(r);
     resetAndClose();
   };
@@ -396,10 +417,24 @@ function SearchBar({ onLocate, onRoute, defaultOpen = false, variant = 'default'
     setRoutingLabel(result.label);
     try {
       await onRoute({ origin: location, destination: result, mode: routeMode, waypoints: draftWaypoints, startImmediately: isMobileNav });
+      rememberRecentDestination(result);
       resetAndClose();
     } finally {
       setRoutingLabel(null);
     }
+  };
+
+  const routeToRecent = async (recent: RecentDestination) => {
+    const result: SearchResult & { placeId?: string } = {
+      label: recent.label,
+      lat: recent.lat,
+      lng: recent.lng,
+      zoom: 14,
+      kind: 'recent',
+    };
+    if (recent.placeId) result.placeId = recent.placeId;
+    if (onRoute) await handleRoute(result);
+    else handleSelect(result);
   };
 
   const routeToSaved = async (slot: SavedDestinationSlot) => {
@@ -583,6 +618,60 @@ function SearchBar({ onLocate, onRoute, defaultOpen = false, variant = 'default'
           )}
         </div>
       )}
+
+      {isMobileNav && normalizedQuery.length === 0 && recentDestinations.length > 0 && (
+        <div className="rounded-[1.15rem] border border-white/10 bg-white/[0.03] px-3 py-2.5">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-white/70">
+              <Clock className="h-3.5 w-3.5" strokeWidth={2.3} />
+              Recientes
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                clearRecentDestinations();
+                setRecentDestinations([]);
+                setSaveHint('Historial reciente eliminado');
+                window.setTimeout(() => setSaveHint(null), 2400);
+              }}
+              className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium text-white/45 hover:text-white/80"
+              aria-label="Limpiar historial reciente"
+            >
+              Limpiar
+            </button>
+          </div>
+          <div className="flex flex-col gap-1">
+            {recentDestinations.map((recent) => (
+              <button
+                key={`${recent.label}-${recent.lat}-${recent.lng}-${recent.updatedAt}`}
+                type="button"
+                onClick={() => void routeToRecent(recent)}
+                onContextMenu={(event) => {
+                  event.preventDefault();
+                  removeRecentDestination(recent);
+                  setRecentDestinations(readRecentDestinations());
+                  setSaveHint('Destino reciente eliminado');
+                  window.setTimeout(() => setSaveHint(null), 2400);
+                }}
+                className="flex min-h-11 w-full items-center gap-2.5 rounded-2xl border border-transparent px-2 py-2 text-left transition-colors hover:border-cyan-300/20 hover:bg-cyan-300/[0.06] active:scale-[0.99]"
+                aria-label={`Ir a reciente: ${recent.label}`}
+              >
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white/8 text-white/55">
+                  <Clock className="h-4 w-4" strokeWidth={2.2} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[13px] font-semibold text-white/90">{recent.label}</span>
+                  <span className="mt-0.5 block text-[11px] font-medium text-white/40">
+                    {recent.lat.toFixed(4)}, {recent.lng.toFixed(4)}
+                  </span>
+                </span>
+                <MapPin className="h-3.5 w-3.5 shrink-0 text-white/30" />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
 
       {!isMobileNav && (
       <div className="flex items-center gap-2 glass-panel px-3 py-2.5 !border-[var(--border-active)]">

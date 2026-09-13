@@ -14,3 +14,7 @@ Polish for mobile `¿A dónde vas?` / `Destino y ruta` toward Google Maps clarit
 
 - `src/components/SearchBar.tsx`
 - `src/components/dashboard/MobileCommandDrawer.tsx`
+
+## Recent destinations
+
+See `docs/recent-destinations.md` — local MRU history under Casa / Trabajo (no GMP keys; OSM geocode unchanged).
