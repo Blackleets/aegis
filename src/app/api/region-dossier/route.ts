@@ -101,10 +101,24 @@ interface TerritoryLiveContext {
  * Steps that depend on reverse geocode run after it; external enrichments fan out in parallel.
  */
 
+
+/** Same-app base for internal route fetches — never trust request.url origin (SSRF). */
+function internalAppBase(): string {
+  const site = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  if (site) return site.replace(/\/$/, '');
+  const vercel = process.env.VERCEL_URL?.trim();
+  if (vercel) {
+    const host = vercel.replace(/^https?:\/\//i, '');
+    return `https://${host}`;
+  }
+  return 'http://127.0.0.1:3000';
+}
+
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url);
+  const { searchParams } = new URL(request.url);
   const lat = parseFloat(searchParams.get('lat') || '0');
   const lng = parseFloat(searchParams.get('lng') || '0');
+  const appBase = internalAppBase();
 
   try {
     const geoRes = await fetch(
@@ -220,7 +234,10 @@ export async function GET(request: Request) {
       })(),
       (async () => {
         try {
-          const res = await fetch(`${origin}/api/cctv?lat=${lat}&lng=${lng}`, { signal: AbortSignal.timeout(12000) });
+          const cctvUrl = new URL('/api/cctv', appBase);
+          cctvUrl.searchParams.set('lat', String(lat));
+          cctvUrl.searchParams.set('lng', String(lng));
+          const res = await fetch(cctvUrl, { signal: AbortSignal.timeout(12000) });
           if (res.ok) return await res.json() as CameraRouteResponse;
         } catch (e) {
           console.warn('[AEGIS] CCTV proximity fetch error:', e instanceof Error ? e.message : e);
@@ -229,7 +246,8 @@ export async function GET(request: Request) {
       })(),
       (async () => {
         try {
-          const res = await fetch(`${origin}/api/weather`, { signal: AbortSignal.timeout(12000) });
+          const weatherUrl = new URL('/api/weather', appBase);
+          const res = await fetch(weatherUrl, { signal: AbortSignal.timeout(12000) });
           if (res.ok) return await res.json() as WeatherEventsResponse;
         } catch (e) {
           console.warn('[AEGIS] Weather events fetch error:', e instanceof Error ? e.message : e);
