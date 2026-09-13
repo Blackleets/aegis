@@ -1,16 +1,18 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronDown, ChevronUp, Clock3, MapPin, ShieldAlert } from 'lucide-react';
+import { ChevronDown, ChevronUp, Clock3, MapPin, Network, ShieldAlert } from 'lucide-react';
 import type { OperationalCase } from '@/lib/operational-cases';
 
 export default function OperationalCaseCard({
   operationalCase,
   onLocate,
+  onInspectOntology,
   compact = false,
 }: {
   operationalCase: OperationalCase;
   onLocate: (latitude: number, longitude: number) => void;
+  onInspectOntology?: (operationalCase: OperationalCase) => void;
   compact?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -53,6 +55,17 @@ export default function OperationalCaseCard({
           {expanded ? 'Cerrar' : 'Evidencias'}
         </button>
       </div>
+
+      {onInspectOntology && (
+        <button
+          type="button"
+          onClick={() => onInspectOntology(operationalCase)}
+          className="mt-2 flex min-h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-cyan-200/20 bg-cyan-300/10 px-2 text-[8px] font-semibold uppercase tracking-[0.1em] text-cyan-100"
+        >
+          <Network className="h-3.5 w-3.5" />
+          Ontología
+        </button>
+      )}
 
       {expanded && (
         <ol className={`mt-2 space-y-1.5 border-t border-white/8 pt-2 ${compact ? 'max-h-36 overflow-y-auto' : ''}`}>
