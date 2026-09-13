@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import EntityDrawer from '@/components/dashboard/EntityDrawer';
+import LinkAnalysisPanel from '@/components/dashboard/LinkAnalysisPanel';
 import OperationalCaseCard from '@/components/dashboard/OperationalCaseCard';
 import type { OperationalCase } from '@/lib/operational-cases';
 import { operationalCaseToOntologyGraph, type OntologyGraph } from '@/lib/ontology';
@@ -26,6 +27,7 @@ export default function OperationalCasesPanel({
 }) {
   const [filter, setFilter] = useState<CaseFilter>('all');
   const [ontologyGraph, setOntologyGraph] = useState<OntologyGraph | null>(null);
+  const [linkAnalysisGraph, setLinkAnalysisGraph] = useState<OntologyGraph | null>(null);
   const visibleCases = useMemo(() => cases.filter((operationalCase) => {
     if (filter === 'critical') return operationalCase.severity === 'critical';
     if (filter === 'high-confidence') return operationalCase.confidence === 'high';
@@ -73,7 +75,14 @@ export default function OperationalCasesPanel({
             key={operationalCase.id}
             operationalCase={operationalCase}
             onLocate={onLocate}
-            onInspectOntology={(selected) => setOntologyGraph(operationalCaseToOntologyGraph(selected))}
+            onInspectOntology={(selected) => {
+              setLinkAnalysisGraph(null);
+              setOntologyGraph(operationalCaseToOntologyGraph(selected));
+            }}
+            onInspectLinkAnalysis={(selected) => {
+              setOntologyGraph(null);
+              setLinkAnalysisGraph(operationalCaseToOntologyGraph(selected));
+            }}
             compact
           />
         ))}
@@ -85,6 +94,15 @@ export default function OperationalCasesPanel({
       </div>
       {ontologyGraph && (
         <EntityDrawer graph={ontologyGraph} onClose={() => setOntologyGraph(null)} />
+      )}
+      {linkAnalysisGraph && (
+        <LinkAnalysisPanel
+          graph={linkAnalysisGraph}
+          onClose={() => setLinkAnalysisGraph(null)}
+          onEntitySelect={() => {
+            setOntologyGraph(linkAnalysisGraph);
+          }}
+        />
       )}
     </section>
   );

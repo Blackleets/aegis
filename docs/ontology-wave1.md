@@ -12,7 +12,7 @@ Implements the first slice of [#114](https://github.com/Blackleets/aegis/issues/
 
 ## Non-goals (later waves)
 
-- Force-graph link analysis UI (Wave 2)
+- Force-graph link analysis UI — see [Wave 2](./ontology-wave2.md)
 - Durable saved investigations (Wave 3)
 - Supabase / new paid providers
 
