@@ -32,3 +32,16 @@ export {
   ontologyRelationshipTypeLabel,
 } from './link-graph';
 export type { LinkGraphData, LinkGraphLink, LinkGraphNode } from './link-graph';
+
+export {
+  INVESTIGATIONS_STORAGE_KEY,
+  deleteInvestigation,
+  promoteOperationalCaseToInvestigation,
+  readInvestigations,
+  upsertInvestigation,
+} from './investigations';
+export type {
+  InvestigationUpsertPatch,
+  SavedInvestigation,
+  SavedInvestigationMapPin,
+} from './investigations';

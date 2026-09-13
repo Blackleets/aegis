@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronDown, ChevronUp, Clock3, Share2, MapPin, Network, ShieldAlert } from 'lucide-react';
+import { BookmarkPlus, ChevronDown, ChevronUp, Clock3, Share2, MapPin, Network, ShieldAlert } from 'lucide-react';
 import type { OperationalCase } from '@/lib/operational-cases';
 
 export default function OperationalCaseCard({
@@ -9,13 +9,18 @@ export default function OperationalCaseCard({
   onLocate,
   onInspectOntology,
   onInspectLinkAnalysis,
+  onSaveInvestigation,
   compact = false,
+  liveLabel = true,
 }: {
   operationalCase: OperationalCase;
   onLocate: (latitude: number, longitude: number) => void;
   onInspectOntology?: (operationalCase: OperationalCase) => void;
   onInspectLinkAnalysis?: (operationalCase: OperationalCase) => void;
+  onSaveInvestigation?: (operationalCase: OperationalCase) => void;
   compact?: boolean;
+  /** When true, show the live-cluster chip (cluster en vivo). */
+  liveLabel?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const severityClass = operationalCase.severity === 'critical'
@@ -31,6 +36,11 @@ export default function OperationalCaseCard({
             <span>Operational case · {operationalCase.id}</span>
             <span>{operationalCase.confidence} confidence</span>
           </div>
+          {liveLabel && (
+            <p className="mt-1 text-[7px] font-mono uppercase tracking-[0.14em] text-cyan-200/80">
+              cluster en vivo
+            </p>
+          )}
           <p className="mt-1 truncate text-[10px] font-semibold">{operationalCase.title}</p>
           <p className="mt-1 text-[8px] opacity-55">
             {operationalCase.signals.length} linked signals · {operationalCase.sourceCount} independent sources
@@ -58,7 +68,7 @@ export default function OperationalCaseCard({
         </button>
       </div>
 
-      {(onInspectOntology || onInspectLinkAnalysis) && (
+      {(onInspectOntology || onInspectLinkAnalysis || onSaveInvestigation) && (
         <div className="mt-2 flex gap-2">
           {onInspectOntology && (
             <button
@@ -78,6 +88,17 @@ export default function OperationalCaseCard({
             >
               <Share2 className="h-3.5 w-3.5" />
               Grafo
+            </button>
+          )}
+          {onSaveInvestigation && (
+            <button
+              type="button"
+              onClick={() => onSaveInvestigation(operationalCase)}
+              className="flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-lg border border-emerald-200/20 bg-emerald-300/10 px-2 text-[8px] font-semibold uppercase tracking-[0.1em] text-emerald-100"
+              aria-label="Guardar investigación"
+            >
+              <BookmarkPlus className="h-3.5 w-3.5" />
+              Guardar
             </button>
           )}
         </div>
