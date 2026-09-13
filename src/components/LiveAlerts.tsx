@@ -32,6 +32,14 @@ import {
   type SituationalRadarSnapshot,
   type SituationalSeverity,
 } from '@/lib/situational-alerts';
+import {
+  filterRouteCorridorAlerts,
+  formatDistanceAheadEs,
+  shouldShowRouteCorridorAlerts,
+  type RouteCorridorAlert,
+} from '@/lib/route-corridor-alerts';
+import type { RouteAlertPreferences } from '@/lib/route-alert-preferences';
+import type { Coordinate } from '@/lib/routing-shell';
 
 interface NewsItem {
   id?: string;
@@ -65,7 +73,13 @@ interface LiveAlertsProps {
   data: LiveAlertsData;
   onLocate: (lat: number, lng: number) => void;
   onWatchFeed?: (url: string, name: string) => void;
+  routeCoordinates?: [number, number][];
+  userLocation?: Coordinate | null;
+  routeAlertPreferences?: RouteAlertPreferences | null;
+  navigationActive?: boolean;
 }
+
+type LiveAlertsFilter = SituationalFilterChip | 'en-ruta';
 
 const SEVERITY_COLORS: Record<SituationalSeverity, string> = {
   critical: '#FF4D6D',
@@ -104,10 +118,18 @@ function statusLabelEs(status: SituationalRadarSnapshot['status']): string {
   return 'Fuentes no disponibles';
 }
 
-export default function LiveAlerts({ data, onLocate, onWatchFeed }: LiveAlertsProps) {
+export default function LiveAlerts({
+  data,
+  onLocate,
+  onWatchFeed,
+  routeCoordinates = [],
+  userLocation = null,
+  routeAlertPreferences = null,
+  navigationActive = false,
+}: LiveAlertsProps) {
   const [expanded, setExpanded] = useState(true);
   const [maximized, setMaximized] = useState(false);
-  const [filter, setFilter] = useState<SituationalFilterChip>('all');
+  const [filter, setFilter] = useState<LiveAlertsFilter>('all');
   const [snapshot, setSnapshot] = useState<SituationalRadarSnapshot | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [clock, setClock] = useState(() => Date.now());
@@ -207,10 +229,34 @@ export default function LiveAlerts({ data, onLocate, onWatchFeed }: LiveAlertsPr
   }, [refresh]);
 
   const effective = snapshot ?? buildFromProps();
-  const filtered = useMemo(
-    () => filterAlertsByChip(effective.alerts, filter),
-    [effective.alerts, filter],
+
+  const corridorMonitoring = Boolean(
+    routeAlertPreferences && shouldShowRouteCorridorAlerts(navigationActive, routeAlertPreferences),
   );
+  const corridorEnabled = corridorMonitoring && Array.isArray(routeCoordinates) && routeCoordinates.length >= 2;
+
+  const corridorAlerts = useMemo(() => {
+    if (!corridorEnabled || !routeAlertPreferences) return [] as RouteCorridorAlert[];
+    return filterRouteCorridorAlerts({
+      alerts: effective.alerts,
+      routeCoordinates,
+      userLocation,
+      prefs: routeAlertPreferences,
+      navigationActive,
+    });
+  }, [
+    corridorEnabled,
+    effective.alerts,
+    navigationActive,
+    routeAlertPreferences,
+    routeCoordinates,
+    userLocation,
+  ]);
+
+  const filtered = useMemo(() => {
+    if (filter === 'en-ruta') return corridorAlerts;
+    return filterAlertsByChip(effective.alerts, filter);
+  }, [corridorAlerts, effective.alerts, filter]);
 
   const criticalCount = effective.alerts.filter((a) => a.severity === 'critical').length;
   const geoCount = effective.alerts.filter((a) => a.lat !== undefined && a.lng !== undefined).length;
@@ -314,6 +360,20 @@ export default function LiveAlerts({ data, onLocate, onWatchFeed }: LiveAlertsPr
             </div>
 
             <div className="mb-2 flex gap-1.5 overflow-x-auto pb-0.5">
+              <button
+                type="button"
+                disabled={!corridorEnabled}
+                onClick={() => {
+                  if (!corridorEnabled) return;
+                  setFilter('en-ruta');
+                }}
+                title={corridorEnabled
+                  ? 'Avisos reales en el corredor de tu ruta (opt-in)'
+                  : 'Activa preferencias o inicia navegación con ruta'}
+                className={`rounded-full border px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] transition-all whitespace-nowrap ${filter === 'en-ruta' ? 'border-emerald-400/40 bg-emerald-400/10 text-emerald-200' : corridorEnabled ? 'border-white/0 text-[var(--text-muted)] hover:border-white/8 hover:bg-white/[0.03] hover:text-[var(--text-secondary)]' : 'cursor-not-allowed border-white/0 text-white/20'}`}
+              >
+                En ruta{corridorEnabled && corridorAlerts.length > 0 ? ` · ${corridorAlerts.length}` : ''}
+              </button>
               {SITUATIONAL_FILTER_CHIPS.map((chip) => (
                 <button
                   key={chip.id}
@@ -334,16 +394,23 @@ export default function LiveAlerts({ data, onLocate, onWatchFeed }: LiveAlertsPr
                   now={clock}
                   onLocate={onLocate}
                   onWatchFeed={onWatchFeed}
+                  distanceAheadMeters={filter === 'en-ruta' && 'distanceAheadMeters' in alert
+                    ? (alert as RouteCorridorAlert).distanceAheadMeters
+                    : undefined}
                 />
               ))}
 
               {filtered.length === 0 && (
                 <div className="rounded-2xl border border-dashed border-white/10 px-3 py-6 text-center text-[10px] font-mono uppercase tracking-[0.18em] text-[var(--text-muted)]">
-                  {effective.status === 'unavailable'
-                    ? 'Fuentes no disponibles — sin eventos inventados'
-                    : effective.status === 'degraded'
-                      ? 'Sin eventos verificados en este filtro · fuentes degradadas'
-                      : 'Sin alertas en este filtro'}
+                  {filter === 'en-ruta'
+                    ? (corridorEnabled
+                      ? 'Nada en tu corredor ahora'
+                      : 'Activa preferencias o inicia navegación')
+                    : effective.status === 'unavailable'
+                      ? 'Fuentes no disponibles — sin eventos inventados'
+                      : effective.status === 'degraded'
+                        ? 'Sin eventos verificados en este filtro · fuentes degradadas'
+                        : 'Sin alertas en este filtro'}
                 </div>
               )}
             </div>
@@ -359,11 +426,13 @@ function AlertRow({
   now,
   onLocate,
   onWatchFeed,
+  distanceAheadMeters,
 }: {
   alert: SituationalAlert;
   now: number;
   onLocate: (lat: number, lng: number) => void;
   onWatchFeed?: (url: string, name: string) => void;
+  distanceAheadMeters?: number;
 }) {
   const sevColor = SEVERITY_COLORS[alert.severity];
   const hasCoords = alert.lat !== undefined && alert.lng !== undefined;
@@ -399,6 +468,14 @@ function AlertRow({
           </div>
 
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[8px] font-mono tracking-[0.04em] text-[var(--text-secondary)]">
+            {typeof distanceAheadMeters === 'number' && (
+              <>
+                <span className="font-semibold uppercase tracking-[0.12em] text-emerald-300/90">
+                  {formatDistanceAheadEs(distanceAheadMeters)}
+                </span>
+                <span className="text-[var(--text-muted)]">·</span>
+              </>
+            )}
             <span className="uppercase tracking-[0.12em]">{alert.source}</span>
             <span className="text-[var(--text-muted)]">·</span>
             <span>{relativeTimeEs(alert.observedAt, now)}</span>
