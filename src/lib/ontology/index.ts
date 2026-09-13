@@ -45,3 +45,32 @@ export type {
   SavedInvestigation,
   SavedInvestigationMapPin,
 } from './investigations';
+
+export {
+  UNAVAILABLE_PROVENANCE_LABEL,
+  coerceObservedAt,
+  collectContextSources,
+  filterActionsWithProvenance,
+  fusionItemsToClaims,
+  hardenFusionDossier,
+  hideUnprovenFusionItems,
+  mapFusionConfidence,
+  normalizeFusionItems,
+  operationalFusionToDisplayItems,
+  provenanceChipLabel,
+  regionDossierHasProvenance,
+  regionDossierToClaims,
+  resolveItemProvenance,
+  toFusionDisplayItems,
+} from './fusion-claims';
+export type {
+  FusionClaimKind,
+  FusionContextFeed,
+  FusionDisplayItem,
+  HardenedFusionDossier,
+  LooseFusionItem,
+  RawFusionDossier,
+  RegionDossierLike,
+  RegionDossierSection,
+  UnavailableFusionItem,
+} from './fusion-claims';

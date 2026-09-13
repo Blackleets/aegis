@@ -30,6 +30,7 @@ Stacked on [Wave 2](./ontology-wave2.md) (`feat/ontology-wave2-link-analysis`).
 - Supabase / shared multi-user investigation sync
 - Changes to AegisMap, globe, navigation HUD, SolarSystemMode
 - Invented coordinates or fabricated provenance
+- Fusion / dossier provenance hardening — see [Wave 4](./ontology-wave4.md)
 
 ## Demo
 

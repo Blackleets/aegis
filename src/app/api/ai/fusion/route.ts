@@ -12,6 +12,11 @@ import {
   generateLocalFusionDossier,
   type IntelligenceContext,
 } from '@/lib/ai-engine';
+import {
+  collectContextSources,
+  hardenFusionDossier,
+  type HardenedFusionDossier,
+} from '@/lib/ontology/fusion-claims';
 
 export const dynamic = 'force-dynamic';
 
@@ -63,11 +68,14 @@ interface FusionRequestBody {
 
 interface FusionDossier {
   bluf: string;
+  blufAvailable?: boolean;
   riskLevel: 'CRITICAL' | 'HIGH' | 'ELEVATED' | 'LOW';
   confidence: 'HIGH' | 'MODERATE' | 'LOW';
   hotspots: string[];
   priorityActions: string[];
   watchlist: string[];
+  claims?: HardenedFusionDossier['claims'];
+  unavailable?: HardenedFusionDossier['unavailable'];
 }
 
 interface FusionResponse {
@@ -97,7 +105,9 @@ Rules:
 - Mention concrete regions, systems, or themes from the dataset.
 - priorityActions must be action-oriented.
 - watchlist should contain near-term developments to monitor.
-- If evidence is weak, lower confidence instead of inventing facts.`;
+- If evidence is weak, lower confidence instead of inventing facts.
+- Never invent sources, timestamps, or live counters.
+- Cite only sources already present in the operational data.`;
 
 function extractJsonObject(rawText: string): FusionDossier {
   const cleaned = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
@@ -123,6 +133,23 @@ function extractJsonObject(rawText: string): FusionDossier {
       ? parsed.priorityActions.filter((item): item is string => typeof item === 'string')
       : [],
     watchlist: Array.isArray(parsed.watchlist) ? parsed.watchlist.filter((item): item is string => typeof item === 'string') : [],
+  };
+}
+
+function shapeFusionDossier(dossier: FusionDossier, context: IntelligenceContext): FusionDossier {
+  const hardened = hardenFusionDossier(dossier, {
+    contextSources: collectContextSources(context),
+  });
+  return {
+    bluf: hardened.bluf,
+    blufAvailable: hardened.blufAvailable,
+    riskLevel: dossier.riskLevel,
+    confidence: dossier.confidence,
+    hotspots: hardened.hotspots,
+    priorityActions: hardened.priorityActions,
+    watchlist: hardened.watchlist,
+    claims: hardened.claims,
+    unavailable: hardened.unavailable,
   };
 }
 
@@ -176,7 +203,7 @@ export async function POST(
   if (!apiKey) {
     return NextResponse.json(
       {
-        dossier: generateLocalFusionDossier(body.context),
+        dossier: shapeFusionDossier(generateLocalFusionDossier(body.context), body.context),
         generatedAt: new Date().toISOString(),
         mode: 'local',
       },
@@ -195,7 +222,7 @@ export async function POST(
 
     return NextResponse.json(
       {
-        dossier,
+        dossier: shapeFusionDossier(dossier, body.context),
         generatedAt: new Date().toISOString(),
         mode: 'premium',
       },
@@ -227,7 +254,7 @@ export async function POST(
 
     return NextResponse.json(
       {
-        dossier: generateLocalFusionDossier(body.context),
+        dossier: shapeFusionDossier(generateLocalFusionDossier(body.context), body.context),
         generatedAt: new Date().toISOString(),
         mode: 'local',
       },

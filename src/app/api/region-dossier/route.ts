@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { regionDossierToClaims } from '@/lib/ontology/fusion-claims';
 
 interface LocationInfo {
   city: string;
@@ -287,7 +288,8 @@ export async function GET(request: Request) {
       },
     };
 
-    return NextResponse.json({
+    const compiledAt = new Date().toISOString();
+    const payload = {
       coordinates: { lat, lng },
       location: locationInfo,
       country: countryData ? {
@@ -309,7 +311,11 @@ export async function GET(request: Request) {
       head_of_state: headOfState,
       wikipedia: wikiSummary,
       live_context: liveContext,
-      timestamp: new Date().toISOString(),
+      timestamp: compiledAt,
+    };
+    return NextResponse.json({
+      ...payload,
+      claims: regionDossierToClaims(payload),
     }, {
       headers: {
         'Cache-Control': 'public, s-maxage=1800, stale-while-revalidate=3600',
