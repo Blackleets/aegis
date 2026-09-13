@@ -34,6 +34,7 @@ import RouteCockpitMobile from '@/components/dashboard/RouteCockpitMobile';
 import RouteAlertPreferencesPanel from '@/components/dashboard/RouteAlertPreferencesPanel';
 import SplashScreen from '@/components/dashboard/SplashScreen';
 import TopHudOverlays from '@/components/dashboard/TopHudOverlays';
+import AmbientSky from '@/components/dashboard/AmbientSky';
 import WeatherAtmosphere from '@/components/dashboard/WeatherAtmosphere';
 import WeatherCapsule from '@/components/dashboard/WeatherCapsule';
 import { useLocalWeather } from '@/hooks/useLocalWeather';
@@ -2269,6 +2270,12 @@ export default function Dashboard() {
           onWorldPulsePinClick={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })}
         />
       </ErrorBoundary>
+
+      <AmbientSky
+        weather={localWeather}
+        navigationActive={navigationActive}
+        visible={isEarthOps && !showSplash}
+      />
 
       <WeatherAtmosphere
         weather={localWeather}
