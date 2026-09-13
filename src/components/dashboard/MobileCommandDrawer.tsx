@@ -1,7 +1,7 @@
 'use client';
 
 import { AnimatePresence, motion } from 'framer-motion';
-import { ChevronRight, LocateFixed, Map, Menu, Mic, Navigation, RotateCw, Search, Satellite, X } from 'lucide-react';
+import { ChevronRight, Map, Menu, Mic, Navigation, RotateCw, Search, Satellite, X } from 'lucide-react';
 import { useEffect, useState, type ComponentType, type ReactNode } from 'react';
 
 type MobilePanel = 'layers' | 'markets' | 'intel' | 'alerts' | 'search' | 'recon';
@@ -184,30 +184,33 @@ export default function MobileCommandDrawer({
           <motion.div
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
-            className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-4 right-4 z-[390] flex min-h-[62px] items-center rounded-[22px] border border-cyan-200/20 bg-[linear-gradient(135deg,rgba(5,18,29,0.92),rgba(4,12,20,0.88))] p-1.5 shadow-[0_14px_38px_rgba(0,0,0,0.42),0_0_22px_rgba(34,211,238,0.09)] backdrop-blur-xl"
+            className="maps-where-to fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-4 right-4 z-[390] flex min-h-[64px] items-center rounded-[26px] border border-white/12 bg-[linear-gradient(135deg,rgba(5,18,29,0.94),rgba(4,12,20,0.9))] p-1.5 shadow-[0_16px_40px_rgba(0,0,0,0.45)] backdrop-blur-xl"
           >
-            <button type="button" onClick={() => openPanel('search')} className="flex min-w-0 flex-1 items-center gap-3 rounded-[17px] px-2.5 py-1.5 text-left" aria-label="Escribir o buscar destino">
-              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-cyan-300/12 text-cyan-200">
-                <Search className="h-5 w-5" strokeWidth={2.2} />
+            <button type="button" onClick={() => openPanel('search')} className="flex min-w-0 flex-1 items-center gap-3 rounded-[20px] px-2.5 py-1.5 text-left active:bg-white/[0.04]" aria-label="Escribir o buscar destino">
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white/[0.07] text-white">
+                <Search className="h-5 w-5" strokeWidth={2.35} />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block text-[15px] font-semibold text-white">¿A dónde vas?</span>
-                <span className="mt-0.5 flex items-center gap-1.5 text-[9px] text-white/42">
-                  <LocateFixed className="h-3 w-3 text-emerald-300" />
+                <span className="block text-[16px] font-semibold tracking-[-0.01em] text-white">¿A dónde vas?</span>
+                <span className="mt-0.5 flex items-center gap-2 text-[11px] text-white/48">
+                  <span className="relative inline-flex h-3.5 w-3.5 items-center justify-center">
+                    <span className="absolute inset-0 rounded-full bg-sky-400/35 animate-ping opacity-50" />
+                    <span className="relative h-2.5 w-2.5 rounded-full border border-white bg-sky-500 shadow-[0_0_0_2px_rgba(56,189,248,0.35)]" />
+                  </span>
                   Ruta desde tu ubicación
                 </span>
               </span>
-              <ChevronRight className="h-5 w-5 text-white/35" />
+              <ChevronRight className="h-5 w-5 text-white/30" strokeWidth={2.2} />
             </button>
-            <span className="h-8 w-px shrink-0 bg-white/10" aria-hidden="true" />
+            <span className="h-9 w-px shrink-0 bg-white/10" aria-hidden="true" />
             <button
               type="button"
               onClick={onOpenVoiceSearch}
-              className="ml-1 grid h-11 w-11 shrink-0 place-items-center rounded-[16px] bg-cyan-300 text-slate-950 shadow-[0_6px_20px_rgba(34,211,238,0.2)] transition-transform active:scale-95"
+              className="ml-1 grid h-12 w-12 shrink-0 place-items-center rounded-[18px] bg-sky-500 text-white shadow-[0_8px_22px_rgba(14,165,233,0.35)] transition-transform active:scale-95"
               aria-label="Decir destino por voz"
               title="Buscar destino por voz"
             >
-              <Mic className="h-5 w-5" />
+              <Mic className="h-5 w-5" strokeWidth={2.3} />
             </button>
           </motion.div>
         </>
@@ -227,16 +230,16 @@ export default function MobileCommandDrawer({
             <div className="mx-auto mt-2.5 h-1 w-10 rounded-full bg-white/26" />
             <div className={`px-3 pb-3 ${isSearchPanel ? 'pt-2' : ''}`}>
               {isSearchPanel ? (
-                <div className="sticky top-0 z-10 -mx-3 mb-2 flex items-center justify-between border-b border-white/8 bg-[rgba(6,17,27,0.96)] px-4 py-1.5 backdrop-blur-2xl">
+                <div className="sticky top-0 z-10 -mx-3 mb-3 flex items-center justify-between border-b border-white/8 bg-[rgba(6,17,27,0.96)] px-4 py-2.5 backdrop-blur-2xl">
                   <div>
-                    <div className="flex items-center gap-2 text-[8px] font-mono uppercase tracking-[0.22em] text-cyan-200">
-                      <Navigation className="h-3.5 w-3.5" />
+                    <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-sky-300">
+                      <Navigation className="h-4 w-4" strokeWidth={2.3} />
                       AEGIS GPS
                     </div>
-                    <div className="mt-0.5 text-[11px] font-semibold text-white">Destino y ruta</div>
+                    <div className="mt-1 text-[18px] font-semibold tracking-[-0.02em] text-white">Destino y ruta</div>
                   </div>
-                  <button type="button" onClick={() => onTogglePanel('search')} className="grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-white/[0.035] text-white/65" aria-label="Cerrar navegación">
-                    <X className="h-4 w-4" />
+                  <button type="button" onClick={() => onTogglePanel('search')} className="grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-white/[0.05] text-white/70 active:bg-white/10" aria-label="Cerrar navegación">
+                    <X className="h-4 w-4" strokeWidth={2.3} />
                   </button>
                 </div>
               ) : isReconPanel ? (

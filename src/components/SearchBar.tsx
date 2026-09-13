@@ -1,7 +1,7 @@
 'use client';
 
 import { memo, useState, useRef, useEffect, useCallback } from 'react';
-import { Search, X, MapPin, Navigation, LocateFixed, Car, Footprints, Bike, Plus, Flag, GitCommitHorizontal, Mic, MicOff } from 'lucide-react';
+import { Search, X, MapPin, Navigation, LocateFixed, Car, PersonStanding, Bike, Plus, Flag, GitCommitHorizontal, Mic, MicOff, CircleDot } from 'lucide-react';
 
 /* ═══════════════════════════════════════════════════════════════
    AEGIS — Search / Locate Bar
@@ -83,17 +83,17 @@ function sameResult(a: SearchResult, b: SearchResult) {
 const ROUTE_MODE_META = {
   driving: {
     label: 'Coche',
-    detail: 'Ruta más rápida',
+    detail: 'Más rápida',
     Icon: Car,
   },
   walking: {
     label: 'A pie',
-    detail: 'Trayecto peatonal',
-    Icon: Footprints,
+    detail: 'Caminando',
+    Icon: PersonStanding,
   },
   cycling: {
     label: 'Bici',
-    detail: 'Ruta urbana equilibrada',
+    detail: 'En bici',
     Icon: Bike,
   },
 } as const;
@@ -218,6 +218,17 @@ function SearchBar({ onLocate, onRoute, defaultOpen = false, variant = 'default'
     });
   }, [currentLocation]);
 
+  // Maps-style: lock origin as soon as the destination sheet opens.
+  useEffect(() => {
+    if (!open || !isMobileNav) return;
+    if (geoState === 'ready' || geoState === 'locating' || geoState === 'denied') return;
+    const timer = window.setTimeout(() => {
+      void requestCurrentLocation();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [open, isMobileNav, geoState, requestCurrentLocation]);
+
+
   const handleSearch = useCallback(async (q: string) => {
     setValue(q);
     const coords = parseCoords(q);
@@ -339,7 +350,7 @@ function SearchBar({ onLocate, onRoute, defaultOpen = false, variant = 'default'
     const location = await requestCurrentLocation();
     if (!location) return;
     onLocate({
-      label: 'My location',
+      label: 'Mi ubicación',
       lat: location.lat,
       lng: location.lng,
       zoom: 13,
@@ -411,7 +422,78 @@ function SearchBar({ onLocate, onRoute, defaultOpen = false, variant = 'default'
     <div className={`relative w-full space-y-2 ${isMobileNav ? 'space-y-3' : ''}`}>
 
 
-      <div className={`flex items-center gap-2 ${isMobileNav ? 'rounded-[1.45rem] border border-cyan-300/20 bg-[rgba(4,14,24,0.92)] px-3.5 py-3 shadow-[0_14px_28px_rgba(0,0,0,0.24)]' : 'glass-panel px-3 py-2.5 !border-[var(--border-active)]'}`}>
+      {isMobileNav && (
+        <div className="maps-origin-stack rounded-[1.35rem] border border-cyan-300/18 bg-[rgba(4,14,24,0.94)] px-3.5 py-3 shadow-[0_14px_28px_rgba(0,0,0,0.22)]">
+          <button
+            type="button"
+            onClick={() => void handleLocateMe()}
+            className="flex w-full items-center gap-3 rounded-xl px-1 py-1.5 text-left transition-colors active:bg-white/[0.04]"
+            aria-label="Centrar mapa en mi ubicación"
+          >
+            <span className="maps-my-location-glyph relative grid h-9 w-9 shrink-0 place-items-center">
+              <span className="absolute inset-0 rounded-full bg-sky-400/25 animate-ping opacity-40" />
+              <span className="relative grid h-8 w-8 place-items-center rounded-full border-2 border-white/90 bg-sky-500 shadow-[0_0_0_4px_rgba(56,189,248,0.22)]">
+                <CircleDot className="h-3.5 w-3.5 text-white" strokeWidth={2.5} />
+              </span>
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[13px] font-semibold text-white">Tu ubicación</span>
+              <span className="mt-0.5 block truncate text-[11px] text-white/50">
+                {geoState === 'ready' && currentLocation
+                  ? `GPS listo${currentLocation.accuracy ? ` · ±${currentLocation.accuracy} m` : ''}`
+                  : geoState === 'locating'
+                    ? 'Obteniendo GPS…'
+                    : geoState === 'denied'
+                      ? 'Activa el permiso de ubicación'
+                      : 'Toca para usar tu GPS'}
+              </span>
+            </span>
+            <LocateFixed className={`h-4 w-4 shrink-0 ${geoState === 'ready' ? 'text-sky-300' : 'text-white/35'}`} strokeWidth={2.25} />
+          </button>
+          <div className="mx-1 my-2 border-t border-white/8" />
+          <div className="flex items-center gap-2 px-1">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-rose-500/90 text-white shadow-[0_4px_12px_rgba(244,63,94,0.35)]">
+              <MapPin className="h-4 w-4" strokeWidth={2.4} />
+            </span>
+            <input
+              ref={inputRef}
+              value={value}
+              onChange={(e) => void handleSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') resetAndClose();
+                if (e.key === 'Enter' && results.length > 0) {
+                  if (onRoute) void handleRoute(results[0]);
+                  else handleSelect(results[0]);
+                }
+              }}
+              placeholder="Busca un destino…"
+              className="min-w-0 flex-1 bg-transparent text-[15px] font-medium tracking-[0.01em] text-white outline-none placeholder:text-white/38"
+            />
+            {loading && <div className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-cyan-300 border-t-transparent" />}
+            <button
+              type="button"
+              onClick={toggleVoiceSearch}
+              className={`grid h-10 w-10 shrink-0 place-items-center rounded-full transition-all ${
+                voiceState === 'listening'
+                  ? 'bg-rose-400 text-white shadow-[0_0_18px_rgba(251,113,133,0.35)]'
+                  : 'bg-sky-500 text-white shadow-[0_6px_16px_rgba(14,165,233,0.35)]'
+              }`}
+              aria-label={voiceState === 'listening' ? 'Detener búsqueda por voz' : 'Buscar destino por voz'}
+              aria-pressed={voiceState === 'listening'}
+            >
+              {voiceState === 'listening' ? <MicOff className="h-4 w-4" strokeWidth={2.3} /> : <Mic className="h-4 w-4" strokeWidth={2.3} />}
+            </button>
+            {value ? (
+              <button type="button" onClick={() => { setValue(''); setResults([]); setLastResolvedQuery(''); }} className="grid h-8 w-8 place-items-center rounded-full text-white/45 hover:bg-white/8 hover:text-white" aria-label="Borrar búsqueda">
+                <X className="h-4 w-4" />
+              </button>
+            ) : null}
+          </div>
+        </div>
+      )}
+
+      {!isMobileNav && (
+      <div className="flex items-center gap-2 glass-panel px-3 py-2.5 !border-[var(--border-active)]">
         <Search className="w-3.5 h-3.5 text-[var(--gold-primary)] flex-shrink-0" />
         <input
           ref={inputRef}
@@ -420,12 +502,11 @@ function SearchBar({ onLocate, onRoute, defaultOpen = false, variant = 'default'
           onKeyDown={(e) => {
             if (e.key === 'Escape') resetAndClose();
             if (e.key === 'Enter' && results.length > 0) {
-              if (isMobileNav && onRoute) void handleRoute(results[0]);
-              else handleSelect(results[0]);
+              handleSelect(results[0]);
             }
           }}
-          placeholder={isMobileNav ? 'Busca un destino…' : 'Busca ciudad, dirección o coordenadas…'}
-          className={`flex-1 bg-transparent outline-none placeholder:text-[var(--text-muted)] ${isMobileNav ? 'text-[13px] text-white font-medium tracking-[0.02em]' : 'text-[10px] text-[var(--text-primary)] font-mono tracking-wider'}`}
+          placeholder="Busca ciudad, dirección o coordenadas…"
+          className="flex-1 bg-transparent outline-none placeholder:text-[var(--text-muted)] text-[10px] text-[var(--text-primary)] font-mono tracking-wider"
         />
         {loading && <div className="w-3 h-3 border border-[var(--gold-primary)] border-t-transparent rounded-full animate-spin" />}
         <button
@@ -446,6 +527,7 @@ function SearchBar({ onLocate, onRoute, defaultOpen = false, variant = 'default'
           <X className="w-3 h-3" />
         </button>
       </div>
+      )}
 
       {voiceState !== 'idle' && (
         <div
@@ -470,62 +552,86 @@ function SearchBar({ onLocate, onRoute, defaultOpen = false, variant = 'default'
 
 
 
-      <div className={`rounded-[1.15rem] border border-cyan-300/15 bg-[linear-gradient(180deg,rgba(6,18,27,0.88),rgba(7,15,24,0.58))] px-3 py-3 shadow-[0_12px_28px_rgba(0,0,0,0.16)] ${isMobileNav ? 'rounded-[1.25rem] border-cyan-300/18 bg-[rgba(5,16,25,0.82)] px-3 py-2.5 shadow-[0_24px_48px_rgba(0,0,0,0.28),inset_0_1px_0_rgba(255,255,255,0.03)]' : ''}`}>
+      <div className={`rounded-[1.15rem] border border-cyan-300/15 bg-[linear-gradient(180deg,rgba(6,18,27,0.88),rgba(7,15,24,0.58))] px-3 py-3 shadow-[0_12px_28px_rgba(0,0,0,0.16)] ${isMobileNav ? 'rounded-[1.35rem] border-cyan-300/16 bg-[rgba(5,16,25,0.88)] px-3 py-3 shadow-[0_18px_40px_rgba(0,0,0,0.26)]' : ''}`}>
         <div className={isMobileNav ? 'hidden' : 'flex items-start justify-between gap-3'}>
           <div>
-            <div className="text-[7px] font-mono uppercase tracking-[0.22em] text-cyan-300">{isMobileNav ? 'Ruta' : 'Ruta'}</div>
-            <div className="mt-1 text-[10px] font-semibold tracking-[0.02em] text-white">{isMobileNav ? 'Usa tu GPS y elige cómo moverte.' : 'Usa tu GPS y elige cómo moverte.'}</div>
-            {isMobileNav && (
-              <div className="mt-1.5 text-[8px] font-mono uppercase tracking-[0.16em] text-cyan-100/58">Elige modo y abre la ruta al instante</div>
-            )}
+            <div className="text-[7px] font-mono uppercase tracking-[0.22em] text-cyan-300">Ruta</div>
+            <div className="mt-1 text-[10px] font-semibold tracking-[0.02em] text-white">Usa tu GPS y elige cómo moverte.</div>
           </div>
           <div className="rounded-full border border-cyan-300/18 bg-cyan-300/[0.08] px-2.5 py-1 text-[7px] font-mono uppercase tracking-[0.18em] text-cyan-100/88">
             {ROUTE_MODE_META[routeMode].label}
           </div>
         </div>
 
-        <div className={`${isMobileNav ? 'mt-0' : 'mt-3'} flex flex-wrap gap-2`}>
+        {!isMobileNav && (
+        <div className="mt-3 flex flex-wrap gap-2">
           <button
             type="button"
             onClick={() => void handleLocateMe()}
             className="inline-flex items-center gap-1.5 rounded-full border border-cyan-300/30 bg-cyan-400/[0.10] px-2.5 py-1.5 text-[8px] font-mono uppercase tracking-[0.18em] text-cyan-100 hover:border-cyan-300/55 hover:bg-cyan-400/[0.16]"
           >
             <LocateFixed className="h-3 w-3" />
-            {isMobileNav ? 'Usar mi GPS' : 'Usar mi GPS'}
+            Usar mi GPS
           </button>
-          {!isMobileNav && (
-            <button
-              type="button"
-              onClick={() => setDraftWaypoints([])}
-              disabled={draftWaypoints.length === 0}
-              className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-[8px] font-mono uppercase tracking-[0.18em] text-[var(--text-secondary)] disabled:opacity-40"
-            >
-              <X className="h-3 w-3" />
-Limpiar paradas
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => setDraftWaypoints([])}
+            disabled={draftWaypoints.length === 0}
+            className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-[8px] font-mono uppercase tracking-[0.18em] text-[var(--text-secondary)] disabled:opacity-40"
+          >
+            <X className="h-3 w-3" />
+            Limpiar paradas
+          </button>
         </div>
+        )}
+
+        {isMobileNav && (
+          <div className="mb-2.5 text-[12px] font-medium text-white/55">Cómo quieres ir</div>
+        )}
 
         <div className={`mt-2 grid gap-2 ${isMobileNav ? 'grid-cols-3' : 'sm:grid-cols-3'}`}>
           {((['driving', 'walking', 'cycling'] as const)).map((mode) => {
             const meta = ROUTE_MODE_META[mode];
             const Icon = meta.Icon;
+            const active = routeMode === mode;
             return (
               <button
                 key={mode}
                 type="button"
                 onClick={() => setRouteMode(mode)}
-                className={`rounded-2xl border px-3 py-2 text-left transition-all ${routeMode === mode ? 'border-cyan-300/38 bg-[linear-gradient(180deg,rgba(34,211,238,0.14),rgba(34,211,238,0.07))] text-cyan-100 shadow-[0_0_18px_rgba(34,211,238,0.12),inset_0_1px_0_rgba(255,255,255,0.03)]' : 'border-white/10 bg-white/[0.03] text-[var(--text-muted)] hover:border-cyan-300/20 hover:text-[var(--text-primary)]'} ${isMobileNav ? 'min-h-[54px] px-2 py-2' : ''}`}
+                aria-pressed={active}
+                className={`rounded-2xl border transition-all ${
+                  isMobileNav
+                    ? `flex min-h-[72px] flex-col items-center justify-center gap-1.5 px-2 py-2.5 ${
+                        active
+                          ? 'border-sky-400/55 bg-sky-500/15 text-sky-100 shadow-[0_0_20px_rgba(56,189,248,0.18)]'
+                          : 'border-white/10 bg-white/[0.03] text-white/55 active:bg-white/[0.06]'
+                      }`
+                    : `px-3 py-2 text-left ${
+                        active
+                          ? 'border-cyan-300/38 bg-[linear-gradient(180deg,rgba(34,211,238,0.14),rgba(34,211,238,0.07))] text-cyan-100 shadow-[0_0_18px_rgba(34,211,238,0.12)]'
+                          : 'border-white/10 bg-white/[0.03] text-[var(--text-muted)] hover:border-cyan-300/20 hover:text-[var(--text-primary)]'
+                      }`
+                }`}
               >
-                <div className="flex items-center gap-2">
-                  <span className={`rounded-full border p-1.5 ${routeMode === mode ? 'border-cyan-300/35 bg-cyan-300/10 text-cyan-200' : 'border-white/10 bg-white/[0.03]'}`}>
-                    <Icon className="h-3 w-3" />
-                  </span>
-                  <span>
-                    <span className="block text-[8px] font-mono uppercase tracking-[0.2em]">{meta.label}</span>
-                    <span className={`${isMobileNav ? 'hidden' : 'mt-0.5 block'} text-[8px] font-medium tracking-[0.03em] opacity-80`}>{meta.detail}</span>
-                  </span>
-                </div>
+                {isMobileNav ? (
+                  <>
+                    <span className={`grid h-10 w-10 place-items-center rounded-full ${active ? 'bg-sky-400 text-slate-950' : 'bg-white/8 text-white/70'}`}>
+                      <Icon className="h-[18px] w-[18px]" strokeWidth={2.35} />
+                    </span>
+                    <span className="text-[12px] font-semibold tracking-[0.01em]">{meta.label}</span>
+                  </>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span className={`rounded-full border p-1.5 ${active ? 'border-cyan-300/35 bg-cyan-300/10 text-cyan-200' : 'border-white/10 bg-white/[0.03]'}`}>
+                      <Icon className="h-3 w-3" />
+                    </span>
+                    <span>
+                      <span className="block text-[8px] font-mono uppercase tracking-[0.2em]">{meta.label}</span>
+                      <span className="mt-0.5 block text-[8px] font-medium tracking-[0.03em] opacity-80">{meta.detail}</span>
+                    </span>
+                  </div>
+                )}
               </button>
             );
           })}
@@ -559,21 +665,22 @@ Limpiar paradas
           </div>
         )}
 
+        {!isMobileNav && (
         <div className="mt-3 flex flex-wrap gap-2">
           {geoState === 'ready' && currentLocation && (
             <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/30 bg-emerald-400/12 px-2.5 py-1.5 text-[8px] font-mono uppercase tracking-[0.18em] text-emerald-200">
               <Navigation className="h-3 w-3" />
-              {isMobileNav ? `GPS listo · ${formatCoordinateChip(currentLocation.lat, currentLocation.lng)}` : `GPS ready · from ${formatCoordinateChip(currentLocation.lat, currentLocation.lng)}`}
+              {`GPS ready · from ${formatCoordinateChip(currentLocation.lat, currentLocation.lng)}`}
             </span>
           )}
           {geoState === 'locating' && (
             <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/20 bg-amber-400/8 px-2.5 py-1.5 text-[8px] font-mono uppercase tracking-[0.18em] text-amber-300">
               <div className="h-3 w-3 rounded-full border border-current border-t-transparent animate-spin" />
-              {isMobileNav ? 'Ubicando…' : 'Locating...'}
+              Locating...
             </span>
           )}
-
         </div>
+        )}
       </div>
 
       {geoError && (
@@ -591,9 +698,9 @@ Limpiar paradas
         </div>
       )}
 
-      {currentLocation && (
+      {currentLocation && !isMobileNav && (
         <div className="rounded-2xl border border-cyan-300/20 bg-cyan-400/[0.07] px-3 py-2 text-[8px] font-mono uppercase tracking-[0.14em] text-cyan-100/75">
-          {isMobileNav ? `GPS confirmado${currentLocation.accuracy ? ` · precisión ±${currentLocation.accuracy} m` : ''}` : `AEGIS VECTOR origin locked · ${formatCoordinateChip(currentLocation.lat, currentLocation.lng)}${currentLocation.accuracy ? ` · ±${currentLocation.accuracy} m` : ''}`}
+          {`AEGIS VECTOR origin locked · ${formatCoordinateChip(currentLocation.lat, currentLocation.lng)}${currentLocation.accuracy ? ` · ±${currentLocation.accuracy} m` : ''}`}
         </div>
       )}
 
