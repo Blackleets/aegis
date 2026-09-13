@@ -37,6 +37,8 @@ import { type RouteRiskSummary, type RouteSnapshot, type RouteStep, formatRouteD
 import { requestNavigationNotificationPermission } from '@/lib/navigation-notifications';
 import { formatRouteAlertAge } from '@/lib/route-alert-freshness';
 import { getRouteAlertGuidance } from '@/lib/route-alert-guidance';
+import { buildLiveRouteIncidentCockpitModel } from '@/lib/live-route-incident-cockpit';
+import { useLiveRouteIncidents } from '@/hooks/useLiveRouteIncidents';
 import {
   COMMUNITY_INCIDENTS_CHANGED_EVENT,
   createBrowserCommunityIncidentService,
@@ -189,6 +191,16 @@ export default function RouteCockpitMobile({
   const [reportComposerOpen, setReportComposerOpen] = useState(false);
   const [reportFeedback, setReportFeedback] = useState<string | null>(null);
   const [communityVoteBusy, setCommunityVoteBusy] = useState(false);
+  const destinationCoordinate = routeSnapshot
+    ? { lat: routeSnapshot.destination.lat, lng: routeSnapshot.destination.lng }
+    : null;
+  const liveRouteIncidents = useLiveRouteIncidents({
+    enabled: navigationActive,
+    route: routeSnapshot?.coordinates ?? [],
+    currentLocation,
+    destination: destinationCoordinate,
+  });
+  const liveIncidentCockpit = buildLiveRouteIncidentCockpitModel(liveRouteIncidents);
   const destinationLabel = routeSnapshot?.destination.label ?? 'Preparando ruta';
   const distanceLabel = routeSnapshot ? formatRouteDistance(remainingRouteDistance || routeSnapshot.distanceMeters) : '--';
   const durationLabel = routeSnapshot ? formatRouteDuration(routeSnapshot.durationSeconds) : 'Calculando…';
@@ -238,16 +250,36 @@ export default function RouteCockpitMobile({
   const progressPercent = routeSnapshot
     ? Math.round(Math.max(0, Math.min(1, (routeSnapshot.distanceMeters - remainingRouteDistance) / routeSnapshot.distanceMeters)) * 100)
     : 0;
-  const proximityAlert = nearbyEarthquakeAlert
+  const liveIncidentDistanceMeters = liveRouteIncidents.incident?.distanceAheadMeters ?? null;
+  const proximityAlert = liveIncidentCockpit && liveIncidentDistanceMeters !== null
+    ? {
+        id: liveIncidentCockpit.incidentId,
+        eyebrow: liveIncidentCockpit.eyebrow,
+        title: liveIncidentCockpit.title,
+        detail: liveIncidentCockpit.detail,
+        action: liveIncidentCockpit.action,
+        confidence: liveIncidentCockpit.confidence,
+        distanceMeters: liveIncidentDistanceMeters,
+        severity: liveIncidentCockpit.severity,
+        critical: liveIncidentCockpit.critical,
+        dismiss: () => liveRouteIncidents.dismissIncident(liveIncidentCockpit.incidentId),
+        channel: 'traffic' as const,
+      }
+    : nearbyEarthquakeAlert
     ? {
         id: nearbyEarthquakeAlert.id,
         eyebrow: `Terremoto · USGS · ${formatRouteAlertAge(nearbyEarthquakeAlert.time)}`,
         title: `M${nearbyEarthquakeAlert.magnitude} a ${formatStepDistance(nearbyEarthquakeAlert.distanceMeters)}`,
         detail: nearbyEarthquakeAlert.place,
+        action: nearbyEarthquakeAlert.magnitude >= 5
+          ? 'Reduce y evita zonas inestables si puedes'
+          : 'Mantén precaución en la zona',
+        confidence: 'high' as const,
         distanceMeters: nearbyEarthquakeAlert.distanceMeters,
         severity: nearbyEarthquakeAlert.magnitude >= 5 ? 'critical' as const : 'warning' as const,
         critical: nearbyEarthquakeAlert.magnitude >= 5,
         dismiss: onDismissNearbyEarthquake,
+        channel: 'earthquake' as const,
       }
     : nearbyContextAlert
       ? {
@@ -255,10 +287,15 @@ export default function RouteCockpitMobile({
           eyebrow: `Incidencia en ruta · ${nearbyContextAlert.source}`,
           title: `${nearbyContextAlert.title} a ${formatStepDistance(nearbyContextAlert.distanceMeters)}`,
           detail: `${nearbyContextAlert.detail} · ${formatRouteAlertAge(nearbyContextAlert.observedAt)}`,
+          action: nearbyContextAlert.severity === 'critical'
+            ? 'Reduce y prepárate para desviar'
+            : 'Mantén vigilancia en la zona',
+          confidence: 'medium' as const,
           distanceMeters: nearbyContextAlert.distanceMeters,
           severity: nearbyContextAlert.severity,
           critical: nearbyContextAlert.severity !== 'info',
           dismiss: onDismissNearbyContext,
+          channel: 'context' as const,
         }
       : null;
   const proximityGuidance = proximityAlert
@@ -431,6 +468,12 @@ export default function RouteCockpitMobile({
                     </div>
                     <p className="mt-0.5 truncate text-[13px] font-bold text-white">{proximityAlert.title}</p>
                     <p className="truncate text-[9px] text-white/48">{proximityAlert.detail}</p>
+                    <p className={`mt-0.5 truncate text-[10px] font-semibold ${proximityAlert.critical ? 'text-orange-100' : 'text-cyan-100'}`}>
+                      {proximityAlert.action}
+                      <span className="ml-1.5 font-mono text-[8px] uppercase tracking-[0.12em] text-white/35">
+                        · conf {proximityAlert.confidence}
+                      </span>
+                    </p>
                   </div>
                   <button type="button" onClick={proximityAlert.dismiss} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white/60" aria-label="Cerrar incidencia próxima">
                     <X className="h-4 w-4" />
