@@ -66,4 +66,13 @@ describe('world-pulse-map-pins', () => {
     expect(fc.features[0].properties.color).toBe(WORLD_PULSE_PIN_COLORS.critical);
     expect(WORLD_PULSE_MAP_PIN_LIMIT).toBe(25);
   });
+
+  it('keeps source selectable after disable/enable without inventing events', () => {
+    const source = [
+      { id: 'c1', lat: 2, lng: 2, severity: 'critical' as const, title: 'Crit' },
+    ];
+    expect(selectWorldPulseMapPins(source, { enabled: false })).toEqual([]);
+    expect(selectWorldPulseMapPins(source, { enabled: true })).toHaveLength(1);
+    expect(selectWorldPulseMapPins(source, { enabled: true })[0].id).toBe('c1');
+  });
 });

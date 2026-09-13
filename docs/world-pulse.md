@@ -21,9 +21,11 @@ Missing or malformed upstream → `error`/`empty` for that source. Never invents
 
 ## Soft 2D map pins
 
-- Optional toggle in the World Pulse panel (default on when the panel has events)
+- Optional toggle in the World Pulse panel (default on)
+- **Durable at dashboard page** via `useWorldPulseMapPins` — pin source + Pins toggle survive mobile drawer / desktop-rail unmount so mercator pins stay available on mobile
+- Panel reports filtered events + toggle through callbacks; page runs `selectWorldPulseMapPins` (no setState-in-effect push from the panel)
 - Cap: top **25** by severity (then score) — see `selectWorldPulseMapPins`
 - Rendered **only** when map projection is `mercator` (2D). Globe / Earth / Three.js / SolarSystemMode paths stay untouched
 - Soft glow markers using AEGIS severity tokens (rose critical, amber elevated, cyan watch)
 - Pin click uses the same locate/fly behavior as panel rows (`onLocate`)
-- Fail-closed: no coords / no identity → no pin; empty feed → no pins
+- Fail-closed: no coords / no identity → no pin; empty feed → no pins; transient fetch errors do not clear last good pins
