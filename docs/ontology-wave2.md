@@ -26,7 +26,7 @@ Stacked on [Wave 1](./ontology-wave1.md) (`feat/ontology-wave1`).
 
 ## Non-goals
 
-- Durable saved investigations (Wave 3)
+- Durable saved investigations — see [Wave 3](./ontology-wave3.md)
 - Fake live graph feeds / Supabase
 - Changes to AegisMap, globe, navigation HUD, SolarSystemMode
 
