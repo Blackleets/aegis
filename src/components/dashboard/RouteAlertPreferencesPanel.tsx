@@ -17,11 +17,11 @@ const OPTIONS: Array<{
   detail: string;
   icon: typeof BellRing;
 }> = [
-  { key: 'localMonitoring', label: 'Vigilancia local', detail: 'Riesgos cercanos incluso sin ruta', icon: LocateFixed },
-  { key: 'earthquakes', label: 'Terremotos', detail: 'Eventos USGS cercanos', icon: BellRing },
-  { key: 'wildfires', label: 'Incendios', detail: 'Focos térmicos NASA FIRMS', icon: Flame },
-  { key: 'volcanoes', label: 'Volcanes', detail: 'Actividad NASA EONET', icon: Mountain },
-  { key: 'severeWeather', label: 'Clima severo', detail: 'Avisos meteorológicos activos', icon: CloudLightning },
+  { key: 'localMonitoring', label: 'Vigilancia local', detail: 'También sin ruta (además de avisos en tu corredor)', icon: LocateFixed },
+  { key: 'earthquakes', label: 'Terremotos', detail: 'USGS en tu ruta o cerca', icon: BellRing },
+  { key: 'wildfires', label: 'Incendios', detail: 'FIRMS en tu ruta o cerca', icon: Flame },
+  { key: 'volcanoes', label: 'Volcanes', detail: 'EONET en tu ruta o cerca', icon: Mountain },
+  { key: 'severeWeather', label: 'Clima severo', detail: 'Avisos en tu ruta o cerca', icon: CloudLightning },
   { key: 'trafficCameras', label: 'Cámaras', detail: 'Puntos viales a menos de 500 m', icon: Camera },
   { key: 'notifications', label: 'Notificaciones', detail: 'Avisos del navegador', icon: Smartphone },
   { key: 'haptics', label: 'Vibración', detail: 'Patrones según peligro', icon: Vibrate },
@@ -39,7 +39,10 @@ export default function RouteAlertPreferencesPanel({ value, onChange }: RouteAle
     <section className="mb-3 overflow-hidden rounded-[22px] border border-white/10 bg-white/[0.025]">
       <div className="border-b border-white/8 px-4 py-3">
         <div className="text-[8px] font-mono uppercase tracking-[0.22em] text-cyan-200">Preferencias del conductor</div>
-        <p className="mt-1 text-[10px] leading-relaxed text-white/45">Activa riesgos cercanos con o sin ruta. La preferencia se guarda solo en este dispositivo.</p>
+        <p className="mt-1 text-[10px] leading-relaxed text-white/45">
+          Con categorías activas recibirás avisos <span className="text-white/70">en tu ruta</span> (ej. trayecto Móstoles–Madrid) solo si el evento cae en el corredor.
+          Vigilancia local = también sin ruta. Se guarda solo en este dispositivo.
+        </p>
       </div>
       <div className="grid grid-cols-1 gap-px bg-white/6 sm:grid-cols-2">
         {OPTIONS.map(({ key, label, detail, icon: Icon }) => {

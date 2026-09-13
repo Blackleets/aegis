@@ -2575,7 +2575,15 @@ export default function Dashboard() {
               onMapPinsEnabledChange={setWorldPulsePinsEnabled}
               onMapPinSourceChange={handleWorldPulsePinSourceChange}
             />
-            <LiveAlerts data={dataWithSdk} onLocate={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })} onWatchFeed={(url, name) => { setLiveFeedUrl(url); setLiveFeedName(name); }} />
+            <LiveAlerts
+              data={dataWithSdk}
+              onLocate={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })}
+              onWatchFeed={(url, name) => { setLiveFeedUrl(url); setLiveFeedName(name); }}
+              routeCoordinates={routeSnapshot?.coordinates ?? []}
+              userLocation={userLocation}
+              routeAlertPreferences={routeAlertPreferences}
+              navigationActive={navigationActive}
+            />
           </>
         )}
         reconContent={<OsintPanel onSweepVisualize={setSweepData} onScanGeolocate={(target: string, payload: OsintGeolocatePayload) => {
@@ -2728,7 +2736,15 @@ export default function Dashboard() {
                     onMapPinsEnabledChange={setWorldPulsePinsEnabled}
                     onMapPinSourceChange={handleWorldPulsePinSourceChange}
                   />
-                  <LiveAlerts data={dataWithSdk} onLocate={(lat, lng) => { setFlyToLocation({ lat, lng, ts: Date.now() }); setMobilePanel(null); }} onWatchFeed={(url, name) => { setLiveFeedUrl(url); setLiveFeedName(name); }} />
+                  <LiveAlerts
+                    data={dataWithSdk}
+                    onLocate={(lat, lng) => { setFlyToLocation({ lat, lng, ts: Date.now() }); setMobilePanel(null); }}
+                    onWatchFeed={(url, name) => { setLiveFeedUrl(url); setLiveFeedName(name); }}
+                    routeCoordinates={routeSnapshot?.coordinates ?? []}
+                    userLocation={userLocation}
+                    routeAlertPreferences={routeAlertPreferences}
+                    navigationActive={navigationActive}
+                  />
                 </>
               </>
             )}
