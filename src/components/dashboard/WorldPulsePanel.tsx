@@ -2,6 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ExternalLink, MapPin, RadioTower, RefreshCw } from 'lucide-react';
+import {
+  selectWorldPulseMapPins,
+  type WorldPulseMapPin,
+} from '@/lib/world-pulse-map-pins';
 
 type PulseSeverity = 'info' | 'watch' | 'elevated' | 'critical';
 
@@ -58,15 +62,19 @@ function relativeTime(iso: string) {
 export default function WorldPulsePanel({
   onLocate,
   autoTourCritical = false,
+  onMapPinsChange,
 }: {
   onLocate: (lat: number, lng: number) => void;
   /** When true, slowly cycles critical events via fly-to only — never mutates map layers. */
   autoTourCritical?: boolean;
+  /** Soft 2D pins for AegisMap mercator only — parent must not forward these to globe layers. */
+  onMapPinsChange?: (pins: WorldPulseMapPin[]) => void;
 }) {
   const [payload, setPayload] = useState<PulsePayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [kindFilter, setKindFilter] = useState<(typeof KIND_FILTERS)[number]>('all');
+  const [mapPinsEnabled, setMapPinsEnabled] = useState(true);
 
   const refresh = useCallback(async (options?: { showSpinner?: boolean }) => {
     const showSpinner = options?.showSpinner === true;
@@ -132,6 +140,25 @@ export default function WorldPulsePanel({
     [payload?.events],
   );
 
+  const mapPins = useMemo(
+    () => selectWorldPulseMapPins(
+      events.map((event) => ({
+        id: event.id,
+        lat: event.lat,
+        lng: event.lng,
+        severity: event.severity,
+        title: event.title,
+        kind: event.kind,
+      })),
+      { enabled: mapPinsEnabled },
+    ),
+    [events, mapPinsEnabled],
+  );
+
+  useEffect(() => {
+    onMapPinsChange?.(mapPins);
+  }, [mapPins, onMapPinsChange]);
+
   useEffect(() => {
     if (!autoTourCritical || criticalEvents.length === 0) return;
     let index = 0;
@@ -165,14 +192,31 @@ export default function WorldPulsePanel({
             {sourceLabel || 'USGS · EONET · FIRMS · GDACS'}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => void refresh({ showSpinner: true })}
-          className="flex min-h-9 min-w-9 items-center justify-center rounded-lg border border-white/10 bg-black/20 text-white/70"
-          aria-label="Actualizar World Pulse"
-        >
-          <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setMapPinsEnabled((value) => !value)}
+            className={`flex min-h-9 items-center justify-center gap-1.5 rounded-lg border px-2.5 text-[8px] font-semibold uppercase tracking-[0.08em] ${
+              mapPinsEnabled
+                ? 'border-cyan-300/30 bg-cyan-300/12 text-cyan-100'
+                : 'border-white/10 bg-black/20 text-white/45'
+            }`}
+            aria-pressed={mapPinsEnabled}
+            aria-label="Pins suaves en mapa 2D"
+            title="Pins suaves solo en vista 2D (mercator)"
+          >
+            <MapPin className="h-3.5 w-3.5" />
+            {mapPinsEnabled ? `Pins ${mapPins.length}` : 'Pins off'}
+          </button>
+          <button
+            type="button"
+            onClick={() => void refresh({ showSpinner: true })}
+            className="flex min-h-9 min-w-9 items-center justify-center rounded-lg border border-white/10 bg-black/20 text-white/70"
+            aria-label="Actualizar World Pulse"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
       </div>
 
       <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1">
