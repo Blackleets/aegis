@@ -3,6 +3,7 @@ import {
   buildWorldPulseSnapshot,
   earthquakeToPulseEvent,
   eonetToPulseEvent,
+  gdacsToPulseEvent,
   sanitizeWorldPulseEvent,
   scoreWorldPulseEvent,
 } from '../src/lib/world-pulse';
@@ -87,5 +88,38 @@ describe('world pulse', () => {
 
     expect(snapshot.status).toBe('degraded');
     expect(snapshot.events).toHaveLength(1);
+  });
+});
+
+describe('gdacsToPulseEvent', () => {
+  it('maps orange cyclone to elevated storm', () => {
+    const event = gdacsToPulseEvent({
+      id: '1001',
+      name: 'Tropical Cyclone TEST',
+      eventType: 'TC',
+      alertLevel: 'Orange',
+      lat: 12.5,
+      lng: -60.2,
+      fromDate: '2026-09-06T12:00:00Z',
+      url: 'https://www.gdacs.org/report.aspx?eventid=1001',
+    });
+    expect(event?.kind).toBe('storm');
+    expect(event?.severity).toBe('elevated');
+    expect(event?.source).toBe('GDACS');
+  });
+
+  it('returns null without coords or id', () => {
+    expect(gdacsToPulseEvent({
+      id: '',
+      name: 'x',
+      lat: 1,
+      lng: 2,
+    })).toBeNull();
+    expect(gdacsToPulseEvent({
+      id: '1',
+      name: 'x',
+      lat: Number.NaN,
+      lng: 2,
+    })).toBeNull();
   });
 });

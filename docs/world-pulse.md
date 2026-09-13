@@ -1,13 +1,20 @@
 # World Pulse
 
-Competitive takeaways from App Store live-Earth apps (**Orbital**, **GlobalAlert**, **MonitorWorld**, **Observe Earth**):
+Ranked live global catastrophe / natural-event feed for Earth Ops.
 
-| Pattern | Ported into AEGIS |
-|---|---|
-| Ranked global catastrophe feed | `/api/world-pulse` + severity/recency score |
-| Multi-source scientific feeds | USGS + NASA EONET + NASA FIRMS |
-| Source attribution on every card | `source` + optional `source_url` |
-| Fail closed / degraded status | `ok` / `degraded` / `unavailable` |
-| Tap-to-locate on map | `WorldPulsePanel` → `onLocate` |
+## Sources (fail-closed)
 
-Non-goals this PR: fake live counters, GDACS paid keys, breaking existing map layers.
+| Source | What |
+|--------|------|
+| USGS | M4+ day feed (+ tsunami flag) |
+| NASA EONET | Open natural events |
+| NASA FIRMS | VIIRS active fires (top FRP) |
+| GDACS | Orange/Red multi-hazard alerts |
+
+Missing or malformed upstream → `error`/`empty` for that source. Never invents events.
+
+## Client
+
+- Auto-refresh every 3 minutes
+- Kind filters (does not touch map layers)
+- “Ver en mapa” only flies the camera — does **not** mutate Earth/globe layer state
