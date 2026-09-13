@@ -1,26 +1,44 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronDown,
   ChevronUp,
   MapPin,
-  AlertTriangle,
   Newspaper,
-  Clock,
   RadioTower,
   Maximize2,
   Minimize2,
   ExternalLink,
   RefreshCw,
+  AlertTriangle,
+  CloudLightning,
+  Flame,
+  Mountain,
+  Waves,
+  Swords,
 } from 'lucide-react';
+import {
+  buildSituationalRadar,
+  filterAlertsByChip,
+  kindLabelEs,
+  relativeTimeEs,
+  severityLabelEs,
+  SITUATIONAL_FILTER_CHIPS,
+  type SituationalAlert,
+  type SituationalFilterChip,
+  type SituationalKind,
+  type SituationalRadarSnapshot,
+  type SituationalSeverity,
+} from '@/lib/situational-alerts';
 
 interface NewsItem {
+  id?: string;
   title?: string;
   description?: string;
   source?: string;
-  coords?: [number, number];
+  coords?: [number, number] | null;
   published?: string;
   risk_score?: number;
   link?: string;
@@ -38,18 +56,6 @@ interface EarthquakeItem {
   time?: string | number;
 }
 
-interface AlertItem {
-  type: 'news' | 'quake';
-  title: string;
-  description?: string;
-  source: string;
-  lat?: number;
-  lng?: number;
-  time?: string | number;
-  severity: string;
-  url?: string;
-}
-
 interface LiveAlertsData {
   news?: NewsItem[];
   earthquakes?: EarthquakeItem[];
@@ -61,150 +67,148 @@ interface LiveAlertsProps {
   onWatchFeed?: (url: string, name: string) => void;
 }
 
-const RISK_COLORS: Record<string, string> = {
-  HIGH: '#FF7A59',
-  CRITICAL: '#FF4D6D',
-  ELEVATED: '#F59E0B',
-  MODERATE: '#EAB308',
-  LOW: '#34D399',
+const SEVERITY_COLORS: Record<SituationalSeverity, string> = {
+  critical: '#FF4D6D',
+  high: '#FF7A59',
+  elevated: '#F59E0B',
+  moderate: '#EAB308',
+  low: '#34D399',
 };
 
-function getTimeLabel(value?: string | number) {
-  if (!value) return '';
-  try {
-    return new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  } catch {
-    return '';
+function KindIcon({ kind }: { kind: SituationalKind }) {
+  const className = 'h-3.5 w-3.5 flex-shrink-0';
+  switch (kind) {
+    case 'earthquake':
+      return <AlertTriangle className={className} />;
+    case 'wildfire':
+      return <Flame className={className} />;
+    case 'volcano':
+      return <Mountain className={className} />;
+    case 'storm':
+    case 'weather':
+      return <CloudLightning className={className} />;
+    case 'flood':
+      return <Waves className={className} />;
+    case 'conflict':
+      return <Swords className={className} />;
+    case 'news':
+      return <Newspaper className={className} />;
+    default:
+      return <RadioTower className={className} />;
   }
 }
 
-function getTimestamp(value?: string | number) {
-  if (typeof value === 'number') return value;
-  return value ? Date.parse(value) : 0;
-}
-
-function getLastUpdatedLabel(value?: string) {
-  if (!value) return 'waiting';
-  const diffSeconds = Math.max(0, Math.floor((Date.now() - Date.parse(value)) / 1000));
-  if (diffSeconds < 60) return `${diffSeconds}s ago`;
-  const diffMinutes = Math.floor(diffSeconds / 60);
-  if (diffMinutes < 60) return `${diffMinutes}m ago`;
-  const diffHours = Math.floor(diffMinutes / 60);
-  return `${diffHours}h ago`;
-}
-
-function isBlockedSource(item: NewsItem) {
-  const source = String(item.source || '').toLowerCase();
-  const link = String(item.link || '').toLowerCase();
-  return source.includes('t.me') || source.includes('telegram') || link.includes('t.me/') || link.includes('telegram.');
+function statusLabelEs(status: SituationalRadarSnapshot['status']): string {
+  if (status === 'ok') return 'Fuentes OK';
+  if (status === 'degraded') return 'Fuentes degradadas';
+  return 'Fuentes no disponibles';
 }
 
 export default function LiveAlerts({ data, onLocate, onWatchFeed }: LiveAlertsProps) {
   const [expanded, setExpanded] = useState(true);
   const [maximized, setMaximized] = useState(false);
-  const [filter, setFilter] = useState<'all' | 'news' | 'quakes'>('all');
-  const [liveData, setLiveData] = useState<LiveAlertsData | null>(null);
-  const [lastUpdated, setLastUpdated] = useState<string>(new Date().toISOString());
+  const [filter, setFilter] = useState<SituationalFilterChip>('all');
+  const [snapshot, setSnapshot] = useState<SituationalRadarSnapshot | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const effectiveData = liveData ?? data;
+  const [clock, setClock] = useState(() => Date.now());
+
+  const buildFromProps = useCallback((): SituationalRadarSnapshot => {
+    return buildSituationalRadar({
+      earthquakes: (data.earthquakes || []) as Array<Record<string, unknown>>,
+      quakeStatus: data.earthquakes?.length ? 'ok' : 'empty',
+      news: (data.news || []) as Array<Record<string, unknown>>,
+      newsStatus: data.news?.length ? 'ok' : 'empty',
+      pulseEvents: [],
+      pulseStatus: 'empty',
+      weatherStatus: 'skipped',
+      limit: 40,
+    });
+  }, [data.earthquakes, data.news]);
+
+  const refresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const settled = await Promise.allSettled([
+        fetch('/api/world-pulse', { cache: 'no-store' }),
+        fetch('/api/news', { cache: 'no-store' }),
+        fetch('/api/earthquakes', { cache: 'no-store' }),
+        fetch('/api/weather', { cache: 'no-store' }),
+      ]);
+
+      const readJson = async (result: PromiseSettledResult<Response>) => {
+        if (result.status !== 'fulfilled' || !result.value.ok) return null;
+        try {
+          return await result.value.json();
+        } catch {
+          return null;
+        }
+      };
+
+      const [pulseJson, newsJson, quakeJson, weatherJson] = await Promise.all([
+        readJson(settled[0]),
+        readJson(settled[1]),
+        readJson(settled[2]),
+        readJson(settled[3]),
+      ]);
+
+      const pulseOk = settled[0].status === 'fulfilled' && settled[0].value.ok;
+      const newsOk = settled[1].status === 'fulfilled' && settled[1].value.ok;
+      const quakeOk = settled[2].status === 'fulfilled' && settled[2].value.ok;
+      const weatherOk = settled[3].status === 'fulfilled' && settled[3].value.ok;
+
+      const pulseEvents = Array.isArray(pulseJson?.events) ? pulseJson.events : [];
+      const newsItems = Array.isArray(newsJson?.news)
+        ? newsJson.news
+        : Array.isArray(newsJson)
+          ? newsJson
+          : [];
+      const quakes = Array.isArray(quakeJson?.earthquakes)
+        ? quakeJson.earthquakes
+        : Array.isArray(quakeJson)
+          ? quakeJson
+          : [];
+      const weatherEvents = Array.isArray(weatherJson?.events) ? weatherJson.events : [];
+
+      const next = buildSituationalRadar({
+        pulseEvents,
+        pulseStatus: pulseOk
+          ? (pulseJson?.status === 'unavailable' ? 'unavailable' : pulseJson?.status === 'degraded' ? 'degraded' : 'ok')
+          : 'error',
+        earthquakes: quakes,
+        quakeStatus: quakeOk ? (quakes.length ? 'ok' : 'empty') : 'error',
+        news: newsItems,
+        newsStatus: newsOk ? (newsItems.length ? 'ok' : 'empty') : 'error',
+        weatherEvents,
+        weatherStatus: weatherOk ? (weatherEvents.length ? 'ok' : 'empty') : 'error',
+        limit: 40,
+      });
+
+      setSnapshot(next);
+      setClock(Date.now());
+    } catch {
+      // Keep last good snapshot; never invent.
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
 
   useEffect(() => {
-    let cancelled = false;
-
-    const refresh = async () => {
-      setRefreshing(true);
-      try {
-        const [newsResponse, quakeResponse] = await Promise.all([
-          fetch('/api/news', { cache: 'no-store' }),
-          fetch('/api/earthquakes', { cache: 'no-store' }),
-        ]);
-
-        if (cancelled) return;
-
-        const nextNewsPayload = newsResponse.ok ? await newsResponse.json() as { news?: NewsItem[] } | NewsItem[] : undefined;
-        const nextQuakesPayload = quakeResponse.ok ? await quakeResponse.json() as { earthquakes?: EarthquakeItem[] } | EarthquakeItem[] : undefined;
-        const nextNews = Array.isArray(nextNewsPayload) ? nextNewsPayload : nextNewsPayload?.news;
-        const nextQuakes = Array.isArray(nextQuakesPayload) ? nextQuakesPayload : nextQuakesPayload?.earthquakes;
-
-        setLiveData((prev) => ({
-          news: nextNews ?? prev?.news,
-          earthquakes: nextQuakes ?? prev?.earthquakes,
-        }));
-        setLastUpdated(new Date().toISOString());
-      } catch {
-        // Keep last good payload.
-      } finally {
-        if (!cancelled) setRefreshing(false);
-      }
-    };
-
     void refresh();
     const interval = window.setInterval(() => {
       void refresh();
-    }, 20000);
+    }, 45_000);
+    return () => window.clearInterval(interval);
+  }, [refresh]);
 
-    return () => {
-      cancelled = true;
-      window.clearInterval(interval);
-    };
-  }, []);
+  const effective = snapshot ?? buildFromProps();
+  const filtered = useMemo(
+    () => filterAlertsByChip(effective.alerts, filter),
+    [effective.alerts, filter],
+  );
 
-  const alerts = useMemo(() => {
-    const unified: AlertItem[] = [];
-
-    (effectiveData.news || [])
-      .filter((item) => !isBlockedSource(item))
-      .forEach((item) => {
-        unified.push({
-          type: 'news',
-          title: item.title || 'Untitled brief',
-          description: item.description,
-          source: item.source || 'News desk',
-          lat: item.coords?.[0],
-          lng: item.coords?.[1],
-          time: item.published,
-          severity: (item.risk_score ?? 1) >= 8 ? 'CRITICAL' : (item.risk_score ?? 1) >= 6 ? 'HIGH' : (item.risk_score ?? 1) >= 4 ? 'ELEVATED' : 'LOW',
-          url: item.link,
-        });
-      });
-
-    effectiveData.earthquakes?.slice(0, 8).forEach((quake) => {
-      unified.push({
-        type: 'quake',
-        title: `M${quake.magnitude} · ${quake.place}`,
-        source: 'USGS',
-        lat: quake.lat,
-        lng: quake.lng,
-        time: quake.time,
-        description: `${typeof quake.depth === 'number' ? `${quake.depth.toFixed(1)} km deep` : 'Depth unavailable'}${quake.tsunami ? ' · TSUNAMI FLAG' : ''}`,
-        severity: quake.tsunami || quake.magnitude >= 6 ? 'CRITICAL' : quake.magnitude >= 4.5 ? 'HIGH' : quake.magnitude >= 3.5 ? 'ELEVATED' : 'MODERATE',
-        url: quake.url || (quake.id ? `https://earthquake.usgs.gov/earthquakes/eventpage/${quake.id}` : undefined),
-      });
-    });
-
-    return unified.sort((a, b) => getTimestamp(b.time) - getTimestamp(a.time));
-  }, [effectiveData]);
-
-  const filtered = filter === 'all'
-    ? alerts
-    : filter === 'news'
-      ? alerts.filter((item) => item.type === 'news')
-      : alerts.filter((item) => item.type === 'quake');
-
-  const criticalCount = alerts.filter((item) => item.severity === 'CRITICAL').length;
-  const newsCount = alerts.filter((item) => item.type === 'news').length;
-  const geolocatedCount = alerts.filter((item) => item.lat !== undefined && item.lng !== undefined).length;
-
-  const getIcon = (type: AlertItem['type']) => {
-    switch (type) {
-      case 'news':
-        return Newspaper;
-      case 'quake':
-        return AlertTriangle;
-      default:
-        return Newspaper;
-    }
-  };
+  const criticalCount = effective.alerts.filter((a) => a.severity === 'critical').length;
+  const geoCount = effective.alerts.filter((a) => a.lat !== undefined && a.lng !== undefined).length;
+  const degraded = effective.status !== 'ok';
 
   return (
     <motion.div
@@ -230,16 +234,31 @@ export default function LiveAlerts({ data, onLocate, onWatchFeed }: LiveAlertsPr
             <RadioTower className="h-4 w-4 text-[var(--cyan-primary)]" />
           </div>
           <div>
-            <div className="text-[8px] font-mono uppercase tracking-[0.3em] text-[var(--text-muted)]">Live incident desk</div>
-            <div className="mt-1 text-[13px] font-semibold tracking-[0.08em] text-[var(--text-primary)]">Realtime Newswire</div>
+            <div className="text-[8px] font-mono uppercase tracking-[0.3em] text-[var(--text-muted)]">
+              Multi-fuente · fail-closed
+            </div>
+            <div className="mt-1 text-[13px] font-semibold tracking-[0.08em] text-[var(--text-primary)]">
+              Radar situacional
+            </div>
           </div>
         </div>
 
         <div className="flex items-center gap-2 text-[var(--text-muted)]">
           <div className="inline-flex items-center gap-1.5 rounded-full border border-cyan-400/10 bg-cyan-400/8 px-2 py-1 text-[7px] font-mono uppercase tracking-[0.16em] text-cyan-300">
             <RefreshCw className={`h-3 w-3 ${refreshing ? 'animate-spin' : ''}`} />
-            {getLastUpdatedLabel(lastUpdated)}
+            {relativeTimeEs(effective.fetchedAt, clock) || '—'}
           </div>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              void refresh();
+            }}
+            className="rounded-full border border-white/10 p-1.5 hover:text-white"
+            title="Actualizar"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+          </button>
           <button
             type="button"
             onClick={(e) => {
@@ -248,7 +267,7 @@ export default function LiveAlerts({ data, onLocate, onWatchFeed }: LiveAlertsPr
               if (!expanded && !maximized) setExpanded(true);
             }}
             className="rounded-full border border-white/10 p-1.5 hover:text-white"
-            title={maximized ? 'Restore' : 'Maximize'}
+            title={maximized ? 'Restaurar' : 'Maximizar'}
           >
             {maximized ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
           </button>
@@ -265,121 +284,60 @@ export default function LiveAlerts({ data, onLocate, onWatchFeed }: LiveAlertsPr
             transition={{ duration: 0.2 }}
             className="flex h-full min-h-0 flex-1 flex-col overflow-hidden px-3.5 pb-3"
           >
-            <div className="grid grid-cols-3 gap-2 pb-3">
-              <div className="rounded-2xl border border-white/6 bg-white/[0.03] px-3 py-2.5">
-                <div className="text-[8px] font-mono uppercase tracking-[0.22em] text-[var(--text-muted)]">Critical</div>
-                <div className="mt-1 text-[16px] font-semibold text-rose-300">{criticalCount}</div>
+            <div className="grid grid-cols-3 gap-2 pb-2">
+              <div className="rounded-2xl border border-white/6 bg-white/[0.03] px-3 py-2">
+                <div className="text-[8px] font-mono uppercase tracking-[0.22em] text-[var(--text-muted)]">Críticos</div>
+                <div className="mt-0.5 text-[15px] font-semibold text-rose-300">{criticalCount}</div>
               </div>
-              <div className="rounded-2xl border border-white/6 bg-white/[0.03] px-3 py-2.5">
-                <div className="text-[8px] font-mono uppercase tracking-[0.22em] text-[var(--text-muted)]">News</div>
-                <div className="mt-1 text-[16px] font-semibold text-sky-300">{newsCount}</div>
+              <div className="rounded-2xl border border-white/6 bg-white/[0.03] px-3 py-2">
+                <div className="text-[8px] font-mono uppercase tracking-[0.22em] text-[var(--text-muted)]">Activos</div>
+                <div className="mt-0.5 text-[15px] font-semibold text-sky-300">{effective.alerts.length}</div>
               </div>
-              <div className="rounded-2xl border border-white/6 bg-white/[0.03] px-3 py-2.5">
-                <div className="text-[8px] font-mono uppercase tracking-[0.22em] text-[var(--text-muted)]">Geo-tagged</div>
-                <div className="mt-1 text-[16px] font-semibold text-emerald-300">{geolocatedCount}</div>
+              <div className="rounded-2xl border border-white/6 bg-white/[0.03] px-3 py-2">
+                <div className="text-[8px] font-mono uppercase tracking-[0.22em] text-[var(--text-muted)]">Con coords</div>
+                <div className="mt-0.5 text-[15px] font-semibold text-emerald-300">{geoCount}</div>
               </div>
             </div>
 
-            <div className="mb-2 text-[8px] font-mono uppercase tracking-[0.18em] text-[var(--text-muted)]">
-              Real-source incident desk · autorefresh 60s · news + seismic activity
+            <div className={`mb-2 text-[8px] font-mono uppercase tracking-[0.16em] ${degraded ? 'text-amber-300/90' : 'text-[var(--text-muted)]'}`}>
+              {statusLabelEs(effective.status)}
+              {' · '}
+              pulse + USGS + news
+              {effective.sources.some((s) => s.name === 'Weather' && s.status === 'ok') ? ' + weather' : ''}
+              {' · sin ruido comunitario'}
             </div>
 
-            <div className="mb-3 flex gap-1.5 overflow-x-auto">
-              {(['all', 'news', 'quakes'] as const).map((entry) => (
+            <div className="mb-2 flex gap-1.5 overflow-x-auto pb-0.5">
+              {SITUATIONAL_FILTER_CHIPS.map((chip) => (
                 <button
-                  key={entry}
-                  onClick={() => setFilter(entry)}
-                  className={`rounded-full border px-3 py-1.5 text-[9px] font-semibold uppercase tracking-[0.16em] transition-all ${filter === entry ? 'border-[var(--border-active)] bg-white/[0.06] text-[var(--text-primary)]' : 'border-white/0 text-[var(--text-muted)] hover:border-white/8 hover:bg-white/[0.03] hover:text-[var(--text-secondary)]'}`}
+                  key={chip.id}
+                  type="button"
+                  onClick={() => setFilter(chip.id)}
+                  className={`rounded-full border px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] transition-all whitespace-nowrap ${filter === chip.id ? 'border-[var(--border-active)] bg-white/[0.06] text-[var(--text-primary)]' : 'border-white/0 text-[var(--text-muted)] hover:border-white/8 hover:bg-white/[0.03] hover:text-[var(--text-secondary)]'}`}
                 >
-                  {entry}
+                  {chip.label}
                 </button>
               ))}
             </div>
 
-            <div className="flex-1 space-y-2 overflow-y-auto styled-scrollbar pb-4">
-              {filtered.map((alert, index) => {
-                const Icon = getIcon(alert.type);
-                const sevColor = RISK_COLORS[alert.severity] || '#EAB308';
-
-                return (
-                  <div
-                    key={`${alert.type}-${alert.title}-${index}`}
-                    onClick={() => {
-                      if (alert.lat !== undefined && alert.lng !== undefined) onLocate(alert.lat, alert.lng);
-                    }}
-                    className="rounded-2xl border border-white/6 bg-white/[0.03] px-3 py-3 transition-colors hover:bg-white/[0.05]"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="mt-0.5 h-9 w-1 rounded-full" style={{ backgroundColor: sevColor, boxShadow: `0 0 10px ${sevColor}55` }} />
-
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <Icon className="h-3.5 w-3.5 flex-shrink-0" style={{ color: sevColor }} />
-                          <span className="rounded-full border px-2 py-1 text-[8px] font-semibold uppercase tracking-[0.16em]" style={{ borderColor: `${sevColor}44`, color: sevColor }}>
-                            {alert.severity}
-                          </span>
-                          <span className="ml-auto text-[8px] font-mono uppercase tracking-[0.14em] text-[var(--text-muted)]">
-                            {alert.type}
-                          </span>
-                        </div>
-
-                        <div className="mt-2 text-[11px] font-semibold leading-snug text-[var(--text-primary)]">
-                          {alert.type === 'news' ? alert.description || alert.title : alert.title}
-                        </div>
-
-                        <div className="mt-2 flex flex-wrap items-center gap-2 text-[8px] font-mono uppercase tracking-[0.14em] text-[var(--text-secondary)]">
-                          <span>{alert.source}</span>
-                          {alert.time && (
-                            <span className="inline-flex items-center gap-1">
-                              <Clock className="h-3 w-3" />
-                              {getTimeLabel(alert.time)}
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="mt-3 flex items-center gap-2">
-                          {alert.lat !== undefined && (
-                            <span className="inline-flex items-center gap-1 rounded-full border border-white/10 px-2 py-1 text-[8px] font-semibold uppercase tracking-[0.16em] text-[var(--text-secondary)]">
-                              <MapPin className="h-3 w-3" />
-                              Map focus
-                            </span>
-                          )}
-                          {alert.url && (
-                            <>
-                              <a
-                                href={alert.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 rounded-full border border-white/10 px-2 py-1 text-[8px] font-semibold uppercase tracking-[0.16em] text-[var(--cyan-primary)] hover:underline"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <ExternalLink className="h-3 w-3" />
-                                Read source
-                              </a>
-                              {onWatchFeed && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onWatchFeed(alert.url!, alert.source || alert.title);
-                                  }}
-                                  className="inline-flex items-center gap-1 rounded-full border border-white/10 px-2 py-1 text-[8px] font-semibold uppercase tracking-[0.16em] text-emerald-300"
-                                >
-                                  Live feed
-                                </button>
-                              )}
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+            <div className="max-h-[min(52vh,420px)] flex-1 space-y-1.5 overflow-y-auto styled-scrollbar pb-3">
+              {filtered.map((alert) => (
+                <AlertRow
+                  key={alert.id}
+                  alert={alert}
+                  now={clock}
+                  onLocate={onLocate}
+                  onWatchFeed={onWatchFeed}
+                />
+              ))}
 
               {filtered.length === 0 && (
-                <div className="rounded-2xl border border-dashed border-white/10 px-3 py-6 text-center text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--text-muted)]">
-                  No items for this desk view
+                <div className="rounded-2xl border border-dashed border-white/10 px-3 py-6 text-center text-[10px] font-mono uppercase tracking-[0.18em] text-[var(--text-muted)]">
+                  {effective.status === 'unavailable'
+                    ? 'Fuentes no disponibles — sin eventos inventados'
+                    : effective.status === 'degraded'
+                      ? 'Sin eventos verificados en este filtro · fuentes degradadas'
+                      : 'Sin alertas en este filtro'}
                 </div>
               )}
             </div>
@@ -387,5 +345,95 @@ export default function LiveAlerts({ data, onLocate, onWatchFeed }: LiveAlertsPr
         )}
       </AnimatePresence>
     </motion.div>
+  );
+}
+
+function AlertRow({
+  alert,
+  now,
+  onLocate,
+  onWatchFeed,
+}: {
+  alert: SituationalAlert;
+  now: number;
+  onLocate: (lat: number, lng: number) => void;
+  onWatchFeed?: (url: string, name: string) => void;
+}) {
+  const sevColor = SEVERITY_COLORS[alert.severity];
+  const hasCoords = alert.lat !== undefined && alert.lng !== undefined;
+
+  return (
+    <div
+      className="rounded-xl border border-white/6 bg-white/[0.028] px-2.5 py-2 transition-colors hover:bg-white/[0.045]"
+    >
+      <div className="flex items-start gap-2.5">
+        <div
+          className="mt-0.5 h-8 w-0.5 shrink-0 rounded-full"
+          style={{ backgroundColor: sevColor, boxShadow: `0 0 8px ${sevColor}44` }}
+        />
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            <span style={{ color: sevColor }}>
+              <KindIcon kind={alert.kind} />
+            </span>
+            <span
+              className="rounded-full border px-1.5 py-0.5 text-[7px] font-semibold uppercase tracking-[0.14em]"
+              style={{ borderColor: `${sevColor}44`, color: sevColor }}
+            >
+              {severityLabelEs(alert.severity)}
+            </span>
+            <span className="text-[7px] font-mono uppercase tracking-[0.12em] text-[var(--text-muted)]">
+              {kindLabelEs(alert.kind)}
+            </span>
+          </div>
+
+          <div className="mt-1 text-[11px] font-semibold leading-snug text-[var(--text-primary)] line-clamp-2">
+            {alert.title}
+          </div>
+
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[8px] font-mono tracking-[0.04em] text-[var(--text-secondary)]">
+            <span className="uppercase tracking-[0.12em]">{alert.source}</span>
+            <span className="text-[var(--text-muted)]">·</span>
+            <span>{relativeTimeEs(alert.observedAt, now)}</span>
+          </div>
+
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            {hasCoords && (
+              <button
+                type="button"
+                onClick={() => onLocate(alert.lat!, alert.lng!)}
+                className="inline-flex items-center gap-1 rounded-full border border-white/10 px-2 py-0.5 text-[8px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)] hover:border-cyan-400/30 hover:text-cyan-200"
+              >
+                <MapPin className="h-3 w-3" />
+                Localizar
+              </button>
+            )}
+            {alert.url && (
+              <>
+                <a
+                  href={alert.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 rounded-full border border-white/10 px-2 py-0.5 text-[8px] font-semibold uppercase tracking-[0.14em] text-[var(--cyan-primary)] hover:underline"
+                >
+                  <ExternalLink className="h-3 w-3" />
+                  Fuente
+                </a>
+                {onWatchFeed && (
+                  <button
+                    type="button"
+                    onClick={() => onWatchFeed(alert.url!, alert.source || alert.title)}
+                    className="inline-flex items-center gap-1 rounded-full border border-white/10 px-2 py-0.5 text-[8px] font-semibold uppercase tracking-[0.14em] text-emerald-300"
+                  >
+                    Live
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
