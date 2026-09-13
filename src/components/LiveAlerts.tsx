@@ -193,11 +193,17 @@ export default function LiveAlerts({ data, onLocate, onWatchFeed }: LiveAlertsPr
   }, []);
 
   useEffect(() => {
-    void refresh();
+    // Defer initial fetch so eslint react-hooks/set-state-in-effect stays happy.
+    const boot = window.setTimeout(() => {
+      void refresh();
+    }, 0);
     const interval = window.setInterval(() => {
       void refresh();
     }, 45_000);
-    return () => window.clearInterval(interval);
+    return () => {
+      window.clearTimeout(boot);
+      window.clearInterval(interval);
+    };
   }, [refresh]);
 
   const effective = snapshot ?? buildFromProps();
