@@ -6,6 +6,11 @@ import { Activity, AlertTriangle, Database, RadioTower } from 'lucide-react';
 import { assessOperationalFusion, type OperationalPressure } from '@/lib/operational-fusion';
 import type { OperationalCase } from '@/lib/operational-cases';
 import OperationalCaseCard from '@/components/dashboard/OperationalCaseCard';
+import {
+  operationalFusionToDisplayItems,
+  provenanceChipLabel,
+  type FusionDisplayItem,
+} from '@/lib/ontology';
 
 type BackendStatus = 'connecting' | 'connected' | 'error';
 
@@ -36,6 +41,23 @@ function pressureColor(label: string) {
   return 'var(--alert-green)';
 }
 
+function ProvenanceChip({ item }: { item: FusionDisplayItem }) {
+  const label = item.available
+    ? provenanceChipLabel(item.claim?.provenance, true)
+    : item.unavailableLabel ?? provenanceChipLabel(undefined);
+  return (
+    <span
+      className={`rounded-full border px-2 py-0.5 text-[7px] font-mono uppercase tracking-[0.12em] ${
+        item.available
+          ? 'border-cyan-200/20 bg-cyan-200/5 text-cyan-100/80'
+          : 'border-white/10 bg-black/20 text-white/35'
+      }`}
+    >
+      {label}
+    </span>
+  );
+}
+
 function IncidentFusionStrip({
   backendStatus,
   trackedEntityCount,
@@ -57,6 +79,11 @@ function IncidentFusionStrip({
     earthquakeCount,
     gdeltCount,
   });
+  const evidenceItems = operationalFusionToDisplayItems(
+    assessment.evidence,
+    topOperationalCase?.signals ?? [],
+  );
+  const actionItem = operationalFusionToDisplayItems([assessment.action], [])[0];
   const label = pressureLabel(assessment.pressure);
   const color = pressureColor(label);
   const sourceMix = [
@@ -120,9 +147,27 @@ function IncidentFusionStrip({
             <span style={{ color }}>Confidence {assessment.confidence} · {assessment.corroboratingSources} sources</span>
           </div>
           <p className="mt-1 text-[9px] leading-relaxed text-[var(--text-secondary)]">{assessment.action}</p>
-          <p className="mt-1 truncate text-[7px] font-mono tracking-[0.08em] text-[var(--cyan-primary)]">
-            EVIDENCE · {assessment.evidence.join(' · ') || 'No active evidence'}
-          </p>
+          {actionItem && (
+            <div className="mt-1.5">
+              <ProvenanceChip item={actionItem} />
+            </div>
+          )}
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {evidenceItems.length > 0 ? (
+              evidenceItems.map((item) => (
+                <span key={item.id} className="inline-flex max-w-full items-center gap-1.5">
+                  <span className={`truncate text-[7px] font-mono tracking-[0.08em] ${item.available ? 'text-[var(--cyan-primary)]' : 'text-white/45'}`}>
+                    {item.text}
+                  </span>
+                  <ProvenanceChip item={item} />
+                </span>
+              ))
+            ) : (
+              <span className="text-[7px] font-mono tracking-[0.08em] text-white/35">
+                EVIDENCE · sin procedencia
+              </span>
+            )}
+          </div>
         </div>
         {topOperationalCase && (
           <div className="mt-2">

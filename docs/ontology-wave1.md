@@ -14,6 +14,7 @@ Implements the first slice of [#114](https://github.com/Blackleets/aegis/issues/
 
 - Force-graph link analysis UI — see [Wave 2](./ontology-wave2.md)
 - Durable saved investigations — see [Wave 3](./ontology-wave3.md)
+- Fusion / dossier provenance hardening — see [Wave 4](./ontology-wave4.md)
 - Supabase / new paid providers
 
 ## Demo
