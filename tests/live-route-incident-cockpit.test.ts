@@ -38,6 +38,8 @@ describe('live route incident cockpit model', () => {
       title: 'Accidente a 850 m',
       detail: 'A-5 · +6 min',
       severity: 'critical',
+      action: 'Reduce y estate listo para detenerte',
+      confidence: 'high',
     });
   });
 
