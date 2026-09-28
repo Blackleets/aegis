@@ -321,7 +321,7 @@ export default function RouteCockpitMobile({
             initial={{ opacity: 0, y: 12, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.98 }}
-            className="pointer-events-auto fixed bottom-[6.15rem] left-2.5 right-2.5 z-[365] mx-auto max-w-[34rem] overflow-hidden rounded-[1.35rem] border border-amber-200/18 bg-[rgba(13,18,24,0.96)] p-3 shadow-[0_18px_45px_rgba(0,0,0,0.42)] backdrop-blur-xl"
+            className="pointer-events-auto fixed bottom-[calc(9.4rem+env(safe-area-inset-bottom))] left-2.5 right-2.5 z-[365] mx-auto max-w-[34rem] overflow-hidden rounded-[1.35rem] border border-amber-200/18 bg-[rgba(13,18,24,0.96)] p-3 shadow-[0_18px_45px_rgba(0,0,0,0.42)] backdrop-blur-xl"
             aria-label="Reportar incidencia"
           >
             <div className="flex items-start justify-between gap-3">
@@ -487,73 +487,77 @@ export default function RouteCockpitMobile({
                   transition={{ type: 'spring', stiffness: 140, damping: 24 }}
                 />
               </div>
-              <div className="aegis-nav-trip flex items-center gap-2 px-3 py-3">
-                <div className="grid min-w-0 flex-1 grid-cols-3 gap-1 text-center">
-                  <div>
-                    <div className="text-[20px] font-bold leading-none tracking-[-0.03em] text-[color:var(--text-primary)] tabular-nums">{routeEtaLabel}</div>
-                    <div className="mt-1 text-[10px] font-medium text-[color:var(--text-muted)]">Llegada</div>
+              <div className="aegis-nav-trip px-3 pb-2.5 pt-2.5">
+                <dl className="aegis-nav-stats grid grid-cols-3 divide-x divide-white/8 text-center" aria-label="Resumen del trayecto">
+                  {[
+                    { key: 'eta', value: routeEtaLabel, label: 'Llegada' },
+                    { key: 'remaining', value: durationLabel, label: 'Restante' },
+                    { key: 'distance', value: distanceLabel, label: 'Distancia' },
+                  ].map((stat) => (
+                    <div key={stat.key} className="flex min-w-0 flex-col-reverse items-center px-1">
+                      <dt className="mt-1 max-w-full truncate text-[10px] font-medium leading-none text-[color:var(--text-muted)]">{stat.label}</dt>
+                      <dd className="aegis-nav-stat-value max-w-full truncate whitespace-nowrap font-bold leading-none tracking-[-0.02em] text-[color:var(--text-primary)] tabular-nums">{stat.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+                <div className="aegis-nav-actions mt-2.5 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReportFeedback(null);
+                      setReportComposerOpen((open) => !open);
+                    }}
+                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition-transform active:scale-95 ${reportComposerOpen ? 'border-amber-200/45 bg-amber-200/18 text-amber-100' : 'border-[color:var(--border-secondary)] bg-white/[0.04] text-amber-200'}`}
+                    aria-label="Reportar incidencia"
+                    aria-expanded={reportComposerOpen}
+                  >
+                    <TriangleAlert className="h-[18px] w-[18px]" strokeWidth={2.25} />
+                  </button>
+                  {navigationSimulationActive ? (
+                    <button
+                      type="button"
+                      onClick={onToggleSimulation}
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-violet-300/40 bg-violet-300/18 text-violet-100 transition-transform active:scale-95"
+                      aria-label="Detener simulación GPS"
+                    >
+                      <FlaskConical className="h-[18px] w-[18px]" />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={onResumeNavigationCamera}
+                      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition-transform active:scale-95 ${
+                        navigationCameraFollowing
+                          ? 'border-[color:var(--border-cyan)] bg-[color:var(--cyan-primary)]/15 text-[color:var(--cyan-primary)]'
+                          : 'border-amber-200/35 bg-amber-200/12 text-amber-100'
+                      }`}
+                      aria-label={navigationCameraFollowing ? 'Seguimiento GPS activo' : 'Volver a seguir mi posición'}
+                      aria-pressed={navigationCameraFollowing}
+                    >
+                      <Navigation2 className={`h-[18px] w-[18px] ${navigationCameraFollowing ? 'fill-cyan-200/20' : ''}`} strokeWidth={2.25} />
+                    </button>
+                  )}
                   </div>
-                  <div>
-                    <div className="text-[20px] font-bold leading-none tracking-[-0.03em] text-[color:var(--text-primary)] tabular-nums">{durationLabel}</div>
-                    <div className="mt-1 text-[10px] font-medium text-[color:var(--text-muted)]">Restante</div>
-                  </div>
-                  <div>
-                    <div className="text-[20px] font-bold leading-none tracking-[-0.03em] text-[color:var(--text-primary)] tabular-nums">{distanceLabel}</div>
-                    <div className="mt-1 text-[10px] font-medium text-[color:var(--text-muted)]">{modeMeta?.label ?? 'Ruta'}</div>
+                  <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleNavigationFollow}
+                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[color:var(--cyan-primary)] text-[color:var(--bg-void)] shadow-[0_8px_24px_rgba(118,228,234,0.28)] transition-transform active:scale-95"
+                    aria-label="Pausar navegación"
+                  >
+                    <Pause className="h-5 w-5 fill-current" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onClearNavigationState}
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[color:var(--border-secondary)] bg-white/[0.05] text-[color:var(--text-secondary)] transition-transform active:scale-95"
+                    aria-label="Finalizar navegación"
+                  >
+                    <X className="h-5 w-5" strokeWidth={2.3} />
+                  </button>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setReportFeedback(null);
-                    setReportComposerOpen((open) => !open);
-                  }}
-                  className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition-transform active:scale-95 ${reportComposerOpen ? 'border-amber-200/45 bg-amber-200/18 text-amber-100' : 'border-[color:var(--border-secondary)] bg-white/[0.04] text-amber-200'}`}
-                  aria-label="Reportar incidencia"
-                  aria-expanded={reportComposerOpen}
-                >
-                  <TriangleAlert className="h-[18px] w-[18px]" strokeWidth={2.25} />
-                </button>
-                {navigationSimulationActive ? (
-                  <button
-                    type="button"
-                    onClick={onToggleSimulation}
-                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-violet-300/40 bg-violet-300/18 text-violet-100 transition-transform active:scale-95"
-                    aria-label="Detener simulación GPS"
-                  >
-                    <FlaskConical className="h-[18px] w-[18px]" />
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={onResumeNavigationCamera}
-                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition-transform active:scale-95 ${
-                      navigationCameraFollowing
-                        ? 'border-[color:var(--border-cyan)] bg-[color:var(--cyan-primary)]/15 text-[color:var(--cyan-primary)]'
-                        : 'border-amber-200/35 bg-amber-200/12 text-amber-100'
-                    }`}
-                    aria-label={navigationCameraFollowing ? 'Seguimiento GPS activo' : 'Volver a seguir mi posición'}
-                    aria-pressed={navigationCameraFollowing}
-                  >
-                    <Navigation2 className={`h-[18px] w-[18px] ${navigationCameraFollowing ? 'fill-cyan-200/20' : ''}`} strokeWidth={2.25} />
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={handleNavigationFollow}
-                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[color:var(--cyan-primary)] text-[color:var(--bg-void)] shadow-[0_8px_24px_rgba(118,228,234,0.28)] transition-transform active:scale-95"
-                  aria-label="Pausar navegación"
-                >
-                  <Pause className="h-5 w-5 fill-current" />
-                </button>
-                <button
-                  type="button"
-                  onClick={onClearNavigationState}
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[color:var(--border-secondary)] bg-white/[0.05] text-[color:var(--text-secondary)] transition-transform active:scale-95"
-                  aria-label="Finalizar navegación"
-                >
-                  <X className="h-5 w-5" strokeWidth={2.3} />
-                </button>
               </div>
             </>
           ) : (

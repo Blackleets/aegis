@@ -17,6 +17,8 @@ import GlobalStatusBar from '@/components/GlobalStatusBar';
 import LiveAlerts from '@/components/LiveAlerts';
 import WorldPulsePanel from '@/components/dashboard/WorldPulsePanel';
 import { useWorldPulseMapPins } from '@/hooks/useWorldPulseMapPins';
+import { useWorldPulseFeed } from '@/hooks/useWorldPulseFeed';
+import { countWorldPulseAlerts } from '@/lib/world-pulse-client';
 import AiAnalyst from '@/components/AiAnalyst';
 import SolarSystemMode, { type CelestialBodyId } from '@/components/SolarSystemMode';
 import ModeDock from '@/components/dashboard/ModeDock';
@@ -519,12 +521,15 @@ export default function Dashboard() {
   const [backendStatus, setBackendStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
   const [mapView, setMapView] = useState<MapView>({ zoom: 2.5, latitude: 20 });
   const [flyToLocation, setFlyToLocation] = useState<FlyToLocation | null>(null);
+  const worldPulseFeed = useWorldPulseFeed();
   const {
     worldPulsePins,
     mapPinsEnabled: worldPulsePinsEnabled,
     onMapPinsEnabledChange: setWorldPulsePinsEnabled,
-    onMapPinSourceChange: handleWorldPulsePinSourceChange,
-  } = useWorldPulseMapPins();
+    kindFilter: worldPulseKindFilter,
+    onKindFilterChange: setWorldPulseKindFilter,
+  } = useWorldPulseMapPins(worldPulseFeed.payload?.events);
+  const worldPulseAlertCount = countWorldPulseAlerts(worldPulseFeed.payload);
   const [routeSnapshot, setRouteSnapshot] = useState<RouteSnapshot | null>(null);
   const [userLocation, setUserLocation] = useState<Coordinate | null>(null);
   const [routeLoading, setRouteLoading] = useState(false);
@@ -2573,7 +2578,9 @@ export default function Dashboard() {
               onLocate={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })}
               mapPinsEnabled={worldPulsePinsEnabled}
               onMapPinsEnabledChange={setWorldPulsePinsEnabled}
-              onMapPinSourceChange={handleWorldPulsePinSourceChange}
+              feed={worldPulseFeed}
+              kindFilter={worldPulseKindFilter}
+              onKindFilterChange={setWorldPulseKindFilter}
             />
             <LiveAlerts
               data={dataWithSdk}
@@ -2678,6 +2685,7 @@ export default function Dashboard() {
             onToggleAmbientMotion={() => setAmbientMotionEnabled((enabled) => !enabled)}
             onlineCount={onlineCount}
             presenceStatus={presenceStatus}
+            alertBadgeCount={worldPulseAlertCount}
             headerSummary={(
               <MobileDrawerHeaderSummary
                 commandPanelLabel={copy.status.mobileCommandPanel}
@@ -2734,7 +2742,9 @@ export default function Dashboard() {
                     onLocate={(lat, lng) => { setFlyToLocation({ lat, lng, ts: Date.now() }); setMobilePanel(null); }}
                     mapPinsEnabled={worldPulsePinsEnabled}
                     onMapPinsEnabledChange={setWorldPulsePinsEnabled}
-                    onMapPinSourceChange={handleWorldPulsePinSourceChange}
+                    feed={worldPulseFeed}
+                    kindFilter={worldPulseKindFilter}
+                    onKindFilterChange={setWorldPulseKindFilter}
                   />
                   <LiveAlerts
                     data={dataWithSdk}

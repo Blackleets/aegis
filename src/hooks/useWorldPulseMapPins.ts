@@ -1,32 +1,41 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
+import { selectWorldPulseMapPins } from '@/lib/world-pulse-map-pins';
 import {
-  selectWorldPulseMapPins,
-  type WorldPulseMapPinInput,
-} from '@/lib/world-pulse-map-pins';
+  filterWorldPulseEventsByKind,
+  type WorldPulseClientEvent,
+  type WorldPulseKindFilter,
+} from '@/lib/world-pulse-client';
 
 /**
- * Dashboard-owned World Pulse pin state so mercator pins survive mobile drawer unmount.
- * Panel only reports filtered pin inputs + toggle; selection stays here (fail-closed).
+ * Dashboard-owned World Pulse pin state, derived from the shared feed so pins render on the
+ * idle map without opening any panel. The panel only drives the toggle + kind filter (fail-closed).
  */
-export function useWorldPulseMapPins() {
-  const [pinSource, setPinSource] = useState<WorldPulseMapPinInput[]>([]);
+export function useWorldPulseMapPins(events: WorldPulseClientEvent[] | null | undefined) {
   const [pinsEnabled, setPinsEnabled] = useState(true);
+  const [kindFilter, setKindFilter] = useState<WorldPulseKindFilter>('all');
 
   const worldPulsePins = useMemo(
-    () => selectWorldPulseMapPins(pinSource, { enabled: pinsEnabled }),
-    [pinSource, pinsEnabled],
+    () => selectWorldPulseMapPins(
+      filterWorldPulseEventsByKind(events, kindFilter).map((event) => ({
+        id: event.id,
+        lat: event.lat,
+        lng: event.lng,
+        severity: event.severity,
+        title: event.title,
+        kind: event.kind,
+      })),
+      { enabled: pinsEnabled },
+    ),
+    [events, kindFilter, pinsEnabled],
   );
-
-  const onMapPinSourceChange = useCallback((inputs: WorldPulseMapPinInput[]) => {
-    setPinSource(Array.isArray(inputs) ? inputs : []);
-  }, []);
 
   return {
     worldPulsePins,
     mapPinsEnabled: pinsEnabled,
     onMapPinsEnabledChange: setPinsEnabled,
-    onMapPinSourceChange,
+    kindFilter,
+    onKindFilterChange: setKindFilter,
   } as const;
 }
