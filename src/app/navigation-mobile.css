@@ -9,20 +9,24 @@
   stroke-width: 2.4;
 }
 
+/* Trip stats: value above label, fixed 3-col grid, never collides (360px+). */
+.aegis-nav-stat-value {
+  font-size: clamp(15px, 4.9vw, 20px);
+  font-variant-numeric: tabular-nums;
+}
+
 @media (max-width: 640px) {
   .aegis-nav-maneuver {
     min-height: 4.75rem;
   }
 
-  .aegis-nav-trip {
-    gap: 0.4rem;
-  }
 
   /* Keep speed out of the crowded bottom bar — floating chip only when useful */
   .aegis-nav-speed-chip {
     position: fixed;
     left: 0.75rem;
-    bottom: calc(7.25rem + env(safe-area-inset-bottom));
+    /* Sits above the two-row trip sheet (stats + actions). */
+    bottom: calc(9.75rem + env(safe-area-inset-bottom));
     z-index: 361;
     display: flex;
     min-width: 3.5rem;

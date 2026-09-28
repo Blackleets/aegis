@@ -34,7 +34,13 @@ type MobileCommandDrawerProps = {
   onToggleAmbientMotion: () => void;
   onlineCount: number | null;
   presenceStatus: 'connecting' | 'live' | 'unavailable';
+  /** Live World Pulse critical-alert count. Null hides the badge — never a guessed number. */
+  alertBadgeCount?: number | null;
 };
+
+function formatBadgeCount(count: number) {
+  return count > 99 ? '99+' : String(count);
+}
 
 export default function MobileCommandDrawer({
   mobileNavTabs,
@@ -56,7 +62,12 @@ export default function MobileCommandDrawer({
   onToggleAmbientMotion,
   onlineCount,
   presenceStatus,
+  alertBadgeCount = null,
 }: MobileCommandDrawerProps) {
+  const showAlertBadge = typeof alertBadgeCount === 'number' && alertBadgeCount > 0;
+  const alertBadgeDescription = showAlertBadge
+    ? `${alertBadgeCount} ${alertBadgeCount === 1 ? 'alerta crítica' : 'alertas críticas'} en vivo (World Pulse)`
+    : undefined;
   const [menuOpen, setMenuOpen] = useState(false);
   const activeTab = mobileNavTabs.find((tab) => tab.id === mobilePanel) ?? null;
   const isSearchPanel = mobilePanel === 'search';
@@ -94,13 +105,26 @@ export default function MobileCommandDrawer({
             <button
               type="button"
               onClick={() => setMenuOpen((open) => !open)}
-              className={`grid h-11 w-11 place-items-center rounded-[15px] border shadow-[0_12px_32px_rgba(0,0,0,0.38)] backdrop-blur-xl transition-all ${menuOpen ? 'border-cyan-200/40 bg-cyan-300 text-[#031019]' : 'border-white/15 bg-[rgba(5,15,25,0.91)] text-white'}`}
+              className={`relative grid h-11 w-11 place-items-center rounded-[15px] border shadow-[0_12px_32px_rgba(0,0,0,0.38)] backdrop-blur-xl transition-all ${menuOpen ? 'border-cyan-200/40 bg-cyan-300 text-[#031019]' : 'border-white/15 bg-[rgba(5,15,25,0.91)] text-white'}`}
               aria-label={menuOpen ? 'Cerrar menú AEGIS' : 'Abrir menú AEGIS'}
               aria-expanded={menuOpen}
               aria-controls="aegis-mobile-command-menu"
+              aria-describedby={showAlertBadge ? 'aegis-mobile-alert-badge' : undefined}
             >
               {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+              {showAlertBadge && !menuOpen && (
+                <span
+                  className="pointer-events-none absolute -right-1.5 -top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full border border-[rgba(5,15,25,0.95)] bg-rose-400 px-1 text-[9px] font-bold leading-none text-[#1a0508] tabular-nums shadow-[0_2px_8px_rgba(0,0,0,0.35)]"
+                  aria-hidden="true"
+                  data-testid="mobile-alert-badge"
+                >
+                  {formatBadgeCount(alertBadgeCount)}
+                </span>
+              )}
             </button>
+            {showAlertBadge && (
+              <span id="aegis-mobile-alert-badge" className="sr-only">{alertBadgeDescription}</span>
+            )}
 
             <AnimatePresence>
               {menuOpen && (
@@ -134,6 +158,11 @@ export default function MobileCommandDrawer({
                           <tab.icon className={`h-4 w-4 ${tab.accent ? 'text-cyan-300' : 'text-white/70'}`} />
                         </span>
                         <span className="text-[9px] font-mono uppercase tracking-[0.13em] text-white/85">{tab.label}</span>
+                        {tab.id === 'alerts' && showAlertBadge && (
+                          <span className="ml-auto rounded-full bg-rose-400/15 px-1.5 py-0.5 text-[9px] font-semibold leading-none text-rose-200 tabular-nums" aria-label={alertBadgeDescription}>
+                            {formatBadgeCount(alertBadgeCount)}
+                          </span>
+                        )}
                       </button>
                     ))}
                   </div>

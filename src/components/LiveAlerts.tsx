@@ -39,6 +39,7 @@ import {
   type RouteCorridorAlert,
 } from '@/lib/route-corridor-alerts';
 import type { RouteAlertPreferences } from '@/lib/route-alert-preferences';
+import { loadWorldPulse, type WorldPulseLoadResult } from '@/lib/world-pulse-client';
 import type { Coordinate } from '@/lib/routing-shell';
 
 interface NewsItem {
@@ -150,12 +151,18 @@ export default function LiveAlerts({
   const refresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      const settled = await Promise.allSettled([
-        fetch('/api/world-pulse', { cache: 'no-store' }),
-        fetch('/api/news', { cache: 'no-store' }),
-        fetch('/api/earthquakes', { cache: 'no-store' }),
-        fetch('/api/weather', { cache: 'no-store' }),
-      ]);
+      // World Pulse goes through the shared client (deduped with the map pins / panel feed).
+      const [pulseResult, ...settled] = await Promise.all([
+        loadWorldPulse(),
+        ...[
+          fetch('/api/news', { cache: 'no-store' }),
+          fetch('/api/earthquakes', { cache: 'no-store' }),
+          fetch('/api/weather', { cache: 'no-store' }),
+        ].map((request) => request.then(
+          (value): PromiseSettledResult<Response> => ({ status: 'fulfilled', value }),
+          (reason): PromiseSettledResult<Response> => ({ status: 'rejected', reason }),
+        )),
+      ]) as [WorldPulseLoadResult, ...PromiseSettledResult<Response>[]];
 
       const readJson = async (result: PromiseSettledResult<Response>) => {
         if (result.status !== 'fulfilled' || !result.value.ok) return null;
@@ -166,17 +173,17 @@ export default function LiveAlerts({
         }
       };
 
-      const [pulseJson, newsJson, quakeJson, weatherJson] = await Promise.all([
+      const [newsJson, quakeJson, weatherJson] = await Promise.all([
         readJson(settled[0]),
         readJson(settled[1]),
         readJson(settled[2]),
-        readJson(settled[3]),
       ]);
 
-      const pulseOk = settled[0].status === 'fulfilled' && settled[0].value.ok;
-      const newsOk = settled[1].status === 'fulfilled' && settled[1].value.ok;
-      const quakeOk = settled[2].status === 'fulfilled' && settled[2].value.ok;
-      const weatherOk = settled[3].status === 'fulfilled' && settled[3].value.ok;
+      const pulseOk = pulseResult.ok && pulseResult.httpOk;
+      const pulseJson = pulseOk ? pulseResult.payload : null;
+      const newsOk = settled[0].status === 'fulfilled' && settled[0].value.ok;
+      const quakeOk = settled[1].status === 'fulfilled' && settled[1].value.ok;
+      const weatherOk = settled[2].status === 'fulfilled' && settled[2].value.ok;
 
       const pulseEvents = Array.isArray(pulseJson?.events) ? pulseJson.events : [];
       const newsItems = Array.isArray(newsJson?.news)

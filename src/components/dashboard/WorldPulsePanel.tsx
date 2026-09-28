@@ -1,33 +1,17 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { ExternalLink, MapPin, RadioTower, RefreshCw } from 'lucide-react';
+import { selectWorldPulseMapPins } from '@/lib/world-pulse-map-pins';
 import {
-  selectWorldPulseMapPins,
-  type WorldPulseMapPinInput,
-} from '@/lib/world-pulse-map-pins';
+  filterWorldPulseEventsByKind,
+  WORLD_PULSE_KIND_FILTERS,
+  type WorldPulseClientSeverity,
+  type WorldPulseKindFilter,
+} from '@/lib/world-pulse-client';
+import type { WorldPulseFeedState } from '@/hooks/useWorldPulseFeed';
 
-type PulseSeverity = 'info' | 'watch' | 'elevated' | 'critical';
-
-type PulseEvent = {
-  id: string;
-  kind: string;
-  title: string;
-  detail: string;
-  severity: PulseSeverity;
-  lat: number;
-  lng: number;
-  observed_at: string;
-  source: string;
-  source_url: string | null;
-};
-
-type PulsePayload = {
-  status: 'ok' | 'degraded' | 'unavailable';
-  fetched_at?: string;
-  sources?: Array<{ name: string; status: string; count: number }>;
-  events?: PulseEvent[];
-};
+type PulseSeverity = WorldPulseClientSeverity;
 
 const SEVERITY_CLASS: Record<PulseSeverity, string> = {
   critical: 'border-rose-300/25 bg-rose-300/[0.07] text-rose-50',
@@ -46,7 +30,7 @@ const KIND_LABEL: Record<string, string> = {
   other: 'Otro',
 };
 
-const KIND_FILTERS = ['all', 'earthquake', 'storm', 'wildfire', 'volcano', 'flood'] as const;
+const KIND_FILTERS = WORLD_PULSE_KIND_FILTERS;
 
 function relativeTime(iso: string) {
   const ms = Date.parse(iso);
@@ -59,112 +43,32 @@ function relativeTime(iso: string) {
   return `hace ${Math.round(hours / 24)} d`;
 }
 
-function toPinInputs(events: PulseEvent[]): WorldPulseMapPinInput[] {
-  return events.map((event) => ({
-    id: event.id,
-    lat: event.lat,
-    lng: event.lng,
-    severity: event.severity,
-    title: event.title,
-    kind: event.kind,
-  }));
-}
-
-function filterEventsByKind(events: PulseEvent[], kind: (typeof KIND_FILTERS)[number]) {
-  if (kind === 'all') return events;
-  return events.filter((event) => event.kind === kind);
-}
-
 export default function WorldPulsePanel({
   onLocate,
+  feed,
+  kindFilter,
+  onKindFilterChange,
   autoTourCritical = false,
   mapPinsEnabled = true,
   onMapPinsEnabledChange,
-  onMapPinSourceChange,
 }: {
   onLocate: (lat: number, lng: number) => void;
+  /** Shared dashboard feed (useWorldPulseFeed) — the panel never fetches on its own. */
+  feed: WorldPulseFeedState & { refresh: (options?: { force?: boolean; showSpinner?: boolean }) => Promise<void> };
+  /** Kind filter owned by the dashboard so map pins follow it even when the panel is closed. */
+  kindFilter: WorldPulseKindFilter;
+  onKindFilterChange: (kind: WorldPulseKindFilter) => void;
   /** When true, slowly cycles critical events via fly-to only — never mutates map layers. */
   autoTourCritical?: boolean;
   /** Controlled Pins toggle — owned by dashboard so mobile drawer unmount keeps mercator pins. */
   mapPinsEnabled?: boolean;
   onMapPinsEnabledChange?: (enabled: boolean) => void;
-  /** Filtered pin inputs for page-level selectWorldPulseMapPins (mercator only). */
-  onMapPinSourceChange?: (inputs: WorldPulseMapPinInput[]) => void;
 }) {
-  const [payload, setPayload] = useState<PulsePayload | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [kindFilter, setKindFilter] = useState<(typeof KIND_FILTERS)[number]>('all');
-  const kindFilterRef = useRef(kindFilter);
-
-  useEffect(() => {
-    kindFilterRef.current = kindFilter;
-  }, [kindFilter]);
-
-  const publishPinSource = useCallback((events: PulseEvent[], kind: (typeof KIND_FILTERS)[number]) => {
-    onMapPinSourceChange?.(toPinInputs(filterEventsByKind(events, kind)));
-  }, [onMapPinSourceChange]);
-
-  const refresh = useCallback(async (options?: { showSpinner?: boolean }) => {
-    const showSpinner = options?.showSpinner === true;
-    if (showSpinner) setLoading(true);
-    setError(null);
-    try {
-      const response = await fetch('/api/world-pulse', { cache: 'no-store' });
-      const json = await response.json() as PulsePayload;
-      if (!response.ok && json.status === 'unavailable') {
-        setPayload(json);
-        setError('Fuentes globales no disponibles ahora');
-      } else {
-        setPayload(json);
-      }
-      publishPinSource(json.events ?? [], kindFilterRef.current);
-    } catch {
-      setError('No se pudo cargar World Pulse');
-      setPayload(null);
-      // Fail-closed: keep last published pins on transient fetch errors (do not clear).
-    } finally {
-      setLoading(false);
-    }
-  }, [publishPinSource]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const boot = async () => {
-      try {
-        const response = await fetch('/api/world-pulse', { cache: 'no-store' });
-        const json = await response.json() as PulsePayload;
-        if (cancelled) return;
-        if (!response.ok && json.status === 'unavailable') {
-          setPayload(json);
-          setError('Fuentes globales no disponibles ahora');
-        } else {
-          setPayload(json);
-        }
-        publishPinSource(json.events ?? [], kindFilterRef.current);
-      } catch {
-        if (!cancelled) {
-          setError('No se pudo cargar World Pulse');
-          setPayload(null);
-          // Fail-closed: do not clear durable page pin source on boot error.
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    void boot();
-    const timer = window.setInterval(() => {
-      void refresh({ showSpinner: false });
-    }, 180_000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
-  }, [refresh, publishPinSource]);
+  const { payload, loading, error, refresh } = feed;
 
   const events = useMemo(() => {
     const all = payload?.events ?? [];
-    return filterEventsByKind(all, kindFilter);
+    return filterWorldPulseEventsByKind(all, kindFilter);
   }, [kindFilter, payload?.events]);
 
   const criticalEvents = useMemo(
@@ -239,7 +143,7 @@ export default function WorldPulsePanel({
           </button>
           <button
             type="button"
-            onClick={() => void refresh({ showSpinner: true })}
+            onClick={() => void refresh({ force: true, showSpinner: true })}
             className="flex min-h-9 min-w-9 items-center justify-center rounded-lg border border-white/10 bg-black/20 text-white/70"
             aria-label="Actualizar World Pulse"
           >
@@ -256,10 +160,7 @@ export default function WorldPulsePanel({
             <button
               key={kind}
               type="button"
-              onClick={() => {
-                setKindFilter(kind);
-                publishPinSource(payload?.events ?? [], kind);
-              }}
+              onClick={() => onKindFilterChange(kind)}
               className={`shrink-0 rounded-full border px-2.5 py-1 text-[8px] font-semibold uppercase tracking-[0.08em] ${
                 active
                   ? 'border-cyan-300/35 bg-cyan-300/15 text-cyan-100'

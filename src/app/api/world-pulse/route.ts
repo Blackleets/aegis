@@ -106,6 +106,7 @@ export async function GET() {
       name?: string;
       alertlevel?: string;
       fromdate?: string;
+      todate?: string;
       description?: string;
       url?: { report?: string } | string;
     };
@@ -229,6 +230,7 @@ export async function GET() {
         lat,
         lng,
         fromDate: props.fromdate || null,
+        toDate: props.todate || null,
         description: props.description || null,
         url,
       });
