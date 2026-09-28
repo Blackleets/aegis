@@ -81,7 +81,16 @@ export function formatCoordinateLabel(coordinate: Coordinate) {
 }
 
 export function formatStepDistance(distanceMeters: number) {
-  return distanceMeters >= 1000 ? `${(distanceMeters / 1000).toFixed(1)} km` : `${Math.max(1, Math.round(distanceMeters))} m`;
+  if (!Number.isFinite(distanceMeters) || distanceMeters < 0) return '—';
+  if (distanceMeters >= 1000) {
+    const km = distanceMeters / 1000;
+    return `${km >= 10 ? Math.round(km) : km.toFixed(1)} km`;
+  }
+  // Glanceable like Organic Maps / Google: avoid noisy "1 m"
+  if (distanceMeters < 12) return 'Ahora';
+  if (distanceMeters < 50) return `${Math.round(distanceMeters / 5) * 5} m`;
+  if (distanceMeters < 200) return `${Math.round(distanceMeters / 10) * 10} m`;
+  return `${Math.round(distanceMeters / 25) * 25} m`;
 }
 
 export function localizeRouteInstruction(instruction: string) {
